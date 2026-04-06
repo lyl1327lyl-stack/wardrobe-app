@@ -426,17 +426,23 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
       onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
       onPanResponderGrant: () => {
         didDragToCanvas.current = false;
+        // Lock current visual position as offset, reset value to 0
+        // so subsequent deltas from Animated.event move the item from its current spot
+        gestureX.setOffset((gestureX as any)._value);
+        gestureY.setOffset((gestureY as any)._value);
         gestureX.setValue(0);
         gestureY.setValue(0);
         scaleVal.setValue(1);
         opacityVal.setValue(1);
       },
       onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
-      onPanResponderRelease: (_: any, gestureState: any) => {
+      onPanResponderRelease: () => {
         if (didDragToCanvas.current) return;
-        if (gestureState.moveY < stripTopY.current - 20) {
+        // gestureY._value is the accumulated delta from touch-start
+        const finalY = (gestureY as any)._value;
+        const absScreenY = (gestureY as any)._offset + finalY;
+        if (absScreenY < stripTopY.current - 20) {
           didDragToCanvas.current = true;
-          // Fade + shrink, then add to canvas (native driver conflicts with gesture on Android)
           Animated.parallel([
             Animated.timing(opacityVal, { toValue: 0, duration: 150, useNativeDriver: false }),
             Animated.timing(scaleVal, { toValue: 0.3, duration: 150, useNativeDriver: false }),
@@ -444,7 +450,6 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
             if (finished) onDragToCanvas();
           });
         } else {
-          // Spring back
           Animated.parallel([
             Animated.spring(gestureX, { toValue: 0, useNativeDriver: false, friction: 6, tension: 40 }),
             Animated.spring(gestureY, { toValue: 0, useNativeDriver: false, friction: 6, tension: 40 }),
