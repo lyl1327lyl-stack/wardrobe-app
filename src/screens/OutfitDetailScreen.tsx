@@ -416,9 +416,12 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
   const didDragToCanvas = useRef(false);
   const scaleVal = useRef(new Animated.Value(1)).current;
   const opacityVal = useRef(new Animated.Value(1)).current;
-  // Shared animated values for gesture
+  // Gesture animated values
   const gestureX = useRef(new Animated.Value(0)).current;
   const gestureY = useRef(new Animated.Value(0)).current;
+  // Ref to track locked position (avoids flattenOffset timing issues)
+  const lockedX = useRef(0);
+  const lockedY = useRef(0);
 
   const panResponder = useRef(
     require('react-native').PanResponder.create({
@@ -426,10 +429,11 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
       onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
       onPanResponderGrant: () => {
         didDragToCanvas.current = false;
-        // Lock current visual position as offset, reset value to 0
-        // so subsequent deltas from Animated.event move the item from its current spot
-        gestureX.setOffset((gestureX as any)._value);
-        gestureY.setOffset((gestureY as any)._value);
+        // Sync locked position to current gesture value
+        lockedX.current = (gestureX as any)._offset + (gestureX as any)._value;
+        lockedY.current = (gestureY as any)._offset + (gestureY as any)._value;
+        gestureX.setOffset(lockedX.current);
+        gestureY.setOffset(lockedY.current);
         gestureX.setValue(0);
         gestureY.setValue(0);
         scaleVal.setValue(1);
@@ -438,10 +442,16 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
       onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
       onPanResponderRelease: (_: any, gestureState: any) => {
         if (didDragToCanvas.current) return;
-        // Lock item at current position - flattenOffset merges offset into value
-        // so item stays exactly where released, no spring conflict
-        gestureX.flattenOffset();
-        gestureY.flattenOffset();
+        // Read current absolute position
+        const absX = (gestureX as any)._offset + (gestureX as any)._value;
+        const absY = (gestureY as any)._offset + (gestureY as any)._value;
+        lockedX.current = absX;
+        lockedY.current = absY;
+        // Lock item at exact release position via setValue (no flattenOffset = no conflict)
+        gestureX.setOffset(0);
+        gestureY.setOffset(0);
+        gestureX.setValue(absX);
+        gestureY.setValue(absY);
         if (gestureState.moveY < stripTopY.current - 20) {
           didDragToCanvas.current = true;
           Animated.parallel([
