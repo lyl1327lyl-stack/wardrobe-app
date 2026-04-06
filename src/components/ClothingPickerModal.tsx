@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    height: 520,
+    height: 640,
   },
   header: {
     flexDirection: 'row',
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   clothingCard: {
     flex: 1,
-    aspectRatio: 1,
+    aspectRatio: 0.75,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: theme.colors.borderLight,

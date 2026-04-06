@@ -86,9 +86,6 @@ export function OutfitDetailScreen() {
     .map(id => clothing.find(cl => cl.id === id))
     .filter(Boolean) as ClothingItem[];
 
-  // 待选衣物（未加入搭配的）
-  const availableClothing = clothing.filter(c => !localItemIds.includes(c.id));
-
   // 已加入搭配但未放到画板的衣物（staged）
   const stagedItems: ClothingItem[] = localItemIds
     .filter(id => !canvasItemIds.includes(id))
@@ -346,36 +343,31 @@ interface CanvasItemProps {
 
 function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange, onRemove }: CanvasItemProps) {
   const pan = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
-  const currentPosition = useRef({ x: position.x, y: position.y });
+  const startPos = useRef({ x: position.x, y: position.y });
 
   useEffect(() => {
     pan.setValue({ x: position.x, y: position.y });
-    currentPosition.current = { x: position.x, y: position.y };
+    startPos.current = { x: position.x, y: position.y };
   }, [position.x, position.y]);
 
   const panResponder = useRef(
-    Animated.event(
-      [null, { dx: pan.x, dy: pan.y }],
-      {
-        useNativeDriver: false,
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
-          onSelect();
-          pan.setOffset({
-            x: currentPosition.current.x,
-            y: currentPosition.current.y,
-          });
-          pan.setValue({ x: 0, y: 0 });
-        },
-        onPanResponderRelease: () => {
-          pan.flattenOffset();
-          currentPosition.current.x = (pan.x as any)._value;
-          currentPosition.current.y = (pan.y as any)._value;
-          onPositionChange(currentPosition.current.x, currentPosition.current.y, 1);
-        },
-      }
-    )
+    require('react-native').PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        onSelect();
+        startPos.current = { x: (pan.x as any)._value || position.x, y: (pan.y as any)._value || position.y };
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_: any, gestureState: any) => {
+        const newX = startPos.current.x + gestureState.dx;
+        const newY = startPos.current.y + gestureState.dy;
+        pan.setValue({ x: newX, y: newY });
+        startPos.current = { x: newX, y: newY };
+        onPositionChange(newX, newY, 1);
+      },
+    })
   ).current;
 
   return (
@@ -388,9 +380,11 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
     >
       <Image source={{ uri: clothing.thumbnailUri }} style={styles.canvasImage} />
       {isSelected && (
-        <TouchableOpacity style={styles.removeBtn} onPress={onRemove}>
-          <Ionicons name="close" size={14} color="#fff" />
-        </TouchableOpacity>
+        <View style={styles.removeBtn}>
+          <TouchableOpacity style={styles.removeBtnInner} onPress={onRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={14} color="#fff" />
+          </TouchableOpacity>
+        </View>
       )}
     </Animated.View>
   );
@@ -408,14 +402,14 @@ function DraggableStagedItem({ item, onDragToCanvas, onPress }: DraggableStagedI
   const stripRefY = useRef(0);
 
   const panResponder = useRef(
-    Animated.event([null, { dy: pan.y }], {
-      useNativeDriver: false,
+    require('react-native').PanResponder.create({
       onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_, gestureState) => Math.abs(gestureState.dy) > 12,
+      onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 12,
       onPanResponderGrant: () => {
         pan.setValue({ x: 0, y: 0 });
       },
-      onPanResponderRelease: (_, gestureState) => {
+      onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: (_: any, gestureState: any) => {
         // 向上拖动超过 strip 顶部
         if (gestureState.moveY < stripRefY.current - 20) {
           onDragToCanvas();
@@ -539,6 +533,12 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     backgroundColor: theme.colors.danger,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  removeBtnInner: {
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
