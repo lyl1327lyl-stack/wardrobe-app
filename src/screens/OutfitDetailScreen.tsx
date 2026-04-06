@@ -343,8 +343,11 @@ interface CanvasItemProps {
 
 function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange, onRemove }: CanvasItemProps) {
   const pan = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
+  // Track absolute position in a ref to avoid reading private _value
+  const absPos = useRef({ x: position.x, y: position.y });
 
   useEffect(() => {
+    absPos.current = { x: position.x, y: position.y };
     pan.setValue({ x: position.x, y: position.y });
     pan.flattenOffset();
   }, [position.x, position.y]);
@@ -355,7 +358,9 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         onSelect();
-        pan.flattenOffset();
+        // Set offset to current absolute position, then reset value to 0
+        // so subsequent deltas are relative to the touch-start point
+        pan.setOffset(absPos.current);
         pan.setValue({ x: 0, y: 0 });
       },
       onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
@@ -365,6 +370,7 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
         const rawY = (pan.y as any)._value;
         const newX = Math.max(0, Math.min(rawX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
         const newY = Math.max(0, Math.min(rawY, CANVAS_HEIGHT - CANVAS_ITEM_SIZE));
+        absPos.current = { x: newX, y: newY };
         pan.setValue({ x: newX, y: newY });
         onPositionChange(newX, newY, 1);
       },
