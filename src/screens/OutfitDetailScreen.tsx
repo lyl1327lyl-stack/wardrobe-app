@@ -343,11 +343,10 @@ interface CanvasItemProps {
 
 function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange, onRemove }: CanvasItemProps) {
   const pan = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
-  const startPos = useRef({ x: position.x, y: position.y });
 
   useEffect(() => {
     pan.setValue({ x: position.x, y: position.y });
-    startPos.current = { x: position.x, y: position.y };
+    pan.flattenOffset();
   }, [position.x, position.y]);
 
   const panResponder = useRef(
@@ -356,15 +355,17 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
         onSelect();
-        startPos.current = { x: (pan.x as any)._value || position.x, y: (pan.y as any)._value || position.y };
+        pan.flattenOffset();
         pan.setValue({ x: 0, y: 0 });
       },
       onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: (_: any, gestureState: any) => {
-        const newX = startPos.current.x + gestureState.dx;
-        const newY = startPos.current.y + gestureState.dy;
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+        const rawX = (pan.x as any)._value;
+        const rawY = (pan.y as any)._value;
+        const newX = Math.max(0, Math.min(rawX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
+        const newY = Math.max(0, Math.min(rawY, CANVAS_HEIGHT - CANVAS_ITEM_SIZE));
         pan.setValue({ x: newX, y: newY });
-        startPos.current = { x: newX, y: newY };
         onPositionChange(newX, newY, 1);
       },
     })
