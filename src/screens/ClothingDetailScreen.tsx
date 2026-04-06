@@ -32,7 +32,7 @@ function formatDate(dateStr: string | null): string {
   if (!dateStr) return '从未';
   try {
     const d = new Date(dateStr);
-    return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   } catch {
     return dateStr;
   }
@@ -134,41 +134,39 @@ export function ClothingDetailScreen() {
 
           {/* 3列2行数据 */}
           <View style={styles.statsGrid}>
+            {/* 第一行 */}
             <View style={styles.statRow}>
               <View style={styles.statCell}>
-                <Text style={styles.statLabel}>价格</Text>
-                <Text style={styles.statDivider}>|</Text>
                 <Text style={styles.statValue}>{item.price > 0 ? `¥${item.price}` : '--'}</Text>
+                <Text style={styles.statLabel}>价格</Text>
               </View>
+              <View style={styles.statDividerLine} />
               <View style={styles.statCell}>
-                <Text style={styles.statLabel}>尺码</Text>
-                <Text style={styles.statDivider}>|</Text>
                 <Text style={styles.statValue}>{item.size || '--'}</Text>
+                <Text style={styles.statLabel}>尺码</Text>
               </View>
+              <View style={styles.statDividerLine} />
               <View style={styles.statCell}>
-                <Text style={styles.statLabel}>购买日期</Text>
-                <Text style={styles.statDivider}>|</Text>
                 <Text style={styles.statValue}>{item.purchaseDate || '--'}</Text>
+                <Text style={styles.statLabel}>购买日期</Text>
               </View>
             </View>
-            <View style={styles.statSeparator}>
-              <Text style={styles.separatorLine}>—— —— ——</Text>
-            </View>
+            <View style={styles.rowDivider} />
+            {/* 第二行 */}
             <View style={styles.statRow}>
               <View style={styles.statCell}>
+                <Text style={styles.statValue}>{item.wearCount}</Text>
                 <Text style={styles.statLabel}>穿着次数</Text>
-                <Text style={styles.statDivider}>|</Text>
-                <Text style={styles.statValue}>{item.wearCount}次</Text>
               </View>
+              <View style={styles.statDividerLine} />
               <View style={styles.statCell}>
-                <Text style={styles.statLabel}>单次花费</Text>
-                <Text style={styles.statDivider}>|</Text>
                 <Text style={styles.statValue}>{costPerWear}</Text>
+                <Text style={styles.statLabel}>单次花费</Text>
               </View>
+              <View style={styles.statDividerLine} />
               <View style={styles.statCell}>
-                <Text style={styles.statLabel}>上次穿着</Text>
-                <Text style={styles.statDivider}>|</Text>
                 <Text style={styles.statValue}>{formatDate(item.lastWornAt)}</Text>
+                <Text style={styles.statLabel}>上次穿着</Text>
               </View>
             </View>
           </View>
@@ -365,41 +363,41 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   statsGrid: {
-    gap: 4,
+    gap: 0,
   },
   statRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
+    minHeight: 64,
   },
-  statSeparator: {
-    alignItems: 'center',
-    paddingVertical: 2,
+  rowDivider: {
+    height: 1,
+    backgroundColor: '#f0ebe4',
+    marginVertical: 0,
   },
-  separatorLine: {
-    fontSize: 10,
-    color: '#d4cfc7',
-    letterSpacing: 2,
+  statDividerLine: {
+    width: 1,
+    backgroundColor: '#f0ebe4',
+    marginVertical: 10,
   },
   statCell: {
     flex: 1,
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
     gap: 4,
   },
   statLabel: {
-    fontSize: 12,
-    color: '#8e8e93',
+    fontSize: 11,
+    color: '#a0a0a0',
     fontWeight: '500',
-  },
-  statDivider: {
-    fontSize: 10,
-    color: '#d4cfc7',
+    letterSpacing: 0.3,
   },
   statValue: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1a1a1a',
+    letterSpacing: -0.2,
   },
   profileDivider: {
     height: 1,
