@@ -406,19 +406,25 @@ interface DraggableStagedItemProps {
 
 function DraggableStagedItem({ item, onDragToCanvas, onPress }: DraggableStagedItemProps) {
   const pan = useRef(new Animated.ValueXY()).current;
-  const stripRefY = useRef(0);
+  const viewRef = useRef<View>(null);
+  const startY = useRef(0);
+  const stripAbsY = useRef(0);
 
   const panResponder = useRef(
     require('react-native').PanResponder.create({
       onStartShouldSetPanResponder: () => false,
       onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 12,
-      onPanResponderGrant: () => {
+      onPanResponderGrant: (_: any, gestureState: any) => {
+        startY.current = gestureState.y0;
         pan.setValue({ x: 0, y: 0 });
+        viewRef.current?.measure((_x, _y, _w, _h, _px, py) => {
+          stripAbsY.current = py;
+        });
       },
       onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: (_: any, gestureState: any) => {
-        // 向上拖动超过 strip 顶部
-        if (gestureState.moveY < stripRefY.current - 20) {
+      onPanResponderRelease: () => {
+        const absFinalY = startY.current + (pan.y as any)._value;
+        if (absFinalY < stripAbsY.current - 20) {
           onDragToCanvas();
         }
         Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
@@ -428,8 +434,8 @@ function DraggableStagedItem({ item, onDragToCanvas, onPress }: DraggableStagedI
 
   return (
     <Animated.View
+      ref={viewRef as any}
       style={[styles.stripItem, { transform: [{ translateY: pan.y }] }]}
-      onLayout={e => { stripRefY.current = e.nativeEvent.layout.y + e.nativeEvent.layout.height; }}
       {...panResponder.panHandlers}
     >
       <TouchableOpacity style={styles.stripItemInner} onPress={onPress} activeOpacity={0.8}>
