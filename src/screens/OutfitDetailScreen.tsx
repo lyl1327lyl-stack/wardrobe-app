@@ -6,6 +6,7 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
+  ScrollView,
   Alert,
   BackHandler,
   TextInput,
@@ -52,6 +53,7 @@ export function OutfitDetailScreen() {
   const canvasRef = useRef<View>(null);
   const stripRef = useRef<View>(null);
   const stripTopY = useRef(0);
+  const canvasTopY = useRef(0);
 
   // 初始化数据
   useEffect(() => {
@@ -166,14 +168,19 @@ export function OutfitDetailScreen() {
   };
 
   // 从 staged 添加到画板（点击或拖动释放）
-  const addStagedToCanvas = (id: number) => {
+  const addStagedToCanvas = (id: number, dropX?: number, dropY?: number) => {
     if (!localItemIds.includes(id) || canvasItemIds.includes(id)) return;
-    const centerX = (SCREEN_WIDTH - CANVAS_ITEM_SIZE) / 2 + (Math.random() - 0.5) * 60;
-    const centerY = 60 + (Math.random() - 0.5) * 80;
+    // Use actual drop coords capped within canvas bounds, or random center
+    const x = dropX !== undefined
+      ? Math.max(0, Math.min(dropX, SCREEN_WIDTH - CANVAS_ITEM_SIZE))
+      : (SCREEN_WIDTH - CANVAS_ITEM_SIZE) / 2 + (Math.random() - 0.5) * 60;
+    const y = dropY !== undefined
+      ? Math.max(0, Math.min(dropY, CANVAS_HEIGHT - CANVAS_ITEM_SIZE))
+      : 60 + (Math.random() - 0.5) * 80;
     setCanvasItemIds(prev => [...prev, id]);
     setLocalPositions(prev => ({
       ...prev,
-      [id]: { x: centerX, y: centerY, scale: 1 },
+      [id]: { x, y, scale: 1 },
     }));
   };
 
@@ -234,7 +241,15 @@ export function OutfitDetailScreen() {
       </View>
 
       {/* 画板区域 */}
-      <View style={styles.canvas} ref={canvasRef}>
+      <View
+        style={styles.canvas}
+        ref={canvasRef}
+        onLayout={() => {
+          canvasRef.current?.measure((_x, _y, _w, _h, _px, py) => {
+            canvasTopY.current = py;
+          });
+        }}
+      >
         {canvasItems.length === 0 ? (
           <View style={styles.canvasEmpty}>
             <Ionicons name="images-outline" size={48} color={theme.colors.border} />
@@ -272,17 +287,22 @@ export function OutfitDetailScreen() {
           }}
         >
           <Text style={styles.stripLabel}>已选 {stagedItems.length} 件，拖动到画板</Text>
-          <View style={styles.stripContent}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.stripContent}
+          >
             {stagedItems.map(item => (
               <DraggableStagedItem
                 key={item.id}
                 item={item}
                 stripTopY={stripTopY}
-                onDragToCanvas={() => addStagedToCanvas(item.id)}
+                canvasTopY={canvasTopY}
+                onDragToCanvas={(x, y) => addStagedToCanvas(item.id, x, y)}
                 onPress={() => addStagedToCanvas(item.id)}
               />
             ))}
-          </View>
+          </ScrollView>
         </View>
       )}
 
@@ -407,21 +427,18 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
 interface DraggableStagedItemProps {
   item: ClothingItem;
   stripTopY: React.RefObject<number>;
-  onDragToCanvas: () => void;
+  canvasTopY: React.RefObject<number>;
+  onDragToCanvas: (x: number, y: number) => void;
   onPress: () => void;
 }
 
-function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: DraggableStagedItemProps) {
+function DraggableStagedItem({ item, stripTopY, canvasTopY, onDragToCanvas, onPress }: DraggableStagedItemProps) {
   const itemRef = useRef<View>(null);
   const didDragToCanvas = useRef(false);
   const scaleVal = useRef(new Animated.Value(1)).current;
   const opacityVal = useRef(new Animated.Value(1)).current;
-  // Gesture animated values
   const gestureX = useRef(new Animated.Value(0)).current;
   const gestureY = useRef(new Animated.Value(0)).current;
-  // Ref to track locked position (avoids flattenOffset timing issues)
-  const lockedX = useRef(0);
-  const lockedY = useRef(0);
 
   const panResponder = useRef(
     require('react-native').PanResponder.create({
@@ -429,37 +446,34 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
       onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
       onPanResponderGrant: () => {
         didDragToCanvas.current = false;
-        // Sync locked position to current gesture value
-        lockedX.current = (gestureX as any)._offset + (gestureX as any)._value;
-        lockedY.current = (gestureY as any)._offset + (gestureY as any)._value;
-        gestureX.setOffset(lockedX.current);
-        gestureY.setOffset(lockedY.current);
         gestureX.setValue(0);
         gestureY.setValue(0);
         scaleVal.setValue(1);
         opacityVal.setValue(1);
       },
       onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
-      onPanResponderRelease: (_: any, gestureState: any) => {
+      onPanResponderRelease: (_: any, _gestureState: any) => {
         if (didDragToCanvas.current) return;
-        // Read current absolute position
-        const absX = (gestureX as any)._offset + (gestureX as any)._value;
         const absY = (gestureY as any)._offset + (gestureY as any)._value;
-        lockedX.current = absX;
-        lockedY.current = absY;
-        // Lock item at exact release position via setValue (no flattenOffset = no conflict)
-        gestureX.setOffset(0);
-        gestureY.setOffset(0);
-        gestureX.setValue(absX);
-        gestureY.setValue(absY);
-        if (gestureState.moveY < stripTopY.current - 20) {
+        const absX = (gestureX as any)._offset + (gestureX as any)._value;
+        if (absY < stripTopY.current - 20) {
+          // Dragged into canvas zone - pass drop coords relative to canvas
           didDragToCanvas.current = true;
+          // absX is screen-relative to item's original pos; convert to canvas-relative
+          const canvasRelX = absX;
+          const canvasRelY = absY - canvasTopY.current;
           Animated.parallel([
-            Animated.timing(opacityVal, { toValue: 0, duration: 150, useNativeDriver: false }),
-            Animated.timing(scaleVal, { toValue: 0.3, duration: 150, useNativeDriver: false }),
+            Animated.timing(opacityVal, { toValue: 0, duration: 120, useNativeDriver: false }),
+            Animated.timing(scaleVal, { toValue: 0.3, duration: 120, useNativeDriver: false }),
           ]).start(({ finished }) => {
-            if (finished) onDragToCanvas();
+            if (finished) onDragToCanvas(canvasRelX, canvasRelY);
           });
+        } else {
+          // Within strip zone - spring back to original position
+          Animated.parallel([
+            Animated.spring(gestureX, { toValue: 0, useNativeDriver: false, friction: 7, tension: 50 }),
+            Animated.spring(gestureY, { toValue: 0, useNativeDriver: false, friction: 7, tension: 50 }),
+          ]).start();
         }
       },
     })
@@ -601,6 +615,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.card,
     borderTopWidth: 1,
     borderTopColor: theme.colors.border,
+    maxHeight: 180,
   },
   stripLabel: {
     fontSize: 12,
@@ -611,6 +626,7 @@ const styles = StyleSheet.create({
   },
   stripContent: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: 16,
     paddingBottom: 14,
     gap: 8,
