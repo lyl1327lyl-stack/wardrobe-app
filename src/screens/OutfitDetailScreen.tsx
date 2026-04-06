@@ -51,6 +51,8 @@ export function OutfitDetailScreen() {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const canvasRef = useRef<View>(null);
+  const stripRef = useRef<View>(null);
+  const stripTopY = useRef(0);
 
   // 初始化数据
   useEffect(() => {
@@ -261,7 +263,15 @@ export function OutfitDetailScreen() {
 
       {/* 已选衣物 Strip（未上画板的） */}
       {stagedItems.length > 0 && (
-        <View style={styles.stagedStrip}>
+        <View
+          ref={stripRef as any}
+          style={styles.stagedStrip}
+          onLayout={() => {
+            stripRef.current?.measure((_x, _y, _w, _h, _px, py) => {
+              stripTopY.current = py;
+            });
+          }}
+        >
           <Text style={styles.stripLabel}>已选 {stagedItems.length} 件，拖动到画板</Text>
           <ScrollView
             horizontal
@@ -272,6 +282,7 @@ export function OutfitDetailScreen() {
               <DraggableStagedItem
                 key={item.id}
                 item={item}
+                stripTopY={stripTopY}
                 onDragToCanvas={() => addStagedToCanvas(item.id)}
                 onPress={() => addStagedToCanvas(item.id)}
               />
@@ -400,31 +411,29 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
 // 可拖动 staged 衣物（从 strip 拖到画板）
 interface DraggableStagedItemProps {
   item: ClothingItem;
+  stripTopY: React.RefObject<number>;
   onDragToCanvas: () => void;
   onPress: () => void;
 }
 
-function DraggableStagedItem({ item, onDragToCanvas, onPress }: DraggableStagedItemProps) {
+function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: DraggableStagedItemProps) {
   const pan = useRef(new Animated.ValueXY()).current;
-  const viewRef = useRef<View>(null);
-  const startY = useRef(0);
-  const stripAbsY = useRef(0);
+  const didDragToCanvas = useRef(false);
 
   const panResponder = useRef(
     require('react-native').PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 12,
-      onPanResponderGrant: (_: any, gestureState: any) => {
-        startY.current = gestureState.y0;
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
+      onPanResponderGrant: () => {
+        didDragToCanvas.current = false;
         pan.setValue({ x: 0, y: 0 });
-        viewRef.current?.measure((_x, _y, _w, _h, _px, py) => {
-          stripAbsY.current = py;
-        });
       },
       onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: () => {
-        const absFinalY = startY.current + (pan.y as any)._value;
-        if (absFinalY < stripAbsY.current - 20) {
+      onPanResponderRelease: (_: any, gestureState: any) => {
+        if (didDragToCanvas.current) return;
+        // gestureState.moveY is absolute screen Y of the finger
+        if (gestureState.moveY < stripTopY.current - 20) {
+          didDragToCanvas.current = true;
           onDragToCanvas();
         }
         Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
@@ -434,7 +443,6 @@ function DraggableStagedItem({ item, onDragToCanvas, onPress }: DraggableStagedI
 
   return (
     <Animated.View
-      ref={viewRef as any}
       style={[styles.stripItem, { transform: [{ translateY: pan.y }] }]}
       {...panResponder.panHandlers}
     >
