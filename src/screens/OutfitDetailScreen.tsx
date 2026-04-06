@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { captureRef } from 'react-native-view-shot';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { Outfit, ClothingItem, OutfitItemPosition } from '../types';
 import { theme } from '../utils/theme';
@@ -52,6 +53,7 @@ export function OutfitDetailScreen() {
   const [showSaved, setShowSaved] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const canvasRef = useRef<View>(null);
 
   // 初始化数据
   useEffect(() => {
@@ -115,11 +117,21 @@ export function OutfitDetailScreen() {
   const handleSave = async () => {
     if (!outfit) return;
     try {
+      // 截图 canvas 作为缩略图
+      let thumbnailUri: string | undefined;
+      if (canvasRef.current) {
+        try {
+          thumbnailUri = await captureRef(canvasRef, { format: 'png', quality: 0.8 });
+        } catch {
+          // 截图失败不影响保存
+        }
+      }
       await updateOutfit({
         ...outfit,
         name: editedName.trim() || outfit.name,
         itemIds: localItemIds,
         itemPositions: localPositions,
+        thumbnailUri,
       });
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 1500);
@@ -212,7 +224,7 @@ export function OutfitDetailScreen() {
       </View>
 
       {/* 画板区域 */}
-      <View style={styles.canvas} onTouchStart={() => setSelectedItemId(null)}>
+      <View style={styles.canvas} ref={canvasRef} onTouchStart={() => setSelectedItemId(null)}>
         {canvasItems.length === 0 ? (
           <View style={styles.canvasEmpty}>
             <Ionicons name="images-outline" size={48} color={theme.colors.border} />

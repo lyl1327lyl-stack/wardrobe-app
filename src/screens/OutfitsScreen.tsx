@@ -7,13 +7,22 @@ import {
   StyleSheet,
   Image,
   Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { Outfit } from '../types';
+import { theme } from '../utils/theme';
 
 export function OutfitsScreen() {
-  const { outfits, clothing, deleteOutfit } = useWardrobeStore();
-  const [selectedOutfit, setSelectedOutfit] = useState<Outfit | null>(null);
+  const navigation = useNavigation<any>();
+  const { outfits, clothing, deleteOutfit, addOutfit } = useWardrobeStore();
+  const [showCreate, setShowCreate] = useState(false);
+  const [newOutfitName, setNewOutfitName] = useState('');
 
   const getOutfitItems = (outfit: Outfit) => {
     return outfit.itemIds
@@ -22,7 +31,7 @@ export function OutfitsScreen() {
   };
 
   const handleDelete = (outfit: Outfit) => {
-    Alert.alert('确认删除', '确定要删除这个搭配吗？', [
+    Alert.alert('确认删除', `确定要删除搭配「${outfit.name}」吗？`, [
       { text: '取消', style: 'cancel' },
       {
         text: '删除',
@@ -32,22 +41,56 @@ export function OutfitsScreen() {
     ]);
   };
 
+  const handleCreateOutfit = async () => {
+    if (!newOutfitName.trim()) {
+      Alert.alert('请输入搭配名称');
+      return;
+    }
+    try {
+      await addOutfit({
+        name: newOutfitName.trim(),
+        itemIds: [],
+        createdAt: new Date().toISOString(),
+      });
+      setNewOutfitName('');
+      setShowCreate(false);
+    } catch {
+      Alert.alert('创建失败，请重试');
+    }
+  };
+
   const renderOutfit = ({ item }: { item: Outfit }) => {
     const items = getOutfitItems(item);
     return (
       <TouchableOpacity
         style={styles.outfitCard}
-        onPress={() => setSelectedOutfit(selectedOutfit?.id === item.id ? null : item)}
+        onPress={() => navigation.navigate('OutfitDetail', { outfitId: item.id })}
         onLongPress={() => handleDelete(item)}
+        activeOpacity={0.75}
       >
         <View style={styles.outfitPreview}>
-          {items.slice(0, 4).map((c, idx) => (
-            <Image key={c!.id} source={{ uri: c!.thumbnailUri }} style={styles.outfitThumb} />
-          ))}
-          {items.length === 0 && <Text style={styles.emptyText}>暂无衣服</Text>}
+          {item.thumbnailUri ? (
+            <Image source={{ uri: item.thumbnailUri }} style={styles.canvasThumb} />
+          ) : items.length > 0 ? (
+            <View style={styles.gridPreview}>
+              {items.slice(0, 4).map((c) => (
+                <Image key={c!.id} source={{ uri: c!.thumbnailUri }} style={styles.gridThumb} />
+              ))}
+              {items.length < 4 && Array.from({ length: 4 - items.length }).map((_, idx) => (
+                <View key={`empty-${idx}`} style={styles.gridThumbEmpty} />
+              ))}
+            </View>
+          ) : (
+            <View style={styles.emptyPreview}>
+              <Ionicons name="images-outline" size={32} color={theme.colors.border} />
+              <Text style={styles.emptyPreviewText}>暂无衣服</Text>
+            </View>
+          )}
         </View>
-        <Text style={styles.outfitName}>{item.name}</Text>
-        <Text style={styles.outfitCount}>{items.length} 件</Text>
+        <View style={styles.outfitInfo}>
+          <Text style={styles.outfitName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.outfitCount}>{items.length} 件</Text>
+        </View>
       </TouchableOpacity>
     );
   };
@@ -61,13 +104,72 @@ export function OutfitsScreen() {
         numColumns={2}
         contentContainerStyle={styles.list}
         columnWrapperStyle={styles.row}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>我的搭配</Text>
+            <Text style={styles.headerSubtitle}>{outfits.length} 个搭配</Text>
+          </View>
+        }
         ListEmptyComponent={
           <View style={styles.empty}>
+            <View style={styles.emptyIconWrap}>
+              <Ionicons name="grid-outline" size={40} color={theme.colors.border} />
+            </View>
             <Text style={styles.emptyTitle}>还没有搭配</Text>
             <Text style={styles.emptySubtext}>在衣服详情页可以创建搭配</Text>
+            <TouchableOpacity
+              style={styles.emptyCreateBtn}
+              onPress={() => setShowCreate(true)}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="add" size={18} color={theme.colors.white} />
+              <Text style={styles.emptyCreateBtnText}>创建搭配</Text>
+            </TouchableOpacity>
           </View>
         }
       />
+
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowCreate(true)}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="add" size={26} color={theme.colors.white} />
+      </TouchableOpacity>
+
+      <Modal visible={showCreate} animationType="fade" transparent>
+        <KeyboardAvoidingView style={styles.modalOverlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={styles.modal}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>创建新搭配</Text>
+              <TouchableOpacity onPress={() => { setShowCreate(false); setNewOutfitName(''); }} activeOpacity={0.7}>
+                <Ionicons name="close" size={22} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <TextInput
+              style={styles.modalInput}
+              value={newOutfitName}
+              onChangeText={setNewOutfitName}
+              placeholder="搭配名称，如：周末休闲"
+              placeholderTextColor={theme.colors.textTertiary}
+              autoFocus
+            />
+            <Text style={styles.modalHint}>创建后，在衣服详情页可以将其加入搭配</Text>
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => { setShowCreate(false); setNewOutfitName(''); }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalConfirm} onPress={handleCreateOutfit} activeOpacity={0.8}>
+                <Text style={styles.modalConfirmText}>创建</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </View>
   );
 }
@@ -75,66 +177,213 @@ export function OutfitsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: theme.colors.background,
+  },
+  header: {
+    paddingHorizontal: 16,
+    paddingTop: 56,
+    paddingBottom: 16,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: theme.colors.text,
+    letterSpacing: -0.5,
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: theme.colors.textTertiary,
+    marginTop: 4,
   },
   list: {
-    padding: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 100,
     flexGrow: 1,
   },
   row: {
     justifyContent: 'space-between',
   },
   outfitCard: {
-    width: '47%',
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    width: '48%',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.lg,
+    overflow: 'hidden',
+    marginBottom: 16,
+    ...theme.shadows.md,
   },
   outfitPreview: {
+    aspectRatio: 1,
+    backgroundColor: theme.colors.borderLight,
+  },
+  gridPreview: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 4,
-    marginBottom: 8,
   },
-  outfitThumb: {
-    width: 50,
-    height: 50,
-    borderRadius: 6,
-    backgroundColor: '#f0f0f0',
+  gridThumb: {
+    width: '50%',
+    height: '50%',
+    backgroundColor: theme.colors.borderLight,
+  },
+  gridThumbEmpty: {
+    width: '50%',
+    height: '50%',
+    backgroundColor: theme.colors.border,
+  },
+  canvasThumb: {
+    width: '100%',
+    height: '100%',
+    aspectRatio: 1,
+    backgroundColor: theme.colors.borderLight,
+  },
+  emptyPreview: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 8,
+  },
+  emptyPreviewText: {
+    fontSize: 12,
+    color: theme.colors.textTertiary,
+  },
+  outfitInfo: {
+    padding: 14,
   },
   outfitName: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#333',
+    color: theme.colors.text,
   },
   outfitCount: {
     fontSize: 12,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginTop: 4,
   },
   empty: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingTop: 100,
+    paddingTop: 80,
+    paddingHorizontal: 40,
+  },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: theme.colors.borderLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   emptyTitle: {
     fontSize: 18,
-    color: '#666',
+    fontWeight: '600',
+    color: theme.colors.text,
+    marginBottom: 8,
   },
   emptySubtext: {
     fontSize: 14,
-    color: '#999',
-    marginTop: 8,
+    color: theme.colors.textTertiary,
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  emptyText: {
+  emptyCreateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: theme.colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: theme.borderRadius.full,
+    marginTop: 20,
+    ...theme.shadows.sm,
+  },
+  emptyCreateBtnText: {
+    color: theme.colors.white,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  fab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 24,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: theme.colors.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    ...theme.shadows.lg,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modal: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.xl,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: theme.colors.text,
+  },
+  modalInput: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: theme.colors.text,
+    backgroundColor: theme.colors.background,
+    marginBottom: 8,
+  },
+  modalHint: {
     fontSize: 12,
-    color: '#ccc',
+    color: theme.colors.textTertiary,
+    marginBottom: 20,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 13,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    fontSize: 15,
+    color: theme.colors.textSecondary,
+    fontWeight: '500',
+  },
+  modalConfirm: {
+    flex: 2,
+    paddingVertical: 13,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.primary,
+    alignItems: 'center',
+    ...theme.shadows.sm,
+  },
+  modalConfirmText: {
+    fontSize: 15,
+    color: theme.colors.white,
+    fontWeight: '600',
   },
 });
