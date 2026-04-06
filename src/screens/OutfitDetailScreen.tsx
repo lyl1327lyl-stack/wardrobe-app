@@ -436,11 +436,10 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
         if (didDragToCanvas.current) return;
         if (gestureState.moveY < stripTopY.current - 20) {
           didDragToCanvas.current = true;
-          // Animate: shrink + fade while moving further up, then add
+          // Fade + shrink, then add to canvas (native driver conflicts with gesture on Android)
           Animated.parallel([
-            Animated.timing(opacityVal, { toValue: 0, duration: 150, useNativeDriver: true }),
-            Animated.timing(scaleVal, { toValue: 0.3, duration: 150, useNativeDriver: true }),
-            Animated.timing(gestureY, { toValue: -80, duration: 150, useNativeDriver: false }),
+            Animated.timing(opacityVal, { toValue: 0, duration: 150, useNativeDriver: false }),
+            Animated.timing(scaleVal, { toValue: 0.3, duration: 150, useNativeDriver: false }),
           ]).start(({ finished }) => {
             if (finished) onDragToCanvas();
           });
