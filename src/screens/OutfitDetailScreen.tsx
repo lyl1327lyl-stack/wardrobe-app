@@ -431,12 +431,25 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
       onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
       onPanResponderRelease: (_: any, gestureState: any) => {
         if (didDragToCanvas.current) return;
-        // gestureState.moveY is absolute screen Y of the finger
         if (gestureState.moveY < stripTopY.current - 20) {
           didDragToCanvas.current = true;
-          onDragToCanvas();
+          // Slide upward toward canvas, then add to canvas
+          Animated.timing(pan, {
+            toValue: { x: 0, y: -120 },
+            duration: 180,
+            useNativeDriver: true,
+          }).start(({ finished }) => {
+            if (finished) onDragToCanvas();
+          });
+        } else {
+          // Spring back to original position
+          Animated.spring(pan, {
+            toValue: { x: 0, y: 0 },
+            useNativeDriver: true,
+            friction: 6,
+            tension: 40,
+          }).start();
         }
-        Animated.spring(pan, { toValue: { x: 0, y: 0 }, useNativeDriver: true }).start();
       },
     })
   ).current;
