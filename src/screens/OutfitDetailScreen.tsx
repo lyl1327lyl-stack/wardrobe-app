@@ -18,6 +18,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { Outfit, ClothingItem, OutfitItemPosition } from '../types';
 import { theme } from '../utils/theme';
+import { ClothingPickerModal } from '../components/ClothingPickerModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CANVAS_HEIGHT = SCREEN_WIDTH * 1.2;
@@ -50,6 +51,7 @@ export function OutfitDetailScreen() {
   const [editedName, setEditedName] = useState('');
   const [showSaved, setShowSaved] = useState(false);
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [showPicker, setShowPicker] = useState(false);
 
   // 初始化数据
   useEffect(() => {
@@ -159,6 +161,19 @@ export function OutfitDetailScreen() {
     }));
   };
 
+  const addClothingToCanvasById = (id: number) => {
+    if (localItemIds.includes(id)) return;
+    const randomX = (Math.random() - 0.5) * 60;
+    const randomY = (Math.random() - 0.5) * 60;
+    const centerX = (SCREEN_WIDTH - ITEM_SIZE) / 2 + randomX;
+    const centerY = (CANVAS_HEIGHT - ITEM_SIZE) / 2 + randomY;
+    setLocalItemIds(prev => [...prev, id]);
+    setLocalPositions(prev => ({
+      ...prev,
+      [id]: { x: centerX, y: centerY, scale: 1 },
+    }));
+  };
+
   const removeItemFromCanvas = (id: number) => {
     setSelectedItemId(null);
     setLocalItemIds(prev => prev.filter(itemId => itemId !== id));
@@ -260,6 +275,9 @@ export function OutfitDetailScreen() {
               </TouchableOpacity>
             ))
           )}
+          <TouchableOpacity style={styles.addBtn} onPress={() => setShowPicker(true)}>
+            <Ionicons name="add" size={24} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
         </ScrollView>
       </View>
 
@@ -280,6 +298,17 @@ export function OutfitDetailScreen() {
           <Text style={[styles.actionBtnText, { color: theme.colors.danger }]}>删除</Text>
         </TouchableOpacity>
       </View>
+
+      {/* ClothingPickerModal */}
+      <ClothingPickerModal
+        visible={showPicker}
+        onClose={() => setShowPicker(false)}
+        alreadyAddedIds={localItemIds}
+        onConfirm={(ids) => {
+          ids.forEach(id => addClothingToCanvasById(id));
+          setShowPicker(false);
+        }}
+      />
     </View>
   );
 }
@@ -505,6 +534,17 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: theme.colors.textTertiary,
     paddingVertical: 16,
+  },
+  addBtn: {
+    width: 64,
+    height: 64,
+    borderRadius: theme.borderRadius.md,
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: theme.colors.borderLight,
   },
   actionBar: {
     flexDirection: 'row',
