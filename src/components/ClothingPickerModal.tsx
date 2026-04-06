@@ -199,8 +199,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.colors.card,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '85%',
-    minHeight: 400,
+    height: 520,
   },
   header: {
     flexDirection: 'row',
@@ -263,16 +262,17 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   gridContent: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingBottom: 8,
   },
   gridRow: {
-    justifyContent: 'flex-start',
+    flexDirection: 'row',
     gap: 8,
+    paddingHorizontal: 16,
   },
   clothingCard: {
-    width: 65,
-    height: 65,
+    flex: 1,
+    aspectRatio: 1,
     borderRadius: 8,
     overflow: 'hidden',
     backgroundColor: theme.colors.borderLight,
@@ -283,8 +283,8 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.primary,
   },
   clothingImage: {
-    width: 65,
-    height: 65,
+    width: '100%',
+    height: '100%',
   },
   checkmark: {
     position: 'absolute',
