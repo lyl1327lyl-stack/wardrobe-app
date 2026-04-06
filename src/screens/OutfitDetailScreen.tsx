@@ -146,21 +146,6 @@ export function OutfitDetailScreen() {
     );
   };
 
-  const addClothingToCanvas = (item: ClothingItem) => {
-    const id = item.id;
-    // 随机位置偏移
-    const randomX = (Math.random() - 0.5) * 60;
-    const randomY = (Math.random() - 0.5) * 60;
-    const centerX = (SCREEN_WIDTH - ITEM_SIZE) / 2 + randomX;
-    const centerY = (CANVAS_HEIGHT - ITEM_SIZE) / 2 + randomY;
-
-    setLocalItemIds(prev => [...prev, id]);
-    setLocalPositions(prev => ({
-      ...prev,
-      [id]: { x: centerX, y: centerY, scale: 1 },
-    }));
-  };
-
   const addClothingToCanvasById = (id: number) => {
     if (localItemIds.includes(id)) return;
     const randomX = (Math.random() - 0.5) * 60;
@@ -266,13 +251,11 @@ export function OutfitDetailScreen() {
             <Text style={styles.stripEmpty}>所有衣服都已添加</Text>
           ) : (
             availableClothing.map(item => (
-              <TouchableOpacity
+              <DraggableStripItem
                 key={item.id}
-                style={styles.stripItem}
-                onPress={() => addClothingToCanvas(item)}
-              >
-                <Image source={{ uri: item.thumbnailUri }} style={styles.stripImage} />
-              </TouchableOpacity>
+                item={item}
+                onAddToCanvas={addClothingToCanvasById}
+              />
             ))
           )}
           <TouchableOpacity style={styles.addBtn} onPress={() => setShowPicker(true)}>
@@ -310,6 +293,53 @@ export function OutfitDetailScreen() {
         }}
       />
     </View>
+  );
+}
+
+// 可拖动 Strip 衣物组件（拖出 Strip 区域添加到画板）
+interface DraggableStripItemProps {
+  item: ClothingItem;
+  onAddToCanvas: (id: number) => void;
+}
+
+function DraggableStripItem({ item, onAddToCanvas }: DraggableStripItemProps) {
+  const pan = useRef(new Animated.ValueXY()).current;
+  const stripTopY = useRef(0);
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gestureState) => {
+        return Math.abs(gestureState.dy) > 15;
+      },
+      onPanResponderGrant: () => {
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event(
+        [null, { dy: pan.y }],
+        { useNativeDriver: false }
+      ),
+      onPanResponderRelease: (_, gestureState) => {
+        // 如果向上拖动超过 strip 区域，添加到画板
+        if (gestureState.moveY < stripTopY.current - 20) {
+          onAddToCanvas(item.id);
+        }
+        Animated.spring(pan, {
+          toValue: { x: 0, y: 0 },
+          useNativeDriver: true,
+        }).start();
+      },
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      style={[styles.stripItem, { transform: [{ translateY: pan.y }] }]}
+      onLayout={(e) => { stripTopY.current = e.nativeEvent.layout.y; }}
+      {...panResponder.panHandlers}
+    >
+      <Image source={{ uri: item.thumbnailUri }} style={styles.stripImage} />
+    </Animated.View>
   );
 }
 
