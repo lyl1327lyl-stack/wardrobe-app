@@ -16,7 +16,6 @@ import { OutfitPickerModal } from '../components/OutfitPickerModal';
 
 type RouteParams = { ClothingDetail: { id: number } };
 
-// 颜色名转 hex
 function getColorHex(colorName: string): string {
   const colorMap: Record<string, string> = {
     '黑色': '#1a1a1a', '白色': '#f5f5f5', '灰色': '#9ca3af',
@@ -29,7 +28,6 @@ function getColorHex(colorName: string): string {
   return colorMap[colorName] || '#a0aec0';
 }
 
-// 格式化日期
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '从未';
   try {
@@ -40,7 +38,6 @@ function formatDate(dateStr: string | null): string {
   }
 }
 
-// 计算单次穿着花费
 function calcCostPerWear(price: number, wearCount: number): string {
   if (price <= 0 || wearCount <= 0) return '--';
   return `¥${Math.round(price / wearCount)}`;
@@ -110,7 +107,7 @@ export function ClothingDetailScreen() {
         <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color="#1a1a1a" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>衣物档案</Text>
+        <Text style={styles.headerTitle}>{item.type}</Text>
         <TouchableOpacity
           style={styles.headerBtn}
           onPress={() => navigation.navigate('EditClothing', { id: item.id })}
@@ -124,7 +121,6 @@ export function ClothingDetailScreen() {
         <View style={styles.imageSection}>
           <View style={styles.imageWrapper}>
             <Image source={{ uri: item.imageUri }} style={styles.image} />
-            {/* 颜色圆点 */}
             <View style={styles.colorBadge}>
               <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />
               <Text style={styles.colorText}>{item.color}</Text>
@@ -132,89 +128,80 @@ export function ClothingDetailScreen() {
           </View>
         </View>
 
-        {/* 标题区 */}
-        <View style={styles.titleSection}>
-          <Text style={styles.clothingType}>{item.type}</Text>
-          {item.brand ? (
-            <Text style={styles.brand}>{item.brand}</Text>
-          ) : null}
-        </View>
+        {/* 衣物档案卡片 */}
+        <View style={styles.profileCard}>
+          <Text style={styles.profileTitle}>衣物档案</Text>
 
-        {/* 核心数据 3x2 网格 */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>
-              <Ionicons name="wallet-outline" size={18} color="#8B7355" />
-            </Text>
-            <Text style={styles.statValue}>{item.price > 0 ? `¥${item.price}` : '--'}</Text>
-            <Text style={styles.statLabel}>价格</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>
-              <Ionicons name="resize-outline" size={18} color="#8B7355" />
-            </Text>
-            <Text style={styles.statValue}>{item.size || '--'}</Text>
-            <Text style={styles.statLabel}>尺码</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>
-              <Ionicons name="calendar-outline" size={18} color="#8B7355" />
-            </Text>
-            <Text style={styles.statValue}>{item.purchaseDate || '--'}</Text>
-            <Text style={styles.statLabel}>购买日期</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>
-              <Ionicons name="repeat-outline" size={18} color="#8B7355" />
-            </Text>
-            <Text style={styles.statValue}>{item.wearCount}</Text>
-            <Text style={styles.statLabel}>穿着次数</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>
-              <Ionicons name="pulse-outline" size={18} color="#8B7355" />
-            </Text>
-            <Text style={styles.statValue}>{costPerWear}</Text>
-            <Text style={styles.statLabel}>单次花费</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statIcon}>
-              <Ionicons name="time-outline" size={18} color="#8B7355" />
-            </Text>
-            <Text style={styles.statValue}>{formatDate(item.lastWornAt)}</Text>
-            <Text style={styles.statLabel}>上次穿着</Text>
-          </View>
-        </View>
-
-        {/* 属性区块 */}
-        <View style={styles.section}>
-          <View style={styles.sectionRow}>
-            <View style={styles.sectionLabel}>
-              <Ionicons name="flower-outline" size={16} color="#8B7355" />
-              <Text style={styles.sectionTitle}>季节</Text>
+          {/* 3列2行数据 */}
+          <View style={styles.statsGrid}>
+            <View style={styles.statRow}>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>价格</Text>
+                <Text style={styles.statDivider}>|</Text>
+                <Text style={styles.statValue}>{item.price > 0 ? `¥${item.price}` : '--'}</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>尺码</Text>
+                <Text style={styles.statDivider}>|</Text>
+                <Text style={styles.statValue}>{item.size || '--'}</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>购买日期</Text>
+                <Text style={styles.statDivider}>|</Text>
+                <Text style={styles.statValue}>{item.purchaseDate || '--'}</Text>
+              </View>
             </View>
+            <View style={styles.statSeparator}>
+              <Text style={styles.separatorLine}>—— —— ——</Text>
+            </View>
+            <View style={styles.statRow}>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>穿着次数</Text>
+                <Text style={styles.statDivider}>|</Text>
+                <Text style={styles.statValue}>{item.wearCount}次</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>单次花费</Text>
+                <Text style={styles.statDivider}>|</Text>
+                <Text style={styles.statValue}>{costPerWear}</Text>
+              </View>
+              <View style={styles.statCell}>
+                <Text style={styles.statLabel}>上次穿着</Text>
+                <Text style={styles.statDivider}>|</Text>
+                <Text style={styles.statValue}>{formatDate(item.lastWornAt)}</Text>
+              </View>
+            </View>
+          </View>
+
+          <View style={styles.profileDivider} />
+
+          {/* 品牌 */}
+          {item.brand ? (
+            <View style={styles.profileRow}>
+              <Text style={styles.profileLabel}>品牌</Text>
+              <Text style={styles.profileValue}>{item.brand}</Text>
+            </View>
+          ) : null}
+
+          {/* 季节 */}
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>季节</Text>
             <View style={styles.tagList}>
               {item.seasons.length > 0
                 ? item.seasons.map(s => (
-                  <View key={s} style={styles.tag}>
-                    <Text style={styles.tagText}>{s}</Text>
-                  </View>
+                  <View key={s} style={styles.tag}><Text style={styles.tagText}>{s}</Text></View>
                 ))
                 : <Text style={styles.noData}>未设置</Text>}
             </View>
           </View>
 
-          <View style={[styles.sectionRow, styles.sectionRowBorder]}>
-            <View style={styles.sectionLabel}>
-              <Ionicons name="calendar-outline" size={16} color="#8B7355" />
-              <Text style={styles.sectionTitle}>场合</Text>
-            </View>
+          {/* 场合 */}
+          <View style={styles.profileRow}>
+            <Text style={styles.profileLabel}>场合</Text>
             <View style={styles.tagList}>
               {item.occasions.length > 0
                 ? item.occasions.map(o => (
-                  <View key={o} style={styles.tag}>
-                    <Text style={styles.tagText}>{o}</Text>
-                  </View>
+                  <View key={o} style={styles.tag}><Text style={styles.tagText}>{o}</Text></View>
                 ))
                 : <Text style={styles.noData}>未设置</Text>}
             </View>
@@ -223,13 +210,8 @@ export function ClothingDetailScreen() {
 
         {/* 备注 */}
         <View style={styles.remarksCard}>
-          <View style={styles.remarksHeader}>
-            <Ionicons name="document-text-outline" size={16} color="#8B7355" />
-            <Text style={styles.remarksTitle}>备注</Text>
-          </View>
-          <Text style={styles.remarksText}>
-            {item.remarks || '暂无备注'}
-          </Text>
+          <Text style={styles.remarksTitle}>备注</Text>
+          <Text style={styles.remarksText}>{item.remarks || '暂无备注'}</Text>
         </View>
 
         {/* 搭配按钮 */}
@@ -303,8 +285,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '700',
     color: '#1a1a1a',
     letterSpacing: -0.3,
   },
@@ -360,114 +342,111 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1a1a1a',
   },
-  titleSection: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 8,
-  },
-  clothingType: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    letterSpacing: -0.8,
-  },
-  brand: {
-    fontSize: 15,
-    color: '#8e8e93',
-    marginTop: 4,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    gap: 10,
-  },
-  statCard: {
-    width: '31%',
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 14,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  statIcon: {
-    marginBottom: 6,
-  },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1a1a1a',
-    marginBottom: 2,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#8e8e93',
-    fontWeight: '500',
-  },
-  section: {
+  profileCard: {
     marginHorizontal: 20,
     marginTop: 20,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#8B7355',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(139,115,85,0.12)',
   },
-  sectionRow: {
+  profileTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    textAlign: 'center',
+    marginBottom: 18,
+    letterSpacing: 1,
+  },
+  statsGrid: {
+    gap: 4,
+  },
+  statRow: {
+    flexDirection: 'row',
+  },
+  statSeparator: {
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  separatorLine: {
+    fontSize: 10,
+    color: '#d4cfc7',
+    letterSpacing: 2,
+  },
+  statCell: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
+    justifyContent: 'center',
+    paddingVertical: 8,
+    gap: 4,
   },
-  sectionRowBorder: {
-    marginTop: 14,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: '#f5f3ef',
+  statLabel: {
+    fontSize: 12,
+    color: '#8e8e93',
+    fontWeight: '500',
   },
-  sectionLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    width: 70,
+  statDivider: {
+    fontSize: 10,
+    color: '#d4cfc7',
   },
-  sectionTitle: {
+  statValue: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
+  },
+  profileDivider: {
+    height: 1,
+    backgroundColor: '#f0ebe4',
+    marginVertical: 14,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  profileLabel: {
+    fontSize: 13,
+    color: '#8e8e93',
+    fontWeight: '500',
+    width: 52,
+  },
+  profileValue: {
+    fontSize: 14,
+    color: '#1a1a1a',
+    fontWeight: '500',
   },
   tagList: {
     flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   tag: {
     backgroundColor: '#F5F3EF',
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 14,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 12,
   },
   tagText: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#5c5c5c',
     fontWeight: '500',
   },
   noData: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#c7c7c7',
     fontStyle: 'italic',
   },
   remarksCard: {
     marginHorizontal: 20,
-    marginTop: 16,
+    marginTop: 14,
     backgroundColor: '#fff',
     borderRadius: 20,
     padding: 18,
@@ -477,16 +456,11 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 2,
   },
-  remarksHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 10,
-  },
   remarksTitle: {
     fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
+    marginBottom: 8,
   },
   remarksText: {
     fontSize: 14,
@@ -499,7 +473,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 16,
     paddingVertical: 16,
     backgroundColor: '#8B7355',
     borderRadius: 16,
