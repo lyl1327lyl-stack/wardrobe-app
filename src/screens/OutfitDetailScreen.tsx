@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,35 +16,254 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { captureRef } from 'react-native-view-shot';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ClothingItem, OutfitItemPosition } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 import { ClothingPickerModal } from '../components/ClothingPickerModal';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
-const CANVAS_SIZE = SCREEN_WIDTH - 32; // 1:1 square, with 16px padding each side
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CANVAS_SIZE = SCREEN_WIDTH - 32;
 const CANVAS_ITEM_SIZE = 100;
-const HEADER_HEIGHT = 68;
-const ACTION_BAR_HEIGHT = 88; // paddingVertical 12 + paddingBottom 36 + ~32 bar height
 
 type RouteParams = {
   OutfitDetail: { outfitId: number };
 };
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingTop: 56,
+      paddingBottom: 12,
+      backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerBtn: {
+      padding: 4,
+      width: 40,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: theme.colors.text,
+      textAlign: 'center',
+    },
+    headerSubtitle: {
+      fontSize: 11,
+      color: theme.colors.textTertiary,
+      textAlign: 'center',
+      marginTop: 2,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: 40,
+      justifyContent: 'flex-end',
+    },
+    savedIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    savedText: {
+      fontSize: 13,
+      color: theme.colors.success,
+    },
+    nameEditRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    nameInput: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: theme.colors.text,
+      textAlign: 'center',
+      minWidth: 120,
+      borderBottomWidth: 1.5,
+      borderBottomColor: theme.colors.primary,
+      paddingVertical: 2,
+      paddingHorizontal: 4,
+    },
+    nameConfirmBtn: {
+      padding: 4,
+    },
+    canvas: {
+      width: CANVAS_SIZE,
+      height: CANVAS_SIZE,
+      backgroundColor: theme.colors.borderLight,
+      position: 'relative',
+    },
+    canvasWrapper: {
+      flex: 1,
+    },
+    topSpacer: {
+      flex: 1,
+    },
+    bottomSpacer: {
+      flex: 1,
+      minHeight: 60,
+    },
+    canvasEmpty: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 12,
+    },
+    canvasEmptyText: {
+      fontSize: 14,
+      color: theme.colors.textTertiary,
+    },
+    canvasItem: {
+      position: 'absolute',
+      width: CANVAS_ITEM_SIZE,
+      height: CANVAS_ITEM_SIZE,
+    },
+    canvasImage: {
+      width: CANVAS_ITEM_SIZE,
+      height: CANVAS_ITEM_SIZE,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.card,
+    },
+    removeBtn: {
+      position: 'absolute',
+      top: -8,
+      right: -8,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.colors.danger,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    removeBtnInner: {
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    actionBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      flexDirection: 'row',
+      backgroundColor: theme.colors.card,
+      paddingVertical: 12,
+      paddingBottom: 36,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    actionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+    },
+    actionDivider: {
+      width: 1,
+      height: 24,
+      backgroundColor: theme.colors.border,
+    },
+    actionLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    errorText: {
+      fontSize: 16,
+      color: theme.colors.textTertiary,
+      textAlign: 'center',
+      marginTop: 100,
+    },
+  });
+
+// 可拖动画板衣物
+interface CanvasItemProps {
+  clothing: ClothingItem;
+  position: OutfitItemPosition;
+  isSelected: boolean;
+  onSelect: () => void;
+  onPositionChange: (x: number, y: number, scale: number) => void;
+  onRemove: () => void;
+  styles: ReturnType<typeof makeStyles>;
+}
+
+function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange, onRemove, styles }: CanvasItemProps) {
+  const pan = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
+  const absPos = useRef({ x: position.x, y: position.y });
+
+  useEffect(() => {
+    absPos.current = { x: position.x, y: position.y };
+    pan.setValue({ x: position.x, y: position.y });
+    pan.flattenOffset();
+  }, [position.x, position.y]);
+
+  const panResponder = useRef(
+    require('react-native').PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: () => {
+        onSelect();
+        pan.setOffset(absPos.current);
+        pan.setValue({ x: 0, y: 0 });
+      },
+      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderRelease: () => {
+        pan.flattenOffset();
+        const rawX = (pan.x as any)._value;
+        const rawY = (pan.y as any)._value;
+        const newX = Math.max(0, Math.min(rawX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
+        const newY = Math.max(0, Math.min(rawY, CANVAS_SIZE - CANVAS_ITEM_SIZE));
+        absPos.current = { x: newX, y: newY };
+        pan.setValue({ x: newX, y: newY });
+        onPositionChange(newX, newY, 1);
+      },
+    })
+  ).current;
+
+  return (
+    <Animated.View
+      style={[
+        styles.canvasItem,
+        { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
+      ]}
+      {...panResponder.panHandlers}
+    >
+      <Image source={{ uri: clothing.thumbnailUri }} style={styles.canvasImage} />
+      {isSelected && (
+        <View style={styles.removeBtn}>
+          <TouchableOpacity style={styles.removeBtnInner} onPress={onRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={14} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      )}
+    </Animated.View>
+  );
+}
+
 export function OutfitDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'OutfitDetail'>>();
   const { outfitId } = route.params;
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const { outfits, clothing, updateOutfit, deleteOutfit } = useWardrobeStore();
 
   const outfit = outfits.find(o => o.id === outfitId);
 
-  // 本地状态
   const [localItemIds, setLocalItemIds] = useState<number[]>([]);
   const [localPositions, setLocalPositions] = useState<Record<number, OutfitItemPosition>>({});
-  // canvasItemIds: items currently visible ON the canvas
   const [canvasItemIds, setCanvasItemIds] = useState<number[]>([]);
 
-  // UI状态
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [showSaved, setShowSaved] = useState(false);
@@ -52,27 +271,23 @@ export function OutfitDetailScreen() {
   const [showPicker, setShowPicker] = useState(false);
   const canvasRef = useRef<View>(null);
 
-  // 初始化数据
   useEffect(() => {
     if (outfit) {
       const itemIds = outfit.itemIds || [];
       const positions = outfit.itemPositions || {};
       setLocalItemIds(itemIds);
       setLocalPositions(positions);
-      // Items with positions are on canvas
       const onCanvas = itemIds.filter(id => positions[id]);
       setCanvasItemIds(onCanvas);
       setEditedName(outfit.name);
     }
   }, [outfit?.id]);
 
-  // 计算是否有未保存的修改
   const hasUnsavedChanges = outfit && (
     JSON.stringify(localItemIds) !== JSON.stringify(outfit.itemIds) ||
     JSON.stringify(localPositions) !== JSON.stringify(outfit.itemPositions)
   );
 
-  // 硬件返回键监听
   useEffect(() => {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
       handleBack();
@@ -81,11 +296,9 @@ export function OutfitDetailScreen() {
     return () => backHandler.remove();
   }, [hasUnsavedChanges]);
 
-  // 画板上的衣物
   const canvasItems: ClothingItem[] = canvasItemIds
     .map(id => clothing.find(cl => cl.id === id))
     .filter(Boolean) as ClothingItem[];
-
 
   const handleBack = useCallback(() => {
     if (hasUnsavedChanges) {
@@ -153,10 +366,8 @@ export function OutfitDetailScreen() {
     setIsEditingName(false);
   };
 
-  // 从弹层添加衣物到搭配并直接放到画板
   const addClothingToOutfitById = (id: number) => {
     if (localItemIds.includes(id)) return;
-    // Place at random position within the square canvas
     const padding = 20;
     const available = CANVAS_SIZE - CANVAS_ITEM_SIZE - padding * 2;
     const x = padding + Math.random() * available;
@@ -169,7 +380,6 @@ export function OutfitDetailScreen() {
     }));
   };
 
-  // 从画板移除（返回 staged）
   const removeFromCanvas = (id: number) => {
     setSelectedItemId(null);
     setCanvasItemIds(prev => prev.filter(itemId => itemId !== id));
@@ -225,8 +435,9 @@ export function OutfitDetailScreen() {
         </View>
       </View>
 
-      {/* 画板区域 - 1:1 正方形居中 */}
+      {/* 画板区域 */}
       <View style={styles.canvasWrapper}>
+        <View style={styles.topSpacer} />
         <View style={styles.canvas} ref={canvasRef}>
           {canvasItems.length === 0 ? (
             <View style={styles.canvasEmpty}>
@@ -248,13 +459,14 @@ export function OutfitDetailScreen() {
                   }));
                 }}
                 onRemove={() => removeFromCanvas(c.id)}
+                styles={styles}
               />
             ))
           )}
         </View>
+        <View style={styles.bottomSpacer} />
       </View>
 
-      {/* ClothingPickerModal */}
       <ClothingPickerModal
         visible={showPicker}
         onClose={() => setShowPicker(false)}
@@ -304,220 +516,3 @@ export function OutfitDetailScreen() {
     </View>
   );
 }
-
-// 可拖动画板衣物
-interface CanvasItemProps {
-  clothing: ClothingItem;
-  position: OutfitItemPosition;
-  isSelected: boolean;
-  onSelect: () => void;
-  onPositionChange: (x: number, y: number, scale: number) => void;
-  onRemove: () => void;
-}
-
-function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange, onRemove }: CanvasItemProps) {
-  const pan = useRef(new Animated.ValueXY({ x: position.x, y: position.y })).current;
-  // Track absolute position in a ref to avoid reading private _value
-  const absPos = useRef({ x: position.x, y: position.y });
-
-  useEffect(() => {
-    absPos.current = { x: position.x, y: position.y };
-    pan.setValue({ x: position.x, y: position.y });
-    pan.flattenOffset();
-  }, [position.x, position.y]);
-
-  const panResponder = useRef(
-    require('react-native').PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        onSelect();
-        // Set offset to current absolute position, then reset value to 0
-        // so subsequent deltas are relative to the touch-start point
-        pan.setOffset(absPos.current);
-        pan.setValue({ x: 0, y: 0 });
-      },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], { useNativeDriver: false }),
-      onPanResponderRelease: () => {
-        pan.flattenOffset();
-        const rawX = (pan.x as any)._value;
-        const rawY = (pan.y as any)._value;
-        const newX = Math.max(0, Math.min(rawX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
-        const newY = Math.max(0, Math.min(rawY, CANVAS_SIZE - CANVAS_ITEM_SIZE));
-        absPos.current = { x: newX, y: newY };
-        pan.setValue({ x: newX, y: newY });
-        onPositionChange(newX, newY, 1);
-      },
-    })
-  ).current;
-
-  return (
-    <Animated.View
-      style={[
-        styles.canvasItem,
-        { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
-      ]}
-      {...panResponder.panHandlers}
-    >
-      <Image source={{ uri: clothing.thumbnailUri }} style={styles.canvasImage} />
-      {isSelected && (
-        <View style={styles.removeBtn}>
-          <TouchableOpacity style={styles.removeBtnInner} onPress={onRemove} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Ionicons name="close" size={14} color="#fff" />
-          </TouchableOpacity>
-        </View>
-      )}
-    </Animated.View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 12,
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  headerBtn: {
-    padding: 4,
-    width: 40,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: theme.colors.text,
-    textAlign: 'center',
-  },
-  headerSubtitle: {
-    fontSize: 11,
-    color: theme.colors.textTertiary,
-    textAlign: 'center',
-    marginTop: 2,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: 40,
-    justifyContent: 'flex-end',
-  },
-  savedIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  savedText: {
-    fontSize: 13,
-    color: theme.colors.success,
-  },
-  nameEditRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  nameInput: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: theme.colors.text,
-    textAlign: 'center',
-    minWidth: 120,
-    borderBottomWidth: 1.5,
-    borderBottomColor: theme.colors.primary,
-    paddingVertical: 2,
-    paddingHorizontal: 4,
-  },
-  nameConfirmBtn: {
-    padding: 4,
-  },
-  canvas: {
-    width: CANVAS_SIZE,
-    height: CANVAS_SIZE,
-    backgroundColor: theme.colors.borderLight,
-    position: 'relative',
-  },
-  canvasWrapper: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  canvasEmpty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  canvasEmptyText: {
-    fontSize: 14,
-    color: theme.colors.textTertiary,
-  },
-  canvasItem: {
-    position: 'absolute',
-    width: CANVAS_ITEM_SIZE,
-    height: CANVAS_ITEM_SIZE,
-  },
-  canvasImage: {
-    width: CANVAS_ITEM_SIZE,
-    height: CANVAS_ITEM_SIZE,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.card,
-  },
-  removeBtn: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: theme.colors.danger,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeBtnInner: {
-    width: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  actionBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    backgroundColor: theme.colors.card,
-    paddingVertical: 12,
-    paddingBottom: 36,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  actionBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-  },
-  actionDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: theme.colors.border,
-  },
-  actionLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  errorText: {
-    fontSize: 16,
-    color: theme.colors.textTertiary,
-    textAlign: 'center',
-    marginTop: 100,
-  },
-});

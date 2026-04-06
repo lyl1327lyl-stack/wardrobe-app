@@ -1,0 +1,63 @@
+<h2>添加衣物弹层 — 多选分类视图</h2>
+<p class="subtitle">点击"+"后弹出的选择器</p>
+
+<div class="mockup">
+  <div class="mockup-header">添加衣物弹层</div>
+  <div class="mockup-body">
+    <!-- Modal -->
+    <div style="background:#fff;border-radius:16px 16px 0 0;height:400px;display:flex;flex-direction:column;overflow:hidden;">
+      <!-- Header -->
+      <div style="padding:16px;border-bottom:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-weight:600;font-size:16px;">选择衣物</div>
+        <div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;color:#999;">×</div>
+      </div>
+
+      <!-- Body -->
+      <div style="flex:1;display:flex;overflow:hidden;">
+        <!-- Sidebar -->
+        <div style="width:80px;background:#f9f9f9;border-right:1px solid #eee;padding-top:8px;">
+          <div style="padding:10px 8px;font-size:12px;color:#8B7355;font-weight:600;background:#EDE4D8;border-radius:6px;margin:0 6px 4px;">全部</div>
+          <div style="padding:10px 8px;font-size:12px;color:#666;">上衣</div>
+          <div style="padding:10px 8px;font-size:12px;color:#666;">裤子</div>
+          <div style="padding:10px 8px;font-size:12px;color:#666;">裙子</div>
+          <div style="padding:10px 8px;font-size:12px;color:#666;">鞋子</div>
+          <div style="padding:10px 8px;font-size:12px;color:#666;">配饰</div>
+          <div style="padding:10px 8px;font-size:12px;color:#666;">外套</div>
+        </div>
+
+        <!-- Grid -->
+        <div style="flex:1;padding:12px;display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;overflow-y:auto;">
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;position:relative;">
+            <div style="position:absolute;top:4px;right:4px;width:18px;height:18px;background:#8B7355;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;">✓</div>
+          </div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+          <div style="width:70px;height:70px;background:#eee;border-radius:8px;"></div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div style="padding:16px;border-top:1px solid #eee;display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;color:#666;">已选 <span style="color:#8B7355;font-weight:600;">3</span> 件</div>
+        <div style="background:#8B7355;color:#fff;padding:10px 24px;border-radius:8px;font-weight:600;font-size:14px;">确认添加</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:20px;">
+  <h3>交互说明</h3>
+  <ul style="font-size:14px;color:#666;line-height:1.8;">
+    <li>点击底部Strip的"+"图标打开弹层</li>
+    <li>左侧分类导航，点击切换筛选</li>
+    <li>右侧网格显示该分类下的衣物缩略图</li>
+    <li>点击衣物切换选中状态，显示蓝色勾选标记</li>
+    <li>底部实时显示已选数量</li>
+    <li>点击"确认添加"批量添加选中衣物到画板</li>
+    <li>已在画板中的衣物显示已添加状态，不可重复选择</li>
+  </ul>
+</div>

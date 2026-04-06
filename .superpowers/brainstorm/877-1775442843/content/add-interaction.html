@@ -1,0 +1,28 @@
+<h2>添加衣物到画板</h2>
+<p class="subtitle">从底部衣物列表添加到画板的交互</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>拖动添加</h3>
+      <p>从底部拖动衣物图片到画板区域<br/>衣物出现在拖动位置，可立即调整</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>点击添加(现状)</h3>
+      <p>点击底部衣物，自动添加到画板中央<br/>简单直接，但无法选择位置</p>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>拖动 + 点击双模式</h3>
+      <p>支持两种方式：拖动可自由定位，点击则添加到中央<br/>灵活但实现复杂度较高</p>
+    </div>
+  </div>
+</div>

@@ -2,14 +2,16 @@ import * as ImagePicker from 'expo-image-picker';
 import {
   documentDirectory,
   makeDirectoryAsync,
-  copyAsync,
   deleteAsync,
   getInfoAsync,
+  readAsStringAsync,
+  writeAsStringAsync,
 } from 'expo-file-system/legacy';
-import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { manipulateAsync } from 'expo-image-manipulator';
 
 const IMAGE_DIR = `${documentDirectory}images/`;
 const THUMBNAIL_SIZE = 300;
+const IMAGE_SIZE = 1200;
 
 export async function ensureImageDir() {
   const dirInfo = await getInfoAsync(IMAGE_DIR);
@@ -21,7 +23,7 @@ export async function ensureImageDir() {
 export async function pickImage(): Promise<string | null> {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ['images'],
-    allowsEditing: true,
+    allowsEditing: false,
     quality: 1,
   });
 
@@ -34,7 +36,7 @@ export async function takePhoto(): Promise<string | null> {
   if (status !== 'granted') return null;
 
   const result = await ImagePicker.launchCameraAsync({
-    allowsEditing: true,
+    allowsEditing: false,
     quality: 1,
   });
 
@@ -46,20 +48,29 @@ export async function processImage(uri: string): Promise<{ imageUri: string; thu
   await ensureImageDir();
 
   const timestamp = Date.now();
-  const imagePath = `${IMAGE_DIR}img_${timestamp}.png`;
+  const imagePath = `${IMAGE_DIR}img_${timestamp}.jpg`;
   const thumbnailPath = `${IMAGE_DIR}thumb_${timestamp}.jpg`;
 
-  // Process and save original image
-  const manipulated = await manipulateAsync(uri, [], { compress: 0.9, format: SaveFormat.PNG });
-  await copyAsync({ from: manipulated.uri, to: imagePath });
+  // Process main image - resize to reasonable size
+  const manipulated = await manipulateAsync(
+    uri,
+    [{ resize: { width: IMAGE_SIZE } }],
+    { compress: 0.9 }
+  );
 
-  // Create thumbnail
+  // Process thumbnail
   const thumbnail = await manipulateAsync(
     uri,
     [{ resize: { width: THUMBNAIL_SIZE } }],
-    { compress: 0.8, format: SaveFormat.JPEG }
+    { compress: 0.8 }
   );
-  await copyAsync({ from: thumbnail.uri, to: thumbnailPath });
+
+  // Copy the processed images to our own directory
+  const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
+  await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
+
+  const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
+  await writeAsStringAsync(thumbnailPath, base64Thumb, { encoding: 'base64' });
 
   return { imageUri: imagePath, thumbnailUri: thumbnailPath };
 }

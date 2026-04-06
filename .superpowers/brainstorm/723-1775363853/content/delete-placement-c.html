@@ -1,0 +1,106 @@
+<h2>方案C：收纳进三点菜单（⋮）</h2>
+<p class="subtitle">顶栏右侧只保留保存按钮，删除等低频操作收纳到菜单中</p>
+
+<h3>布局示意</h3>
+
+<div class="mockup">
+  <div class="mockup-body">
+    <div style="background:#fff;padding:16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+      <!-- 顶栏 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding-top:40px;margin-bottom:8px">
+        <div style="width:32px;height:32px;background:#f0f0f0;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#666;font-weight:bold">←</div>
+        <div style="text-align:center">
+          <div style="font-weight:600;font-size:16px">上班穿搭</div>
+          <div style="font-size:11px;color:#999;margin-top:2px">点击改名</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="background:#8B7355;padding:6px 14px;border-radius:8px">
+            <span style="color:#fff;font-size:13px;font-weight:600">保存</span>
+          </div>
+          <div style="width:32px;height:32px;background:#f0f0f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#666">⋮</div>
+        </div>
+      </div>
+
+      <!-- 画板 -->
+      <div style="height:220px;background:#f8f8f8;border-radius:8px;margin-top:8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px">
+        画板区域
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:16px">点击 ⋮ 后的菜单</h3>
+
+<div class="mockup">
+  <div class="mockup-body">
+    <div style="background:#fff;padding:16px;border-radius:8px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+      <div style="padding-top:40px;margin-bottom:8px;text-align:center">
+        <div style="font-weight:600;font-size:16px">上班穿搭</div>
+        <div style="font-size:11px;color:#999;margin-top:2px">点击改名</div>
+      </div>
+      <div style="height:220px;background:#f8f8f8;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#ccc;font-size:13px">
+        画板区域
+      </div>
+      <!-- 弹出菜单 -->
+      <div style="position:absolute;right:16px;top:110px;background:#fff;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.15);padding:8px;min-width:160px">
+        <div style="padding:12px 16px;border-radius:8px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px">✏️</span>
+          <span style="font-size:14px;color:#333">编辑搭配名称</span>
+        </div>
+        <div style="height:1px;background:#f0f0f0;margin:4px 0"></div>
+        <div style="padding:12px 16px;border-radius:8px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:16px">🗑️</span>
+          <span style="font-size:14px;color:#e74c3c">删除搭配</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top:16px">点击「删除搭配」后</h3>
+<p style="font-size:13px;color:#666;margin-top:4px">弹出二次确认 Alert：「确定要删除搭配「上班穿搭」吗？删除后不可恢复。」</p>
+
+<div class="pros-cons" style="margin-top:16px">
+  <div class="pros">
+    <h4>优点</h4>
+    <ul>
+      <li>顶栏简洁，只保留高频操作</li>
+      <li>删除需要二次确认，防止误触</li>
+      <li>扩展性好，未来可加更多菜单项</li>
+    </ul>
+  </div>
+  <div class="cons">
+    <h4>缺点</h4>
+    <ul>
+      <li>删除多了一步操作</li>
+      <li>用户可能不知道 ⋮ 可以点击</li>
+    </ul>
+  </div>
+</div>
+
+<h3 style="margin-top:24px">其他方案回顾</h3>
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>方案A：视觉弱化</h3>
+      <p>删除按钮改用更小的图标或更淡的颜色</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>方案B：文字链接</h3>
+      <p>在"点击改名"旁边增加"删除搭配"文字链接</p>
+    </div>
+  </div>
+  <div class="option" data-choice="d" onclick="toggleSelect(this)">
+    <div class="letter">D</div>
+    <div class="content">
+      <h3>方案D：底部操作栏</h3>
+      <p>顶栏只放返回和名称，底部操作栏放置保存和删除</p>
+    </div>
+  </div>
+</div>
+
+<p class="label" style="margin-top:16px">如果方案C合适，回复「可以」，我来实现</p>

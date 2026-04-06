@@ -39,7 +39,8 @@
           "photosPermission": "允许访问相册以添加衣服照片",
           "cameraPermission": "允许使用相机拍照"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ]
   }
 }

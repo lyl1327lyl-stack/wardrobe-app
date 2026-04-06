@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -16,11 +16,230 @@ import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { Outfit } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
+
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 56,
+      paddingBottom: 16,
+    },
+    headerTitle: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: theme.colors.text,
+      letterSpacing: -0.5,
+    },
+    headerSubtitle: {
+      fontSize: 14,
+      color: theme.colors.textTertiary,
+      marginTop: 4,
+    },
+    list: {
+      paddingHorizontal: 16,
+      paddingBottom: 100,
+      flexGrow: 1,
+    },
+    row: {
+      justifyContent: 'space-between',
+    },
+    outfitCard: {
+      width: '48%',
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden',
+      marginBottom: 16,
+      ...theme.shadows.md,
+    },
+    outfitPreview: {
+      aspectRatio: 1,
+      backgroundColor: theme.colors.borderLight,
+    },
+    gridPreview: {
+      flex: 1,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    gridThumb: {
+      width: '50%',
+      height: '50%',
+      backgroundColor: theme.colors.borderLight,
+    },
+    gridThumbEmpty: {
+      width: '50%',
+      height: '50%',
+      backgroundColor: theme.colors.border,
+    },
+    canvasThumb: {
+      width: '100%',
+      height: '100%',
+      aspectRatio: 1,
+      backgroundColor: theme.colors.borderLight,
+    },
+    emptyPreview: {
+      height: 120,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 8,
+    },
+    emptyPreviewText: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+    },
+    outfitInfo: {
+      padding: 14,
+    },
+    outfitName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    outfitCount: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      marginTop: 4,
+    },
+    empty: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingTop: 80,
+      paddingHorizontal: 40,
+    },
+    emptyIconWrap: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: theme.colors.borderLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 8,
+    },
+    emptySubtext: {
+      fontSize: 14,
+      color: theme.colors.textTertiary,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    emptyCreateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: theme.borderRadius.full,
+      marginTop: 20,
+      ...theme.shadows.sm,
+    },
+    emptyCreateBtnText: {
+      color: theme.colors.white,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    fab: {
+      position: 'absolute',
+      right: 20,
+      bottom: 24,
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...theme.shadows.lg,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    modal: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.xl,
+      padding: 24,
+      width: '100%',
+      maxWidth: 340,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    modalInput: {
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      marginBottom: 8,
+    },
+    modalHint: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      marginBottom: 20,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    modalCancel: {
+      flex: 1,
+      paddingVertical: 13,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    modalCancelText: {
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      fontWeight: '500',
+    },
+    modalConfirm: {
+      flex: 2,
+      paddingVertical: 13,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+      ...theme.shadows.sm,
+    },
+    modalConfirmText: {
+      fontSize: 15,
+      color: theme.colors.white,
+      fontWeight: '600',
+    },
+  });
 
 export function OutfitsScreen() {
   const navigation = useNavigation<any>();
   const { outfits, clothing, deleteOutfit, addOutfit } = useWardrobeStore();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const [showCreate, setShowCreate] = useState(false);
   const [newOutfitName, setNewOutfitName] = useState('');
 
@@ -173,217 +392,3 @@ export function OutfitsScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 16,
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: theme.colors.text,
-    letterSpacing: -0.5,
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: theme.colors.textTertiary,
-    marginTop: 4,
-  },
-  list: {
-    paddingHorizontal: 16,
-    paddingBottom: 100,
-    flexGrow: 1,
-  },
-  row: {
-    justifyContent: 'space-between',
-  },
-  outfitCard: {
-    width: '48%',
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    marginBottom: 16,
-    ...theme.shadows.md,
-  },
-  outfitPreview: {
-    aspectRatio: 1,
-    backgroundColor: theme.colors.borderLight,
-  },
-  gridPreview: {
-    flex: 1,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  gridThumb: {
-    width: '50%',
-    height: '50%',
-    backgroundColor: theme.colors.borderLight,
-  },
-  gridThumbEmpty: {
-    width: '50%',
-    height: '50%',
-    backgroundColor: theme.colors.border,
-  },
-  canvasThumb: {
-    width: '100%',
-    height: '100%',
-    aspectRatio: 1,
-    backgroundColor: theme.colors.borderLight,
-  },
-  emptyPreview: {
-    height: 120,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 8,
-  },
-  emptyPreviewText: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-  },
-  outfitInfo: {
-    padding: 14,
-  },
-  outfitName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  outfitCount: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-    marginTop: 4,
-  },
-  empty: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 40,
-  },
-  emptyIconWrap: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: theme.colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginBottom: 8,
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: theme.colors.textTertiary,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  emptyCreateBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: theme.borderRadius.full,
-    marginTop: 20,
-    ...theme.shadows.sm,
-  },
-  emptyCreateBtnText: {
-    color: theme.colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  fab: {
-    position: 'absolute',
-    right: 20,
-    bottom: 24,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    ...theme.shadows.lg,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  modal: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.xl,
-    padding: 24,
-    width: '100%',
-    maxWidth: 340,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  modalInput: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-    marginBottom: 8,
-  },
-  modalHint: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-    marginBottom: 20,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  modalCancel: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-  },
-  modalCancelText: {
-    fontSize: 15,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  modalConfirm: {
-    flex: 2,
-    paddingVertical: 13,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-  modalConfirmText: {
-    fontSize: 15,
-    color: theme.colors.white,
-    fontWeight: '600',
-  },
-});

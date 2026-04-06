@@ -68,6 +68,8 @@ export function AddClothingScreen() {
         wearCount: 0,
         lastWornAt: null,
         createdAt: new Date().toISOString(),
+        remarks: '',
+        styles: [],
       });
 
       navigation.goBack();

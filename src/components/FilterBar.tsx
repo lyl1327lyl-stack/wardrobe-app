@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { ClothingType, Season, CLOTHING_TYPES, SEASONS } from '../types';
+import { theme } from '../utils/theme';
 
 interface Props {
   selectedType: ClothingType | '全部';
@@ -20,6 +21,7 @@ export function FilterBar({ selectedType, selectedSeason, onTypeChange, onSeason
               key={type}
               style={[styles.chip, selectedType === type && styles.chipActive]}
               onPress={() => onTypeChange(type)}
+              activeOpacity={0.7}
             >
               <Text style={[styles.chipText, selectedType === type && styles.chipTextActive]}>
                 {type}
@@ -36,6 +38,7 @@ export function FilterBar({ selectedType, selectedSeason, onTypeChange, onSeason
               key={season}
               style={[styles.chip, selectedSeason === season && styles.chipActive]}
               onPress={() => onSeasonChange(season)}
+              activeOpacity={0.7}
             >
               <Text style={[styles.chipText, selectedSeason === season && styles.chipTextActive]}>
                 {season}
@@ -50,40 +53,42 @@ export function FilterBar({ selectedType, selectedSeason, onTypeChange, onSeason
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: 8,
-    backgroundColor: '#fff',
+    paddingVertical: 10,
+    backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: theme.colors.border,
   },
   row: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     marginBottom: 4,
   },
   filterGroup: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   label: {
     fontSize: 13,
-    color: '#999',
+    color: theme.colors.textTertiary,
     marginRight: 4,
+    fontWeight: '500',
   },
   chip: {
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: '#f5f5f5',
+    paddingVertical: 5,
+    borderRadius: theme.borderRadius.full,
+    backgroundColor: theme.colors.borderLight,
     marginRight: 6,
   },
   chipActive: {
-    backgroundColor: '#007AFF',
+    backgroundColor: theme.colors.primary,
   },
   chipText: {
     fontSize: 13,
-    color: '#666',
+    color: theme.colors.textSecondary,
   },
   chipTextActive: {
-    color: '#fff',
+    color: theme.colors.white,
+    fontWeight: '500',
   },
 });
