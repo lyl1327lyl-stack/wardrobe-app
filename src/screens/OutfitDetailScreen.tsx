@@ -22,6 +22,8 @@ import { ClothingPickerModal } from '../components/ClothingPickerModal';
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CANVAS_SIZE = SCREEN_WIDTH - 32; // 1:1 square, with 16px padding each side
 const CANVAS_ITEM_SIZE = 100;
+const HEADER_HEIGHT = 68;
+const ACTION_BAR_HEIGHT = 88; // paddingVertical 12 + paddingBottom 36 + ~32 bar height
 
 type RouteParams = {
   OutfitDetail: { outfitId: number };
@@ -445,7 +447,6 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 16,
   },
   canvasEmpty: {
     flex: 1,
