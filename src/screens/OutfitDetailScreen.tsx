@@ -287,11 +287,7 @@ export function OutfitDetailScreen() {
           }}
         >
           <Text style={styles.stripLabel}>已选 {stagedItems.length} 件，拖动到画板</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stripContent}
-          >
+          <View style={styles.stripContent}>
             {stagedItems.map(item => (
               <DraggableStagedItem
                 key={item.id}
@@ -302,7 +298,7 @@ export function OutfitDetailScreen() {
                 onPress={() => addStagedToCanvas(item.id)}
               />
             ))}
-          </ScrollView>
+          </View>
         </View>
       )}
 
@@ -439,6 +435,10 @@ function DraggableStagedItem({ item, stripTopY, canvasTopY, onDragToCanvas, onPr
   const opacityVal = useRef(new Animated.Value(1)).current;
   const gestureX = useRef(new Animated.Value(0)).current;
   const gestureY = useRef(new Animated.Value(0)).current;
+  // Track the item's starting offset (for spring-back to correct slot)
+  const startOffset = useRef({ x: 0, y: 0 });
+  const cTopY = useRef(0);
+  const sTopY = useRef(0);
 
   const panResponder = useRef(
     require('react-native').PanResponder.create({
@@ -446,22 +446,31 @@ function DraggableStagedItem({ item, stripTopY, canvasTopY, onDragToCanvas, onPr
       onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
       onPanResponderGrant: () => {
         didDragToCanvas.current = false;
+        // Read current strip/canvas Y from refs (set by parent onLayout)
+        sTopY.current = stripTopY.current;
+        cTopY.current = canvasTopY.current;
+        // Capture current visual position as starting offset
+        startOffset.current = {
+          x: (gestureX as any)._offset + (gestureX as any)._value,
+          y: (gestureY as any)._offset + (gestureY as any)._value,
+        };
+        gestureX.setOffset(startOffset.current.x);
+        gestureY.setOffset(startOffset.current.y);
         gestureX.setValue(0);
         gestureY.setValue(0);
         scaleVal.setValue(1);
         opacityVal.setValue(1);
       },
       onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
-      onPanResponderRelease: (_: any, _gestureState: any) => {
+      onPanResponderRelease: (_: any, gestureState: any) => {
         if (didDragToCanvas.current) return;
-        const absY = (gestureY as any)._offset + (gestureY as any)._value;
-        const absX = (gestureX as any)._offset + (gestureX as any)._value;
-        if (absY < stripTopY.current - 20) {
-          // Dragged into canvas zone - pass drop coords relative to canvas
+        // gestureState.moveY is the finger's absolute screen Y - use this directly
+        if (gestureState.moveY < sTopY.current - 20) {
           didDragToCanvas.current = true;
-          // absX is screen-relative to item's original pos; convert to canvas-relative
-          const canvasRelX = absX;
-          const canvasRelY = absY - canvasTopY.current;
+          const absX = startOffset.current.x + (gestureX as any)._value;
+          const absY = startOffset.current.y + (gestureY as any)._value;
+          const canvasRelX = Math.max(0, Math.min(absX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
+          const canvasRelY = Math.max(0, Math.min(absY - cTopY.current, CANVAS_HEIGHT - CANVAS_ITEM_SIZE));
           Animated.parallel([
             Animated.timing(opacityVal, { toValue: 0, duration: 120, useNativeDriver: false }),
             Animated.timing(scaleVal, { toValue: 0.3, duration: 120, useNativeDriver: false }),
@@ -469,7 +478,7 @@ function DraggableStagedItem({ item, stripTopY, canvasTopY, onDragToCanvas, onPr
             if (finished) onDragToCanvas(canvasRelX, canvasRelY);
           });
         } else {
-          // Within strip zone - spring back to original position
+          // Spring back to original position (startOffset), not to 0
           Animated.parallel([
             Animated.spring(gestureX, { toValue: 0, useNativeDriver: false, friction: 7, tension: 50 }),
             Animated.spring(gestureY, { toValue: 0, useNativeDriver: false, friction: 7, tension: 50 }),
