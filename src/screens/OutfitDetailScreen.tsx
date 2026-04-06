@@ -436,12 +436,13 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
         opacityVal.setValue(1);
       },
       onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
-      onPanResponderRelease: () => {
+      onPanResponderRelease: (_: any, gestureState: any) => {
         if (didDragToCanvas.current) return;
-        // gestureY._value is the accumulated delta from touch-start
-        const finalY = (gestureY as any)._value;
-        const absScreenY = (gestureY as any)._offset + finalY;
-        if (absScreenY < stripTopY.current - 20) {
+        // Lock item at current position - flattenOffset merges offset into value
+        // so item stays exactly where released, no spring conflict
+        gestureX.flattenOffset();
+        gestureY.flattenOffset();
+        if (gestureState.moveY < stripTopY.current - 20) {
           didDragToCanvas.current = true;
           Animated.parallel([
             Animated.timing(opacityVal, { toValue: 0, duration: 150, useNativeDriver: false }),
@@ -449,11 +450,6 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
           ]).start(({ finished }) => {
             if (finished) onDragToCanvas();
           });
-        } else {
-          Animated.parallel([
-            Animated.spring(gestureX, { toValue: 0, useNativeDriver: false, friction: 6, tension: 40 }),
-            Animated.spring(gestureY, { toValue: 0, useNativeDriver: false, friction: 6, tension: 40 }),
-          ]).start();
         }
       },
     })
