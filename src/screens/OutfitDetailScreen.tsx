@@ -6,7 +6,6 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
-  ScrollView,
   Alert,
   BackHandler,
   TextInput,
@@ -20,10 +19,9 @@ import { ClothingItem, OutfitItemPosition } from '../types';
 import { theme } from '../utils/theme';
 import { ClothingPickerModal } from '../components/ClothingPickerModal';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CANVAS_HEIGHT = SCREEN_WIDTH * 1.2;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const CANVAS_SIZE = SCREEN_WIDTH - 32; // 1:1 square, with 16px padding each side
 const CANVAS_ITEM_SIZE = 100;
-const STRIP_ITEM_SIZE = 70;
 
 type RouteParams = {
   OutfitDetail: { outfitId: number };
@@ -51,9 +49,6 @@ export function OutfitDetailScreen() {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const canvasRef = useRef<View>(null);
-  const stripRef = useRef<View>(null);
-  const stripTopY = useRef(0);
-  const canvasTopY = useRef(0);
 
   // 初始化数据
   useEffect(() => {
@@ -89,11 +84,6 @@ export function OutfitDetailScreen() {
     .map(id => clothing.find(cl => cl.id === id))
     .filter(Boolean) as ClothingItem[];
 
-  // 已加入搭配但未放到画板的衣物（staged）
-  const stagedItems: ClothingItem[] = localItemIds
-    .filter(id => !canvasItemIds.includes(id))
-    .map(id => clothing.find(cl => cl.id === id))
-    .filter(Boolean) as ClothingItem[];
 
   const handleBack = useCallback(() => {
     if (hasUnsavedChanges) {
@@ -161,22 +151,15 @@ export function OutfitDetailScreen() {
     setIsEditingName(false);
   };
 
-  // 从弹层添加衣物到 staged（不自动上画板）
+  // 从弹层添加衣物到搭配并直接放到画板
   const addClothingToOutfitById = (id: number) => {
     if (localItemIds.includes(id)) return;
+    // Place at random position within the square canvas
+    const padding = 20;
+    const available = CANVAS_SIZE - CANVAS_ITEM_SIZE - padding * 2;
+    const x = padding + Math.random() * available;
+    const y = padding + Math.random() * available;
     setLocalItemIds(prev => [...prev, id]);
-  };
-
-  // 从 staged 添加到画板（点击或拖动释放）
-  const addStagedToCanvas = (id: number, dropX?: number, dropY?: number) => {
-    if (!localItemIds.includes(id) || canvasItemIds.includes(id)) return;
-    // Use actual drop coords capped within canvas bounds, or random center
-    const x = dropX !== undefined
-      ? Math.max(0, Math.min(dropX, SCREEN_WIDTH - CANVAS_ITEM_SIZE))
-      : (SCREEN_WIDTH - CANVAS_ITEM_SIZE) / 2 + (Math.random() - 0.5) * 60;
-    const y = dropY !== undefined
-      ? Math.max(0, Math.min(dropY, CANVAS_HEIGHT - CANVAS_ITEM_SIZE))
-      : 60 + (Math.random() - 0.5) * 80;
     setCanvasItemIds(prev => [...prev, id]);
     setLocalPositions(prev => ({
       ...prev,
@@ -240,67 +223,34 @@ export function OutfitDetailScreen() {
         </View>
       </View>
 
-      {/* 画板区域 */}
-      <View
-        style={styles.canvas}
-        ref={canvasRef}
-        onLayout={() => {
-          canvasRef.current?.measure((_x, _y, _w, _h, _px, py) => {
-            canvasTopY.current = py;
-          });
-        }}
-      >
-        {canvasItems.length === 0 ? (
-          <View style={styles.canvasEmpty}>
-            <Ionicons name="images-outline" size={48} color={theme.colors.border} />
-            <Text style={styles.canvasEmptyText}>拖动下方衣物到画板</Text>
-          </View>
-        ) : (
-          canvasItems.map(c => (
-            <CanvasItem
-              key={c.id}
-              clothing={c}
-              position={localPositions[c.id] || { x: 0, y: 0, scale: 1 }}
-              isSelected={selectedItemId === c.id}
-              onSelect={() => setSelectedItemId(c.id)}
-              onPositionChange={(x, y, scale) => {
-                setLocalPositions(prev => ({
-                  ...prev,
-                  [c.id]: { x, y, scale },
-                }));
-              }}
-              onRemove={() => removeFromCanvas(c.id)}
-            />
-          ))
-        )}
-      </View>
-
-      {/* 已选衣物 Strip（未上画板的） */}
-      {stagedItems.length > 0 && (
-        <View
-          ref={stripRef as any}
-          style={styles.stagedStrip}
-          onLayout={() => {
-            stripRef.current?.measure((_x, _y, _w, _h, _px, py) => {
-              stripTopY.current = py;
-            });
-          }}
-        >
-          <Text style={styles.stripLabel}>已选 {stagedItems.length} 件，拖动到画板</Text>
-          <View style={styles.stripContent}>
-            {stagedItems.map(item => (
-              <DraggableStagedItem
-                key={item.id}
-                item={item}
-                stripTopY={stripTopY}
-                canvasTopY={canvasTopY}
-                onDragToCanvas={(x, y) => addStagedToCanvas(item.id, x, y)}
-                onPress={() => addStagedToCanvas(item.id)}
+      {/* 画板区域 - 1:1 正方形居中 */}
+      <View style={styles.canvasWrapper}>
+        <View style={styles.canvas} ref={canvasRef}>
+          {canvasItems.length === 0 ? (
+            <View style={styles.canvasEmpty}>
+              <Ionicons name="images-outline" size={48} color={theme.colors.border} />
+              <Text style={styles.canvasEmptyText}>点击下方按钮添加衣服</Text>
+            </View>
+          ) : (
+            canvasItems.map(c => (
+              <CanvasItem
+                key={c.id}
+                clothing={c}
+                position={localPositions[c.id] || { x: 0, y: 0, scale: 1 }}
+                isSelected={selectedItemId === c.id}
+                onSelect={() => setSelectedItemId(c.id)}
+                onPositionChange={(x, y, scale) => {
+                  setLocalPositions(prev => ({
+                    ...prev,
+                    [c.id]: { x, y, scale },
+                  }));
+                }}
+                onRemove={() => removeFromCanvas(c.id)}
               />
-            ))}
-          </View>
+            ))
+          )}
         </View>
-      )}
+      </View>
 
       {/* ClothingPickerModal */}
       <ClothingPickerModal
@@ -391,7 +341,7 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
         const rawX = (pan.x as any)._value;
         const rawY = (pan.y as any)._value;
         const newX = Math.max(0, Math.min(rawX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
-        const newY = Math.max(0, Math.min(rawY, CANVAS_HEIGHT - CANVAS_ITEM_SIZE));
+        const newY = Math.max(0, Math.min(rawY, CANVAS_SIZE - CANVAS_ITEM_SIZE));
         absPos.current = { x: newX, y: newY };
         pan.setValue({ x: newX, y: newY });
         onPositionChange(newX, newY, 1);
@@ -415,97 +365,6 @@ function CanvasItem({ clothing, position, isSelected, onSelect, onPositionChange
           </TouchableOpacity>
         </View>
       )}
-    </Animated.View>
-  );
-}
-
-// 可拖动 staged 衣物（从 strip 拖到画板）
-interface DraggableStagedItemProps {
-  item: ClothingItem;
-  stripTopY: React.RefObject<number>;
-  canvasTopY: React.RefObject<number>;
-  onDragToCanvas: (x: number, y: number) => void;
-  onPress: () => void;
-}
-
-function DraggableStagedItem({ item, stripTopY, canvasTopY, onDragToCanvas, onPress }: DraggableStagedItemProps) {
-  const itemRef = useRef<View>(null);
-  const didDragToCanvas = useRef(false);
-  const scaleVal = useRef(new Animated.Value(1)).current;
-  const opacityVal = useRef(new Animated.Value(1)).current;
-  const gestureX = useRef(new Animated.Value(0)).current;
-  const gestureY = useRef(new Animated.Value(0)).current;
-  // Track the item's starting offset (for spring-back to correct slot)
-  const startOffset = useRef({ x: 0, y: 0 });
-  const cTopY = useRef(0);
-  const sTopY = useRef(0);
-
-  const panResponder = useRef(
-    require('react-native').PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
-      onPanResponderGrant: () => {
-        didDragToCanvas.current = false;
-        // Read current strip/canvas Y from refs (set by parent onLayout)
-        sTopY.current = stripTopY.current;
-        cTopY.current = canvasTopY.current;
-        // Capture current visual position as starting offset
-        startOffset.current = {
-          x: (gestureX as any)._offset + (gestureX as any)._value,
-          y: (gestureY as any)._offset + (gestureY as any)._value,
-        };
-        gestureX.setOffset(startOffset.current.x);
-        gestureY.setOffset(startOffset.current.y);
-        gestureX.setValue(0);
-        gestureY.setValue(0);
-        scaleVal.setValue(1);
-        opacityVal.setValue(1);
-      },
-      onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
-      onPanResponderRelease: (_: any, gestureState: any) => {
-        if (didDragToCanvas.current) return;
-        // gestureState.moveY is the finger's absolute screen Y - use this directly
-        if (gestureState.moveY < sTopY.current - 20) {
-          didDragToCanvas.current = true;
-          const absX = startOffset.current.x + (gestureX as any)._value;
-          const absY = startOffset.current.y + (gestureY as any)._value;
-          const canvasRelX = Math.max(0, Math.min(absX, SCREEN_WIDTH - CANVAS_ITEM_SIZE));
-          const canvasRelY = Math.max(0, Math.min(absY - cTopY.current, CANVAS_HEIGHT - CANVAS_ITEM_SIZE));
-          Animated.parallel([
-            Animated.timing(opacityVal, { toValue: 0, duration: 120, useNativeDriver: false }),
-            Animated.timing(scaleVal, { toValue: 0.3, duration: 120, useNativeDriver: false }),
-          ]).start(({ finished }) => {
-            if (finished) onDragToCanvas(canvasRelX, canvasRelY);
-          });
-        } else {
-          // Spring back to original position (startOffset), not to 0
-          Animated.parallel([
-            Animated.spring(gestureX, { toValue: 0, useNativeDriver: false, friction: 7, tension: 50 }),
-            Animated.spring(gestureY, { toValue: 0, useNativeDriver: false, friction: 7, tension: 50 }),
-          ]).start();
-        }
-      },
-    })
-  ).current;
-
-  const animatedStyle = {
-    transform: [
-      { translateX: gestureX },
-      { translateY: gestureY },
-      { scale: scaleVal },
-    ],
-    opacity: opacityVal,
-  };
-
-  return (
-    <Animated.View
-      ref={itemRef as any}
-      style={[styles.stripItem, animatedStyle]}
-      {...panResponder.panHandlers}
-    >
-      <TouchableOpacity style={styles.stripItemInner} onPress={onPress} activeOpacity={0.8}>
-        <Image source={{ uri: item.thumbnailUri }} style={styles.stripImage} />
-      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -577,10 +436,16 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   canvas: {
-    width: SCREEN_WIDTH,
-    height: CANVAS_HEIGHT,
+    width: CANVAS_SIZE,
+    height: CANVAS_SIZE,
     backgroundColor: theme.colors.borderLight,
     position: 'relative',
+  },
+  canvasWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 16,
   },
   canvasEmpty: {
     flex: 1,
@@ -619,41 +484,6 @@ const styles = StyleSheet.create({
     height: 24,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  stagedStrip: {
-    backgroundColor: theme.colors.card,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-    maxHeight: 180,
-  },
-  stripLabel: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    paddingBottom: 6,
-  },
-  stripContent: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    paddingHorizontal: 16,
-    paddingBottom: 14,
-    gap: 8,
-  },
-  stripItem: {
-    width: STRIP_ITEM_SIZE,
-    height: STRIP_ITEM_SIZE,
-  },
-  stripItemInner: {
-    width: STRIP_ITEM_SIZE,
-    height: STRIP_ITEM_SIZE,
-    borderRadius: theme.borderRadius.md,
-    overflow: 'hidden',
-  },
-  stripImage: {
-    width: STRIP_ITEM_SIZE,
-    height: STRIP_ITEM_SIZE,
-    backgroundColor: theme.colors.borderLight,
   },
   actionBar: {
     position: 'absolute',
