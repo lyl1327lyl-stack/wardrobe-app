@@ -6,7 +6,6 @@ import {
   Image,
   TouchableOpacity,
   Dimensions,
-  ScrollView,
   Alert,
   BackHandler,
   TextInput,
@@ -273,11 +272,7 @@ export function OutfitDetailScreen() {
           }}
         >
           <Text style={styles.stripLabel}>已选 {stagedItems.length} 件，拖动到画板</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.stripContent}
-          >
+          <View style={styles.stripContent}>
             {stagedItems.map(item => (
               <DraggableStagedItem
                 key={item.id}
@@ -287,7 +282,7 @@ export function OutfitDetailScreen() {
                 onPress={() => addStagedToCanvas(item.id)}
               />
             ))}
-          </ScrollView>
+          </View>
         </View>
       )}
 
@@ -417,8 +412,13 @@ interface DraggableStagedItemProps {
 }
 
 function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: DraggableStagedItemProps) {
-  const pan = useRef(new Animated.ValueXY()).current;
+  const itemRef = useRef<View>(null);
   const didDragToCanvas = useRef(false);
+  const scaleVal = useRef(new Animated.Value(1)).current;
+  const opacityVal = useRef(new Animated.Value(1)).current;
+  // Shared animated values for gesture
+  const gestureX = useRef(new Animated.Value(0)).current;
+  const gestureY = useRef(new Animated.Value(0)).current;
 
   const panResponder = useRef(
     require('react-native').PanResponder.create({
@@ -426,37 +426,48 @@ function DraggableStagedItem({ item, stripTopY, onDragToCanvas, onPress }: Dragg
       onMoveShouldSetPanResponder: (_: any, gestureState: any) => Math.abs(gestureState.dy) > 8,
       onPanResponderGrant: () => {
         didDragToCanvas.current = false;
-        pan.setValue({ x: 0, y: 0 });
+        gestureX.setValue(0);
+        gestureY.setValue(0);
+        scaleVal.setValue(1);
+        opacityVal.setValue(1);
       },
-      onPanResponderMove: Animated.event([null, { dy: pan.y }], { useNativeDriver: false }),
+      onPanResponderMove: Animated.event([null, { dx: gestureX, dy: gestureY }], { useNativeDriver: false }),
       onPanResponderRelease: (_: any, gestureState: any) => {
         if (didDragToCanvas.current) return;
         if (gestureState.moveY < stripTopY.current - 20) {
           didDragToCanvas.current = true;
-          // Slide upward toward canvas, then add to canvas
-          Animated.timing(pan, {
-            toValue: { x: 0, y: -120 },
-            duration: 180,
-            useNativeDriver: true,
-          }).start(({ finished }) => {
+          // Animate: shrink + fade while moving further up, then add
+          Animated.parallel([
+            Animated.timing(opacityVal, { toValue: 0, duration: 150, useNativeDriver: true }),
+            Animated.timing(scaleVal, { toValue: 0.3, duration: 150, useNativeDriver: true }),
+            Animated.timing(gestureY, { toValue: -80, duration: 150, useNativeDriver: false }),
+          ]).start(({ finished }) => {
             if (finished) onDragToCanvas();
           });
         } else {
-          // Spring back to original position
-          Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
-            useNativeDriver: true,
-            friction: 6,
-            tension: 40,
-          }).start();
+          // Spring back
+          Animated.parallel([
+            Animated.spring(gestureX, { toValue: 0, useNativeDriver: false, friction: 6, tension: 40 }),
+            Animated.spring(gestureY, { toValue: 0, useNativeDriver: false, friction: 6, tension: 40 }),
+          ]).start();
         }
       },
     })
   ).current;
 
+  const animatedStyle = {
+    transform: [
+      { translateX: gestureX },
+      { translateY: gestureY },
+      { scale: scaleVal },
+    ],
+    opacity: opacityVal,
+  };
+
   return (
     <Animated.View
-      style={[styles.stripItem, { transform: [{ translateY: pan.y }] }]}
+      ref={itemRef as any}
+      style={[styles.stripItem, animatedStyle]}
       {...panResponder.panHandlers}
     >
       <TouchableOpacity style={styles.stripItemInner} onPress={onPress} activeOpacity={0.8}>
