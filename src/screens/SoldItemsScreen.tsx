@@ -242,7 +242,7 @@ export function SoldItemsScreen() {
   const renderItem = ({ item }: { item: ClothingItem }) => (
     <TouchableOpacity
       style={styles.itemCard}
-      onPress={() => navigation.navigate('ClothingDetail', { id: item.id })}
+      onPress={() => navigation.navigate('ClothingDetail', { id: item.id, source: 'sold' })}
       activeOpacity={0.85}
     >
       <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />

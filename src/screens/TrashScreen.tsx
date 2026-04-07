@@ -226,7 +226,7 @@ export function TrashScreen() {
   const renderItem = ({ item }: { item: ClothingItem }) => (
     <TouchableOpacity
       style={styles.itemCard}
-      onPress={() => navigation.navigate('ClothingDetail', { id: item.id })}
+      onPress={() => navigation.navigate('ClothingDetail', { id: item.id, source: 'trash' })}
       activeOpacity={0.85}
     >
       <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />

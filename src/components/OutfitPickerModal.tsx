@@ -29,6 +29,8 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
   const [showCreate, setShowCreate] = useState(false);
   const [newOutfitName, setNewOutfitName] = useState('');
   const [selectedOutfitIds, setSelectedOutfitIds] = useState<number[]>([]);
+  const [originallySelectedIds, setOriginallySelectedIds] = useState<number[]>([]);
+  const [hasChanges, setHasChanges] = useState(false);
 
   // 当 modal 打开时，初始化已选中的搭配（已经在该搭配中的）
   useEffect(() => {
@@ -37,6 +39,8 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
         .filter(outfit => outfit.itemIds.includes(clothingItem.id))
         .map(outfit => outfit.id);
       setSelectedOutfitIds(alreadyInOutfits);
+      setOriginallySelectedIds(alreadyInOutfits);
+      setHasChanges(false);
       setShowCreate(false);
     }
   }, [visible]);
@@ -50,22 +54,37 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
   const isItemInOutfit = (outfit: Outfit) => outfit.itemIds.includes(clothingItem.id);
 
   const toggleOutfit = (outfit: Outfit) => {
-    // 如果衣服已在搭配中，不允许切换
-    if (outfit.itemIds.includes(clothingItem.id)) return;
+    // 勾选状态仅由 selectedOutfitIds 决定
     setSelectedOutfitIds(prev =>
       prev.includes(outfit.id) ? prev.filter(id => id !== outfit.id) : [...prev, outfit.id]
     );
+    setHasChanges(true);
   };
 
   const handleConfirm = async () => {
-    if (selectedOutfitIds.length === 0) {
-      Alert.alert('请先选择搭配', '至少选择一个搭配来添加这件衣服');
+    // 需要移除的搭配（之前有，现在取消勾选）
+    const toRemove = originallySelectedIds.filter(id => !selectedOutfitIds.includes(id));
+    // 需要添加的搭配（之前没有，现在勾选）
+    const toAdd = selectedOutfitIds.filter(id => !originallySelectedIds.includes(id));
+
+    if (toRemove.length === 0 && toAdd.length === 0) {
+      onClose();
       return;
     }
-    for (const outfitId of selectedOutfitIds) {
+
+    for (const outfitId of toRemove) {
       const outfit = outfits.find(o => o.id === outfitId);
-      if (outfit && !outfit.itemIds.includes(clothingItem.id)) {
-        // 默认位置：画板中央（与 OutfitDetailScreen 中的 canvas 逻辑一致）
+      if (outfit) {
+        const newItemIds = outfit.itemIds.filter(id => id !== clothingItem.id);
+        const newPositions = { ...outfit.itemPositions };
+        delete newPositions[clothingItem.id];
+        await updateOutfit({ ...outfit, itemIds: newItemIds, itemPositions: newPositions });
+      }
+    }
+
+    for (const outfitId of toAdd) {
+      const outfit = outfits.find(o => o.id === outfitId);
+      if (outfit) {
         const canvasW = Dimensions.get('window').width;
         const canvasH = canvasW * 1.2;
         const itemSize = 120;
@@ -77,14 +96,15 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
         await updateOutfit({
           ...outfit,
           itemIds: [...outfit.itemIds, clothingItem.id],
-          itemPositions: {
-            ...(outfit.itemPositions || {}),
-            [clothingItem.id]: defaultPos,
-          },
+          itemPositions: { ...(outfit.itemPositions || {}), [clothingItem.id]: defaultPos },
         });
       }
     }
-    Alert.alert('已添加', `成功将这件衣服添加到 ${selectedOutfitIds.length} 个搭配`);
+
+    const msgs = [];
+    if (toAdd.length > 0) msgs.push(`添加到 ${toAdd.length} 个搭配`);
+    if (toRemove.length > 0) msgs.push(`从 ${toRemove.length} 个搭配移除`);
+    Alert.alert('已更新', msgs.join('，'));
     setSelectedOutfitIds([]);
     onClose();
   };
@@ -154,7 +174,7 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
 
   return (
     <Modal visible={visible} animationType="slide" transparent>
-      <KeyboardAvoidingView style={styles.overlay} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.overlay} behavior="padding" keyboardVerticalOffset={0}>
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>加入搭配</Text>
@@ -189,9 +209,14 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
                 }
               />
 
-              {outfits.length > 0 && selectedOutfitIds.length > 0 && (
-                <TouchableOpacity style={styles.confirmButton} onPress={handleConfirm} activeOpacity={0.8}>
-                  <Text style={styles.confirmButtonText}>添加到 {selectedOutfitIds.length} 个搭配</Text>
+              {outfits.length > 0 && (
+                <TouchableOpacity
+                  style={[styles.confirmButton, !hasChanges && styles.confirmButtonDisabled]}
+                  onPress={handleConfirm}
+                  activeOpacity={0.8}
+                  disabled={!hasChanges}
+                >
+                  <Text style={styles.confirmButtonText}>应用更改</Text>
                 </TouchableOpacity>
               )}
             </>
@@ -240,10 +265,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   container: {
-    height: Dimensions.get('window').height * 0.85,
+    flex: 1,
     backgroundColor: theme.colors.card,
     borderTopLeftRadius: theme.borderRadius.xl,
     borderTopRightRadius: theme.borderRadius.xl,
+    paddingBottom: 0,
   },
   header: {
     flexDirection: 'row',
@@ -359,6 +385,9 @@ const styles = StyleSheet.create({
     borderRadius: theme.borderRadius.lg,
     alignItems: 'center',
     ...theme.shadows.md,
+  },
+  confirmButtonDisabled: {
+    backgroundColor: theme.colors.border,
   },
   confirmButtonText: {
     color: theme.colors.white,
