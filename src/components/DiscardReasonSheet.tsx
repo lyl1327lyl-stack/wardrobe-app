@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -42,6 +42,15 @@ export function DiscardReasonSheet({
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [customReason, setCustomReason] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (showCustomInput) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [showCustomInput]);
 
   const handleConfirm = () => {
     let reason = selectedReason || '';
@@ -92,11 +101,7 @@ export function DiscardReasonSheet({
           </View>
 
           <ScrollView
-            ref={(ref) => {
-              if (ref && showCustomInput) {
-                setTimeout(() => ref.scrollToEnd({ animated: true }), 100);
-              }
-            }}
+            ref={scrollViewRef}
             style={styles.content}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -165,9 +170,9 @@ export function DiscardReasonSheet({
             {/* 永久删除 */}
             <TouchableOpacity
               style={styles.permanentDeleteBtn}
-              onPress={() => {
+              onPress={async () => {
                 resetState();
-                onPermanentDelete();
+                await onPermanentDelete();
                 onClose();
               }}
               activeOpacity={0.8}

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -169,6 +169,13 @@ export function TrashScreen() {
   const { trashClothing, restoreFromTrash, permanentDelete, emptyTrash } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshKey(k => k + 1);
+    }, [])
+  );
 
   const handleRestore = (item: ClothingItem) => {
     Alert.alert(
@@ -193,9 +200,13 @@ export function TrashScreen() {
         {
           text: '删除',
           style: 'destructive',
-          onPress: async () => {
-            await deleteImage(item.imageUri, item.thumbnailUri);
-            await permanentDelete(item.id);
+          onPress: () => {
+            deleteImage(item.imageUri, item.thumbnailUri)
+              .then(() => permanentDelete(item.id))
+              .catch(e => {
+                console.error('永久删除失败:', e);
+                Alert.alert('删除失败，请重试');
+              });
           },
         },
       ]
@@ -213,10 +224,15 @@ export function TrashScreen() {
           text: '清空',
           style: 'destructive',
           onPress: async () => {
-            for (const item of trashClothing) {
-              await deleteImage(item.imageUri, item.thumbnailUri);
+            try {
+              for (const item of trashClothing) {
+                await deleteImage(item.imageUri, item.thumbnailUri);
+              }
+              await emptyTrash();
+            } catch (e) {
+              console.error('清空废衣篓失败:', e);
+              Alert.alert('清空失败，请重试');
             }
-            await emptyTrash();
           },
         },
       ]
@@ -293,6 +309,7 @@ export function TrashScreen() {
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          extraData={refreshKey}
         />
       )}
     </View>

@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   TextInput,
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem } from '../types';
@@ -38,8 +40,16 @@ export function EditDiscardReasonSheet({ visible, onClose, clothingItem, onSave 
   };
 
   return (
-    <Modal visible={visible} animationType="slide" transparent>
-      <View style={styles.overlay}>
+    <Modal visible={visible} animationType="slide" transparent statusBarTranslucent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.overlay}
+      >
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={handleClose}
+        />
         <View style={styles.sheet}>
           <View style={styles.header}>
             <Text style={styles.title}>编辑废弃原因</Text>
@@ -85,7 +95,7 @@ export function EditDiscardReasonSheet({ visible, onClose, clothingItem, onSave 
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -93,8 +103,11 @@ export function EditDiscardReasonSheet({ visible, onClose, clothingItem, onSave 
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   sheet: {
     backgroundColor: theme.colors.card,

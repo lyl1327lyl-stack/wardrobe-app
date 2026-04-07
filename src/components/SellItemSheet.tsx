@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -33,6 +33,15 @@ export function SellItemSheet({
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [showCustomInput, setShowCustomInput] = useState(false);
   const [customPlatform, setCustomPlatform] = useState('');
+  const scrollViewRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    if (showCustomInput) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [showCustomInput]);
 
   const handleConfirm = () => {
     const price = parseFloat(soldPrice);
@@ -96,6 +105,7 @@ export function SellItemSheet({
           </View>
 
           <ScrollView
+            ref={scrollViewRef}
             style={styles.content}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
@@ -112,7 +122,6 @@ export function SellItemSheet({
                   placeholder="0.00"
                   placeholderTextColor={theme.colors.textTertiary}
                   keyboardType="decimal-pad"
-                  autoFocus
                 />
               </View>
             </View>
@@ -175,9 +184,9 @@ export function SellItemSheet({
             {/* 永久删除 */}
             <TouchableOpacity
               style={styles.permanentDeleteBtn}
-              onPress={() => {
+              onPress={async () => {
                 resetState();
-                onPermanentDelete();
+                await onPermanentDelete();
                 onClose();
               }}
               activeOpacity={0.8}

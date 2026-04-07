@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,7 +7,7 @@ import {
   Image,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ClothingItem, CLOTHING_TYPES, Season } from '../types';
@@ -315,6 +315,12 @@ export function WardrobeScreen() {
     loadData();
     getCustomSeasons().then(setCustomSeasons);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadData();
+    }, [])
+  );
 
   const handlePress = (item: ClothingItem) => {
     navigation.navigate('ClothingDetail', { id: item.id });

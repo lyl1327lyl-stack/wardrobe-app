@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { deleteImage } from '../utils/imageUtils';
 import { ClothingItem } from '../types';
 import { OutfitPickerModal } from '../components/OutfitPickerModal';
 import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
@@ -111,12 +112,18 @@ export function ClothingDetailScreen() {
         { text: '取消', style: 'cancel' },
         {
           text: '确认',
-          onPress: async () => {
-            await wearClothing(item.id);
-            const now = new Date();
-            const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-            setItem(prev => prev ? { ...prev, wearCount: prev.wearCount + 1, lastWornAt: dateStr } : null);
-            Alert.alert('已记录穿着');
+          onPress: () => {
+            (async () => {
+              try {
+                await wearClothing(item.id);
+                const now = new Date();
+                const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                setItem(prev => prev ? { ...prev, wearCount: prev.wearCount + 1, lastWornAt: dateStr } : null);
+                Alert.alert('已记录穿着');
+              } catch (e) {
+                console.error('记录穿着失败:', e);
+              }
+            })();
           },
         },
       ]
@@ -143,6 +150,20 @@ export function ClothingDetailScreen() {
     navigation.goBack();
   };
 
+  const handleDiscardPermanentDelete = () => {
+    deleteImage(item.imageUri, item.thumbnailUri)
+      .then(() => permanentDelete(item.id))
+      .then(() => {
+        setShowDiscardSheet(false);
+        setShowSellSheet(false);
+        navigation.goBack();
+      })
+      .catch(e => {
+        console.error('删除失败:', e);
+        Alert.alert('删除失败，请重试');
+      });
+  };
+
   const handleRestore = async () => {
     Alert.alert(
       '确认恢复',
@@ -151,31 +172,19 @@ export function ClothingDetailScreen() {
         { text: '取消', style: 'cancel' },
         {
           text: '恢复',
-          onPress: async () => {
-            if (isTrash) {
-              await restoreFromTrash(item.id);
-            } else if (isSold) {
-              await restoreFromSold(item.id);
-            }
-            navigation.goBack();
-          },
-        },
-      ]
-    );
-  };
-
-  const handlePermanentDelete = () => {
-    Alert.alert(
-      '确认彻底删除',
-      '此操作不可恢复，确定要彻底删除这件衣服吗？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '彻底删除',
-          style: 'destructive',
-          onPress: async () => {
-            await permanentDelete(item.id);
-            navigation.goBack();
+          onPress: () => {
+            (async () => {
+              try {
+                if (isTrash) {
+                  await restoreFromTrash(item.id);
+                } else if (isSold) {
+                  await restoreFromSold(item.id);
+                }
+              } catch (e) {
+                console.error('恢复失败:', e);
+              }
+              navigation.goBack();
+            })();
           },
         },
       ]
@@ -358,7 +367,28 @@ export function ClothingDetailScreen() {
               <Ionicons name="refresh" size={20} color="#8B9B7A" />
               <Text style={styles.restoreActionText}>恢复</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteAction} onPress={handlePermanentDelete} activeOpacity={0.8}>
+            <TouchableOpacity style={styles.deleteAction} onPress={() => {
+              Alert.alert(
+                '确认彻底删除',
+                '此操作不可恢复，确定要彻底删除这件衣服吗？',
+                [
+                  { text: '取消', style: 'cancel' },
+                  {
+                    text: '彻底删除',
+                    style: 'destructive',
+                    onPress: () => {
+                      deleteImage(item.imageUri, item.thumbnailUri)
+                        .then(() => permanentDelete(item.id))
+                        .then(() => navigation.goBack())
+                        .catch(e => {
+                          console.error('删除失败:', e);
+                          Alert.alert('删除失败，请重试');
+                        });
+                    },
+                  },
+                ]
+              );
+            }} activeOpacity={0.8}>
               <Ionicons name="trash-outline" size={20} color="#C47D5A" />
               <Text style={styles.deleteActionText}>彻底删除</Text>
             </TouchableOpacity>
@@ -397,7 +427,7 @@ export function ClothingDetailScreen() {
         onClose={() => setShowDiscardSheet(false)}
         clothingItem={item}
         onMoveToTrash={handleDiscardConfirm}
-        onPermanentDelete={() => {}}
+        onPermanentDelete={handleDiscardPermanentDelete}
       />
 
       <SellItemSheet
@@ -405,7 +435,7 @@ export function ClothingDetailScreen() {
         onClose={() => setShowSellSheet(false)}
         clothingItem={item}
         onSell={handleSellConfirm}
-        onPermanentDelete={() => {}}
+        onPermanentDelete={handleDiscardPermanentDelete}
       />
 
       <EditDiscardReasonSheet
@@ -447,11 +477,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#8B7B6B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
   },
   headerTitle: {
     fontSize: 17,
