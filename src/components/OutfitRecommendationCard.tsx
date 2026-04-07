@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { OutfitRecommendation, Scene } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 interface Props {
   recommendation: OutfitRecommendation;
@@ -25,7 +26,157 @@ const SCENE_CONFIG: Record<Scene, { icon: string; label: string; color: string }
   '宅家': { icon: 'home', label: '宅家', color: '#FDCB6E' },
 };
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.xl,
+      padding: 20,
+      marginHorizontal: 16,
+      marginTop: 16,
+      ...theme.shadows.lg,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    headerLeft: {},
+    headerRight: {},
+    sceneBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: theme.borderRadius.full,
+    },
+    sceneText: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    title: {
+      fontSize: 20,
+      fontWeight: '700',
+      color: theme.colors.text,
+      letterSpacing: -0.3,
+    },
+    reason: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+      marginTop: 4,
+      lineHeight: 18,
+    },
+    itemsScroll: {
+      marginTop: 16,
+      marginHorizontal: -20,
+    },
+    itemsContainer: {
+      paddingHorizontal: 20,
+      gap: 12,
+    },
+    itemCard: {
+      width: 100,
+      borderRadius: theme.borderRadius.lg,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.borderLight,
+      ...theme.shadows.sm,
+    },
+    itemImage: {
+      width: '100%',
+      height: 120,
+      resizeMode: 'cover',
+    },
+    itemOverlay: {
+      padding: 8,
+      backgroundColor: 'rgba(255,255,255,0.95)',
+    },
+    itemType: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    itemColor: {
+      fontSize: 11,
+      color: theme.colors.textTertiary,
+      marginTop: 2,
+    },
+    actions: {
+      flexDirection: 'row',
+      gap: 12,
+      marginTop: 16,
+    },
+    wearButton: {
+      flex: 1.5,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 14,
+      borderRadius: theme.borderRadius.lg,
+      ...theme.shadows.md,
+    },
+    wearButtonDisabled: {
+      opacity: 0.6,
+    },
+    wearButtonText: {
+      color: theme.colors.white,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    refreshButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      backgroundColor: theme.colors.background,
+      paddingVertical: 14,
+      borderRadius: theme.borderRadius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.colors.primary,
+    },
+    refreshText: {
+      color: theme.colors.primary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+    scoreRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 16,
+    },
+    scoreLabel: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+    },
+    scoreBar: {
+      flex: 1,
+      height: 4,
+      backgroundColor: theme.colors.borderLight,
+      borderRadius: 2,
+      overflow: 'hidden',
+    },
+    scoreFill: {
+      height: '100%',
+      backgroundColor: theme.colors.accent,
+      borderRadius: 2,
+    },
+    scoreValue: {
+      fontSize: 12,
+      color: theme.colors.accent,
+      fontWeight: '600',
+      width: 36,
+      textAlign: 'right',
+    },
+  });
+
 export function OutfitRecommendationCard({ recommendation, onRefresh, onWear }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { items, reason, scene } = recommendation;
   const [isLoading, setIsLoading] = useState(false);
 
@@ -102,150 +253,3 @@ export function OutfitRecommendationCard({ recommendation, onRefresh, onWear }: 
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.xl,
-    padding: 20,
-    marginHorizontal: 16,
-    marginTop: 16,
-    ...theme.shadows.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  headerLeft: {},
-  headerRight: {},
-  sceneBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: theme.borderRadius.full,
-  },
-  sceneText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: theme.colors.text,
-    letterSpacing: -0.3,
-  },
-  reason: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  itemsScroll: {
-    marginTop: 16,
-    marginHorizontal: -20,
-  },
-  itemsContainer: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  itemCard: {
-    width: 100,
-    borderRadius: theme.borderRadius.lg,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.borderLight,
-    ...theme.shadows.sm,
-  },
-  itemImage: {
-    width: '100%',
-    height: 120,
-    resizeMode: 'cover',
-  },
-  itemOverlay: {
-    padding: 8,
-    backgroundColor: 'rgba(255,255,255,0.95)',
-  },
-  itemType: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  itemColor: {
-    fontSize: 11,
-    color: theme.colors.textTertiary,
-    marginTop: 2,
-  },
-  actions: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
-  },
-  wearButton: {
-    flex: 1.5,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 14,
-    borderRadius: theme.borderRadius.lg,
-    ...theme.shadows.md,
-  },
-  wearButtonDisabled: {
-    opacity: 0.6,
-  },
-  wearButtonText: {
-    color: theme.colors.white,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  refreshButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: theme.colors.background,
-    paddingVertical: 14,
-    borderRadius: theme.borderRadius.lg,
-    borderWidth: 1.5,
-    borderColor: theme.colors.primary,
-  },
-  refreshText: {
-    color: theme.colors.primary,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 16,
-  },
-  scoreLabel: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-  },
-  scoreBar: {
-    flex: 1,
-    height: 4,
-    backgroundColor: theme.colors.borderLight,
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  scoreFill: {
-    height: '100%',
-    backgroundColor: theme.colors.accent,
-    borderRadius: 2,
-  },
-  scoreValue: {
-    fontSize: 12,
-    color: theme.colors.accent,
-    fontWeight: '600',
-    width: 36,
-    textAlign: 'right',
-  },
-});

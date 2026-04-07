@@ -1,4 +1,4 @@
-export type ThemeId = 'light' | 'dark' | 'wood';
+export type ThemeId = 'wood' | 'spring' | 'summer' | 'winter';
 
 export interface Theme {
   id: ThemeId;
@@ -105,82 +105,111 @@ const baseShadows = {
   },
 };
 
-export const lightTheme: Theme = {
-  id: 'light',
-  name: '浅色',
-  colors: {
-    primary: '#8B7355',
-    primaryLight: '#A69076',
-    primaryDark: '#6B5A42',
-    accent: '#C4A882',
-    accentLight: '#E8D5B0',
-    secondary: '#FAF9F7',
-    background: '#F9F6F1',
-    card: '#FFFFFF',
-    text: '#1A1D23',
-    textSecondary: '#6B6B6B',
-    textTertiary: '#9B9B9B',
-    border: '#E8E4DF',
-    borderLight: '#F3F1ED',
-    success: '#7BA37B',
-    warning: '#D4A94A',
-    danger: '#C0756B',
-    shadow: '#000000',
-    white: '#FFFFFF',
-    black: '#000000',
-  },
-  spacing: baseSpacing,
-  borderRadius: baseBorderRadius,
-  shadows: baseShadows,
-};
-
-export const darkTheme: Theme = {
-  id: 'dark',
-  name: '深色',
-  colors: {
-    primary: '#E8DED3',
-    primaryLight: '#F5EDE5',
-    primaryDark: '#D4C4B5',
-    accent: '#D4B896',
-    accentLight: '#E8D5B0',
-    secondary: '#2A2520',
-    background: '#2A2520',
-    card: '#3D352E',
-    text: '#F9F6F1',
-    textSecondary: '#B8AFA6',
-    textTertiary: '#8A8279',
-    border: '#4D453E',
-    borderLight: '#3D352E',
-    success: '#7BA37B',
-    warning: '#D4A94A',
-    danger: '#C0756B',
-    shadow: '#000000',
-    white: '#FFFFFF',
-    black: '#000000',
-  },
-  spacing: baseSpacing,
-  borderRadius: baseBorderRadius,
-  shadows: baseShadows,
-};
-
 export const woodTheme: Theme = {
   id: 'wood',
-  name: '原木',
+  name: '暖阳原木',
   colors: {
-    primary: '#A67B5B',
-    primaryLight: '#B8956F',
-    primaryDark: '#8B6347',
-    accent: '#8B6914',
-    accentLight: '#B8942A',
-    secondary: '#F5F0E8',
-    background: '#F5F0E8',
-    card: '#EDE4D8',
-    text: '#3D2E1E',
-    textSecondary: '#6B5A4A',
-    textTertiary: '#9B8B7A',
-    border: '#D9CEBF',
-    borderLight: '#E8DFD3',
-    success: '#7BA37B',
+    primary: '#8B7355',
+    primaryLight: '#A89070',
+    primaryDark: '#6B5A42',
+    accent: '#C17F59',
+    accentLight: '#D9A685',
+    secondary: '#F7F4EF',
+    background: '#F7F4EF',
+    card: '#FFFDF9',
+    text: '#3D3D3D',
+    textSecondary: '#6B6B6B',
+    textTertiary: '#9B9B9B',
+    border: '#E5DFD6',
+    borderLight: '#F0EBE3',
+    success: '#5D9E5D',
+    warning: '#D4A94A',
+    danger: '#C0756B',
+    shadow: '#000000',
+    white: '#FFFFFF',
+    black: '#000000',
+  },
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: baseShadows,
+};
+
+export const springTheme: Theme = {
+  id: 'spring',
+  name: '春日樱花',
+  colors: {
+    primary: '#7A9E7E',
+    primaryLight: '#96B398',
+    primaryDark: '#5F8266',
+    accent: '#E8A0A0',
+    accentLight: '#F5C4C4',
+    secondary: '#FDF5F5',
+    background: '#FDFAFB',
+    card: '#FFFFFF',
+    text: '#3D4A3F',
+    textSecondary: '#6B7B6E',
+    textTertiary: '#9BA99C',
+    border: '#E5DEDE',
+    borderLight: '#F5F0F0',
+    success: '#6BAF6B',
+    warning: '#D4A94A',
+    danger: '#C0756B',
+    shadow: '#000000',
+    white: '#FFFFFF',
+    black: '#000000',
+  },
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: baseShadows,
+};
+
+export const summerTheme: Theme = {
+  id: 'summer',
+  name: '夏日海洋',
+  colors: {
+    primary: '#4A7B8C',
+    primaryLight: '#6B96A5',
+    primaryDark: '#3A6272',
+    accent: '#F5C842',
+    accentLight: '#F8D978',
+    secondary: '#F5F9FB',
+    background: '#F8FCFD',
+    card: '#FFFFFF',
+    text: '#2C3E48',
+    textSecondary: '#5A6F7D',
+    textTertiary: '#8FA5B3',
+    border: '#D9E5EA',
+    borderLight: '#EEF4F7',
+    success: '#5D9E5D',
+    warning: '#E5A82C',
+    danger: '#C0756B',
+    shadow: '#000000',
+    white: '#FFFFFF',
+    black: '#000000',
+  },
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: baseShadows,
+};
+
+export const winterTheme: Theme = {
+  id: 'winter',
+  name: '冬日初雪',
+  colors: {
+    primary: '#5A6B8C',
+    primaryLight: '#7889A5',
+    primaryDark: '#465673',
+    accent: '#A0B4C8',
+    accentLight: '#C5D4E3',
+    secondary: '#F5F7FA',
+    background: '#FAFBFD',
+    card: '#FFFFFF',
+    text: '#2C3444',
+    textSecondary: '#5A6577',
+    textTertiary: '#8A95A5',
+    border: '#DDE2E8',
+    borderLight: '#F0F2F5',
+    success: '#5D9E5D',
     warning: '#D4A94A',
     danger: '#C0756B',
     shadow: '#000000',
@@ -193,10 +222,11 @@ export const woodTheme: Theme = {
 };
 
 export const themes: Record<ThemeId, Theme> = {
-  light: lightTheme,
-  dark: darkTheme,
   wood: woodTheme,
+  spring: springTheme,
+  summer: summerTheme,
+  winter: winterTheme,
 };
 
-// Backward compatibility - default export is light theme
-export const theme = lightTheme;
+// Backward compatibility - default export is wood theme
+export const theme = woodTheme;

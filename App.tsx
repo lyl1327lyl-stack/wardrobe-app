@@ -111,7 +111,7 @@ function MainTabs() {
 // Convert our theme to React Navigation theme format
 function getNavTheme(appTheme: any): Theme {
   return {
-    dark: appTheme.id === 'dark',
+    dark: appTheme.id === 'winter',
     colors: {
       primary: appTheme.colors.primary,
       background: appTheme.colors.background,
@@ -219,7 +219,7 @@ function AppNavigator() {
           }}
         />
       </RootStack.Navigator>
-      <StatusBar style={theme.id === 'dark' ? 'light' : 'dark'} />
+      <StatusBar style={theme.id === 'winter' ? 'light' : 'dark'} />
     </NavigationContainer>
   );
 }

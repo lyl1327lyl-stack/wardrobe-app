@@ -16,7 +16,7 @@ interface ThemeProviderProps {
 }
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  const [themeId, setThemeIdState] = useState<ThemeId>('light');
+  const [themeId, setThemeIdState] = useState<ThemeId>('wood');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useLayoutEffect, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -19,7 +19,8 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { ImagePickerModal } from '../components/ImagePickerModal';
 import { processImage } from '../utils/imageUtils';
 import { ClothingType, Season, Occasion, Style, ClothingItem, CLOTHING_TYPES, SEASONS, OCCASIONS, COLORS, STYLES } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 type RouteParams = { EditClothing?: { id: number } };
 
@@ -44,13 +45,355 @@ function formatDate(date: Date): string {
 }
 
 function hasUnsavedChanges(initial: any, current: any): boolean {
-  return JSON.stringify(initial) !== JSON.stringify(current);
+  return (
+    initial.imageUri !== current.imageUri ||
+    initial.type !== current.type ||
+    initial.color !== current.color ||
+    initial.brand !== current.brand ||
+    initial.size !== current.size ||
+    JSON.stringify(initial.seasons) !== JSON.stringify(current.seasons) ||
+    JSON.stringify(initial.occasions) !== JSON.stringify(current.occasions) ||
+    JSON.stringify(initial.clothingStyles) !== JSON.stringify(current.clothingStyles) ||
+    initial.purchaseDate !== current.purchaseDate ||
+    initial.price !== current.price ||
+    initial.remarks !== current.remarks
+  );
 }
+
+// Create styles dynamically based on theme
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 8,
+      paddingTop: 0,
+      paddingBottom: 12,
+      backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    backBtn: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    headerRight: {
+      width: 40,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    imageArea: {
+      width: '100%',
+      aspectRatio: 4 / 3,
+      backgroundColor: theme.colors.borderLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+      overflow: 'hidden',
+    },
+    image: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'cover',
+    },
+    imageOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.06)',
+      justifyContent: 'flex-end',
+      alignItems: 'flex-end',
+      padding: 12,
+    },
+    editBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      opacity: 0.95,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    editBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.primaryDark,
+    },
+    addPhotoBtn: {
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: 'rgba(255,255,255,0.85)',
+      opacity: 0.92,
+      borderRadius: 20,
+      paddingVertical: 20,
+      paddingHorizontal: 32,
+    },
+    addPhotoIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    addPhotoText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.primaryDark,
+    },
+    section: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+    },
+    formCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: 18,
+      marginBottom: 10,
+      ...theme.shadows.sm,
+    },
+    formGroup: {
+      marginBottom: 18,
+    },
+    formLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.textTertiary,
+      letterSpacing: 1,
+      textTransform: 'uppercase',
+      marginBottom: 10,
+    },
+    required: {
+      color: theme.colors.danger,
+    },
+    chipScroll: {
+      marginHorizontal: -18,
+      paddingHorizontal: 18,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    chip: {
+      paddingHorizontal: 14,
+      paddingVertical: 7,
+      borderRadius: 20,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+    },
+    chipActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    chipLabel: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+    },
+    chipLabelActive: {
+      color: theme.colors.white,
+      fontWeight: '600',
+    },
+    colorScroll: {
+      marginHorizontal: -18,
+      paddingHorizontal: 18,
+    },
+    colorRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingRight: 18,
+    },
+    colorItem: {
+      alignItems: 'center',
+      gap: 5,
+    },
+    colorSwatch: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+    },
+    colorSwatchWhite: {
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    colorSwatchActive: {
+      borderWidth: 2.5,
+      borderColor: theme.colors.primary,
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: 0.3,
+      shadowRadius: 6,
+      elevation: 4,
+    },
+    colorName: {
+      fontSize: 10,
+      color: theme.colors.textTertiary,
+      fontWeight: '500',
+    },
+    colorNameActive: {
+      color: theme.colors.primary,
+      fontWeight: '700',
+    },
+    inputRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    inputField: {
+      flex: 1,
+    },
+    textInput: {
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      fontFamily: 'System',
+    },
+    dateWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.background,
+    },
+    dateText: {
+      fontSize: 15,
+      color: theme.colors.text,
+    },
+    datePlaceholder: {
+      color: theme.colors.textTertiary,
+    },
+    datePickerContainer: {
+      marginBottom: 8,
+    },
+    dateConfirmBtn: {
+      alignSelf: 'flex-end',
+      paddingVertical: 6,
+      paddingHorizontal: 16,
+      backgroundColor: theme.colors.primary,
+      borderRadius: theme.borderRadius.sm,
+      marginTop: 4,
+    },
+    dateConfirmText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
+    priceWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      backgroundColor: theme.colors.background,
+    },
+    pricePrefix: {
+      fontSize: 15,
+      color: theme.colors.textTertiary,
+      fontWeight: '500',
+      marginRight: 4,
+    },
+    priceInput: {
+      flex: 1,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: theme.colors.text,
+      fontFamily: 'System',
+    },
+    wearCountInput: {
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.background,
+      fontSize: 15,
+      color: theme.colors.text,
+      fontFamily: 'System',
+      textAlign: 'center',
+    },
+    remarksInput: {
+      minHeight: 80,
+      paddingTop: 12,
+    },
+    bottomBar: {
+      flexDirection: 'row',
+      gap: 10,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 36,
+      backgroundColor: theme.colors.card,
+      ...theme.shadows.md,
+    },
+    draftBtn: {
+      flex: 1,
+      paddingVertical: 15,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    draftBtnText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.textSecondary,
+    },
+    saveBtn: {
+      flex: 2,
+      paddingVertical: 15,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+      shadowColor: theme.colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    saveBtnDisabled: {
+      opacity: 0.5,
+    },
+    saveBtnFull: {
+      flex: 1,
+    },
+    saveBtnText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.colors.white,
+      letterSpacing: 0.5,
+    },
+    bottomPad: {
+      height: 20,
+    },
+  });
 
 export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
   const { addClothing, updateClothing, getClothingById } = useWardrobeStore();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
   const isEditing = !!(route.params?.id);
@@ -262,7 +605,7 @@ export function AddClothingScreen() {
           ) : (
             <View style={styles.addPhotoBtn}>
               <View style={styles.addPhotoIcon}>
-                <Ionicons name="add" size={24} color="#fff" />
+                <Ionicons name="add" size={24} color={theme.colors.white} />
               </View>
               <Text style={styles.addPhotoText}>添加照片</Text>
             </View>
@@ -438,347 +781,3 @@ export function AddClothingScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingTop: 0,
-    paddingBottom: 12,
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  headerRight: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  imageArea: {
-    width: '100%',
-    aspectRatio: 4 / 3,
-    backgroundColor: theme.colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  imageOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.06)',
-    justifyContent: 'flex-end',
-    alignItems: 'flex-end',
-    padding: 12,
-  },
-  editBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    opacity: 0.95,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-  },
-  editBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.primaryDark,
-  },
-  addPhotoBtn: {
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    opacity: 0.92,
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 32,
-  },
-  addPhotoIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addPhotoText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.primaryDark,
-  },
-  section: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-  },
-  formCard: {
-    backgroundColor: theme.colors.card,
-    borderRadius: theme.borderRadius.lg,
-    padding: 18,
-    marginBottom: 10,
-    shadowColor: '#8B7B6B',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  formGroup: {
-    marginBottom: 18,
-  },
-  formLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: theme.colors.textTertiary,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    marginBottom: 10,
-  },
-  required: {
-    color: '#C47D5A',
-  },
-  chipScroll: {
-    marginHorizontal: -18,
-    paddingHorizontal: 18,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-  },
-  chipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  chipLabel: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: theme.colors.textSecondary,
-  },
-  chipLabelActive: {
-    color: '#fff',
-    fontWeight: '600',
-  },
-  colorScroll: {
-    marginHorizontal: -18,
-    paddingHorizontal: 18,
-  },
-  colorRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingRight: 18,
-  },
-  colorItem: {
-    alignItems: 'center',
-    gap: 5,
-  },
-  colorSwatch: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-  },
-  colorSwatchWhite: {
-    borderWidth: 1,
-    borderColor: theme.colors.border,
-  },
-  colorSwatchActive: {
-    borderWidth: 2.5,
-    borderColor: theme.colors.primary,
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  colorName: {
-    fontSize: 10,
-    color: theme.colors.textTertiary,
-    fontWeight: '500',
-  },
-  colorNameActive: {
-    color: theme.colors.primary,
-    fontWeight: '700',
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  inputField: {
-    flex: 1,
-  },
-  textInput: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-    fontFamily: 'System',
-  },
-  dateWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: theme.colors.background,
-  },
-  dateText: {
-    fontSize: 15,
-    color: theme.colors.text,
-  },
-  datePlaceholder: {
-    color: theme.colors.textTertiary,
-  },
-  datePickerContainer: {
-    marginBottom: 8,
-  },
-  dateConfirmBtn: {
-    alignSelf: 'flex-end',
-    paddingVertical: 6,
-    paddingHorizontal: 16,
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.sm,
-    marginTop: 4,
-  },
-  dateConfirmText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  priceWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    backgroundColor: theme.colors.background,
-  },
-  pricePrefix: {
-    fontSize: 15,
-    color: theme.colors.textTertiary,
-    fontWeight: '500',
-    marginRight: 4,
-  },
-  priceInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: theme.colors.text,
-    fontFamily: 'System',
-  },
-  wearCountBox: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: theme.colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  wearCountInput: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    backgroundColor: theme.colors.background,
-    fontSize: 15,
-    color: theme.colors.text,
-    fontFamily: 'System',
-    textAlign: 'center',
-  },
-  remarksInput: {
-    minHeight: 80,
-    paddingTop: 12,
-  },
-  bottomBar: {
-    flexDirection: 'row',
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 36,
-    backgroundColor: theme.colors.card,
-    shadowColor: '#8B7B6B',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  draftBtn: {
-    flex: 1,
-    paddingVertical: 15,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-  },
-  draftBtnText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-  saveBtn: {
-    flex: 2,
-    paddingVertical: 15,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    shadowColor: theme.colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  saveBtnDisabled: {
-    opacity: 0.5,
-  },
-  saveBtnFull: {
-    flex: 1,
-  },
-  saveBtnText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#fff',
-    letterSpacing: 0.5,
-  },
-  bottomPad: {
-    height: 20,
-  },
-});

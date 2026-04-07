@@ -10,12 +10,13 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../hooks/useTheme';
-import { ThemeId } from '../utils/theme';
+import { ThemeId, themes } from '../utils/theme';
 
-const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap; bgColor: string; textColor: string }[] = [
-  { id: 'light', label: '浅色', icon: 'sunny-outline', bgColor: '#F9F6F1', textColor: '#1A1D23' },
-  { id: 'dark', label: '深色', icon: 'moon-outline', bgColor: '#2A2520', textColor: '#F9F6F1' },
-  { id: 'wood', label: '原木', icon: 'leaf-outline', bgColor: '#A67B5B', textColor: '#FFFFFF' },
+const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { id: 'wood', label: '暖阳原木', icon: 'leaf-outline' },
+  { id: 'spring', label: '春日樱花', icon: 'flower-outline' },
+  { id: 'summer', label: '夏日海洋', icon: 'water-outline' },
+  { id: 'winter', label: '冬日初雪', icon: 'snow-outline' },
 ];
 
 interface MenuItem {
@@ -121,26 +122,29 @@ export function PersonalCenterScreen() {
           <View style={styles.themeGrid}>
             {THEME_OPTIONS.map((option) => {
               const isSelected = themeId === option.id;
+              const optionTheme = themes[option.id];
               return (
                 <TouchableOpacity
                   key={option.id}
                   style={[
                     styles.themeOption,
-                    { backgroundColor: option.bgColor },
+                    { backgroundColor: optionTheme.colors.background },
                     isSelected && { borderColor: theme.colors.primary, borderWidth: 3 },
                   ]}
                   onPress={() => handleThemeChange(option.id)}
                   activeOpacity={0.8}
                 >
-                  <Ionicons
-                    name={option.icon}
-                    size={28}
-                    color={option.textColor}
-                  />
+                  <View style={[styles.themeIconWrap, { backgroundColor: optionTheme.colors.card }]}>
+                    <Ionicons
+                      name={option.icon}
+                      size={24}
+                      color={optionTheme.colors.primary}
+                    />
+                  </View>
                   <Text
                     style={[
                       styles.themeLabel,
-                      { color: option.textColor },
+                      { color: optionTheme.colors.text },
                     ]}
                   >
                     {option.label}
@@ -257,7 +261,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     marginBottom: 14,
-    color: '#1A1D23',
   },
   themeGrid: {
     flexDirection: 'row',
@@ -266,14 +269,22 @@ const styles = StyleSheet.create({
   themeOption: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 8,
     borderRadius: 12,
     position: 'relative',
   },
+  themeIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
   themeLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
-    marginTop: 10,
   },
   checkBadge: {
     position: 'absolute',
@@ -301,11 +312,9 @@ const styles = StyleSheet.create({
   menuLabel: {
     flex: 1,
     fontSize: 15,
-    color: '#1A1D23',
   },
   menuValue: {
     fontSize: 14,
-    color: '#9B9B9B',
   },
   bottom: {
     height: 40,

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem, SOLD_PLATFORMS } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 interface SellItemSheetProps {
   visible: boolean;
@@ -21,12 +22,139 @@ interface SellItemSheetProps {
   onSell: (soldPrice: number, soldPlatform: string) => void;
 }
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    sheet: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 50,
+      maxHeight: '80%',
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      backgroundColor: theme.colors.border,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginTop: 12,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    title: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+    },
+    inputSection: {
+      marginBottom: 20,
+    },
+    inputLabel: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      marginBottom: 10,
+      fontWeight: '500',
+    },
+    priceInputWrapper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+    },
+    pricePrefix: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginRight: 4,
+    },
+    priceInput: {
+      flex: 1,
+      fontSize: 18,
+      color: theme.colors.text,
+      paddingVertical: 14,
+    },
+    platformGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+    },
+    platformChip: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+    },
+    platformChipActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    platformChipText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+    },
+    platformChipTextActive: {
+      color: theme.colors.white,
+    },
+    customInput: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    confirmBtn: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 16,
+      borderRadius: 14,
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    confirmBtnDisabled: {
+      backgroundColor: theme.colors.border,
+    },
+    confirmBtnText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
+  });
+
 export function SellItemSheet({
   visible,
   onClose,
   clothingItem,
   onSell,
 }: SellItemSheetProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [soldPrice, setSoldPrice] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -184,142 +312,3 @@ export function SellItemSheet({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  sheet: {
-    backgroundColor: theme.colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 50,
-    maxHeight: '80%',
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  inputSection: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 13,
-    color: theme.colors.textTertiary,
-    marginBottom: 10,
-    fontWeight: '500',
-  },
-  priceInputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-  },
-  pricePrefix: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: theme.colors.text,
-    marginRight: 4,
-  },
-  priceInput: {
-    flex: 1,
-    fontSize: 18,
-    color: theme.colors.text,
-    paddingVertical: 14,
-  },
-  platformGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  platformChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-  },
-  platformChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  platformChipText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: theme.colors.textSecondary,
-  },
-  platformChipTextActive: {
-    color: theme.colors.white,
-  },
-  customInput: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: theme.colors.text,
-  },
-  confirmBtn: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: theme.colors.border,
-  },
-  confirmBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.white,
-  },
-  permanentDeleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: theme.colors.warning,
-  },
-  permanentDeleteBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.warning,
-  },
-});

@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
 import { ClothingType, Season, CLOTHING_TYPES, SEASONS } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 interface Props {
   selectedType: ClothingType | '全部';
@@ -10,7 +11,53 @@ interface Props {
   onSeasonChange: (season: Season | '全部') => void;
 }
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      paddingVertical: 10,
+      backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    row: {
+      paddingHorizontal: 14,
+      marginBottom: 4,
+    },
+    filterGroup: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    label: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      marginRight: 4,
+      fontWeight: '500',
+    },
+    chip: {
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderRadius: theme.borderRadius.full,
+      backgroundColor: theme.colors.borderLight,
+      marginRight: 6,
+    },
+    chipActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    chipText: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+    },
+    chipTextActive: {
+      color: theme.colors.white,
+      fontWeight: '500',
+    },
+  });
+
 export function FilterBar({ selectedType, selectedSeason, onTypeChange, onSeasonChange }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   return (
     <View style={styles.container}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.row}>
@@ -50,45 +97,3 @@ export function FilterBar({ selectedType, selectedSeason, onTypeChange, onSeason
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    paddingVertical: 10,
-    backgroundColor: theme.colors.card,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  row: {
-    paddingHorizontal: 14,
-    marginBottom: 4,
-  },
-  filterGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  label: {
-    fontSize: 13,
-    color: theme.colors.textTertiary,
-    marginRight: 4,
-    fontWeight: '500',
-  },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: theme.colors.borderLight,
-    marginRight: 6,
-  },
-  chipActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  chipText: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-  },
-  chipTextActive: {
-    color: theme.colors.white,
-    fontWeight: '500',
-  },
-});

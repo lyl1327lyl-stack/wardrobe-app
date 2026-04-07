@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 const DISCARD_REASONS = [
   { label: '不再喜欢', icon: 'heart-dislike-outline' },
@@ -32,6 +33,126 @@ interface DiscardReasonSheetProps {
   onPermanentDelete: () => void;
 }
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    sheet: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 50,
+      maxHeight: '80%',
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      backgroundColor: theme.colors.border,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginTop: 12,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    title: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    content: {
+      paddingHorizontal: 20,
+      paddingTop: 20,
+    },
+    reasonGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 20,
+    },
+    reasonChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+    },
+    reasonChipActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    reasonChipText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+    },
+    reasonChipTextActive: {
+      color: theme.colors.white,
+    },
+    customInputSection: {
+      marginBottom: 20,
+    },
+    customInputLabel: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      marginBottom: 8,
+      fontWeight: '500',
+    },
+    customInput: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    confirmBtn: {
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 16,
+      borderRadius: 14,
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    confirmBtnText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
+    permanentDeleteBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 14,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: theme.colors.danger,
+    },
+    permanentDeleteBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.danger,
+    },
+  });
+
 export function DiscardReasonSheet({
   visible,
   onClose,
@@ -39,6 +160,8 @@ export function DiscardReasonSheet({
   onMoveToTrash,
   onPermanentDelete,
 }: DiscardReasonSheetProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [selectedReason, setSelectedReason] = useState<string | null>(null);
   const [customReason, setCustomReason] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -177,7 +300,7 @@ export function DiscardReasonSheet({
               }}
               activeOpacity={0.8}
             >
-              <Ionicons name="trash" size={16} color={theme.colors.warning} />
+              <Ionicons name="trash" size={16} color={theme.colors.danger} />
               <Text style={styles.permanentDeleteBtnText}>直接永久删除</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -186,122 +309,3 @@ export function DiscardReasonSheet({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  sheet: {
-    backgroundColor: theme.colors.card,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 50,
-    maxHeight: '80%',
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    backgroundColor: theme.colors.border,
-    borderRadius: 2,
-    alignSelf: 'center',
-    marginTop: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  reasonGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 20,
-  },
-  reasonChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-  },
-  reasonChipActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  reasonChipText: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: theme.colors.textSecondary,
-  },
-  reasonChipTextActive: {
-    color: theme.colors.white,
-  },
-  customInputSection: {
-    marginBottom: 20,
-  },
-  customInputLabel: {
-    fontSize: 13,
-    color: theme.colors.textTertiary,
-    marginBottom: 8,
-    fontWeight: '500',
-  },
-  customInput: {
-    backgroundColor: theme.colors.background,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 14,
-    color: theme.colors.text,
-  },
-  confirmBtn: {
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 16,
-    borderRadius: 14,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  confirmBtnText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: theme.colors.white,
-  },
-  permanentDeleteBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: theme.colors.warning,
-  },
-  permanentDeleteBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.warning,
-  },
-});

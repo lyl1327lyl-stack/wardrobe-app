@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,7 +15,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ClothingItem, ClothingType, Season } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 interface Props {
   visible: boolean;
@@ -28,8 +29,160 @@ const CLOTHING_TYPES: ('全部' | ClothingType)[] = ['全部', '上衣', '裤子
 const SEASONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 const SEASON_EMOJI: Record<Season, string> = { '春': '🌸', '夏': '☀️', '秋': '🍂', '冬': '❄️' };
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    container: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
+      height: 640,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    searchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.borderLight,
+      borderRadius: 10,
+      marginHorizontal: 16,
+      marginVertical: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      gap: 8,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.text,
+      padding: 0,
+    },
+    tabSection: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    tabLabel: {
+      fontSize: 11,
+      color: theme.colors.textTertiary,
+      marginBottom: 6,
+    },
+    tabRow: {
+      flexDirection: 'row',
+      gap: 6,
+      paddingBottom: 8,
+    },
+    tab: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      backgroundColor: theme.colors.borderLight,
+      borderRadius: 14,
+    },
+    tabActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    tabText: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+    },
+    tabTextActive: {
+      color: theme.colors.white,
+    },
+    gridContent: {
+      paddingTop: 8,
+      paddingBottom: 8,
+    },
+    gridRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 16,
+    },
+    clothingCard: {
+      flex: 1,
+      aspectRatio: 0.75,
+      borderRadius: 8,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.borderLight,
+      marginBottom: 8,
+    },
+    clothingCardActive: {
+      borderWidth: 2,
+      borderColor: theme.colors.primary,
+    },
+    clothingImage: {
+      width: '100%',
+      height: '100%',
+    },
+    checkmark: {
+      position: 'absolute',
+      top: 3,
+      right: 3,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    empty: {
+      alignItems: 'center',
+      paddingTop: 40,
+    },
+    emptyText: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      marginTop: 8,
+    },
+    footer: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    footerCount: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+    },
+    footerCountNum: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+    },
+    confirmBtn: {
+      backgroundColor: theme.colors.primary,
+      paddingHorizontal: 24,
+      paddingVertical: 10,
+      borderRadius: 10,
+    },
+    confirmBtnDisabled: {
+      backgroundColor: theme.colors.borderLight,
+    },
+    confirmBtnText: {
+      color: theme.colors.white,
+      fontSize: 14,
+      fontWeight: '600',
+    },
+  });
+
 export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedIds }: Props) {
   const { clothing } = useWardrobeStore();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedType, setSelectedType] = useState<'全部' | ClothingType>('全部');
@@ -82,7 +235,7 @@ export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedI
         <Image source={{ uri: item.thumbnailUri }} style={styles.clothingImage} />
         {isSelected && (
           <View style={styles.checkmark}>
-            <Ionicons name="checkmark" size={10} color="#fff" />
+            <Ionicons name="checkmark" size={10} color={theme.colors.white} />
           </View>
         )}
       </TouchableOpacity>
@@ -188,152 +341,3 @@ export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedI
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  container: {
-    backgroundColor: theme.colors.card,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    height: 640,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: theme.colors.text,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.borderLight,
-    borderRadius: 10,
-    marginHorizontal: 16,
-    marginVertical: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: theme.colors.text,
-    padding: 0,
-  },
-  tabSection: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  tabLabel: {
-    fontSize: 11,
-    color: theme.colors.textTertiary,
-    marginBottom: 6,
-  },
-  tabRow: {
-    flexDirection: 'row',
-    gap: 6,
-    paddingBottom: 8,
-  },
-  tab: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: theme.colors.borderLight,
-    borderRadius: 14,
-  },
-  tabActive: {
-    backgroundColor: theme.colors.primary,
-  },
-  tabText: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-  },
-  tabTextActive: {
-    color: '#fff',
-  },
-  gridContent: {
-    paddingTop: 8,
-    paddingBottom: 8,
-  },
-  gridRow: {
-    flexDirection: 'row',
-    gap: 8,
-    paddingHorizontal: 16,
-  },
-  clothingCard: {
-    flex: 1,
-    aspectRatio: 0.75,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: theme.colors.borderLight,
-    marginBottom: 8,
-  },
-  clothingCardActive: {
-    borderWidth: 2,
-    borderColor: theme.colors.primary,
-  },
-  clothingImage: {
-    width: '100%',
-    height: '100%',
-  },
-  checkmark: {
-    position: 'absolute',
-    top: 3,
-    right: 3,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 40,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: theme.colors.textTertiary,
-    marginTop: 8,
-  },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.border,
-  },
-  footerCount: {
-    fontSize: 14,
-    color: theme.colors.textSecondary,
-  },
-  footerCountNum: {
-    color: theme.colors.primary,
-    fontWeight: '600',
-  },
-  confirmBtn: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: 10,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: theme.colors.borderLight,
-  },
-  confirmBtnText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});

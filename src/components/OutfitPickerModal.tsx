@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Dimensions } from 'react-native';
 import {
   View,
@@ -11,12 +11,12 @@ import {
   TextInput,
   Alert,
   KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ClothingItem, Outfit } from '../types';
-import { theme } from '../utils/theme';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 interface Props {
   visible: boolean;
@@ -24,8 +24,225 @@ interface Props {
   clothingItem: ClothingItem;
 }
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    overlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: theme.borderRadius.xl,
+      borderTopRightRadius: theme.borderRadius.xl,
+      paddingBottom: 0,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+      letterSpacing: -0.3,
+    },
+    createButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      padding: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    createButtonText: {
+      fontSize: 15,
+      color: theme.colors.primary,
+      fontWeight: '600',
+    },
+    list: {
+      flex: 1,
+    },
+    outfitItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.card,
+    },
+    outfitItemActive: {
+      backgroundColor: `${theme.colors.primary}10`,
+      borderLeftWidth: 3,
+      borderLeftColor: theme.colors.primary,
+    },
+    outfitPreview: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 3,
+      width: 52,
+    },
+    outfitThumb: {
+      width: 24,
+      height: 24,
+      borderRadius: 4,
+      backgroundColor: theme.colors.borderLight,
+    },
+    emptyOutfitPreview: {
+      width: 24,
+      height: 24,
+      borderRadius: 4,
+      backgroundColor: theme.colors.borderLight,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    outfitInfo: {
+      flex: 1,
+      marginLeft: 12,
+    },
+    outfitName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    outfitCount: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      marginTop: 2,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.card,
+      ...theme.shadows.sm,
+    },
+    checkboxActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    empty: {
+      alignItems: 'center',
+      paddingTop: 48,
+    },
+    emptyText: {
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      marginTop: 12,
+      fontWeight: '500',
+    },
+    emptySubtext: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      marginTop: 4,
+    },
+    confirmButton: {
+      margin: 16,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 15,
+      borderRadius: theme.borderRadius.lg,
+      alignItems: 'center',
+      ...theme.shadows.md,
+    },
+    confirmButtonDisabled: {
+      backgroundColor: theme.colors.border,
+    },
+    confirmButtonText: {
+      color: theme.colors.white,
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    createForm: {
+      padding: 20,
+    },
+    createTitle: {
+      fontSize: 17,
+      fontWeight: '700',
+      color: theme.colors.text,
+      marginBottom: 16,
+      letterSpacing: -0.3,
+    },
+    input: {
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      marginBottom: 16,
+    },
+    selectedPreview: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      padding: 12,
+      backgroundColor: theme.colors.background,
+      borderRadius: theme.borderRadius.lg,
+      marginBottom: 20,
+    },
+    selectedThumb: {
+      width: 48,
+      height: 48,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.borderLight,
+    },
+    selectedName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    selectedInfo: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      marginTop: 2,
+    },
+    createActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    cancelButton: {
+      flex: 1,
+      paddingVertical: 13,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    cancelButtonText: {
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      fontWeight: '500',
+    },
+    saveButton: {
+      flex: 2,
+      paddingVertical: 13,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+      ...theme.shadows.sm,
+    },
+    saveButtonText: {
+      fontSize: 15,
+      color: theme.colors.white,
+      fontWeight: '600',
+    },
+  });
+
 export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
   const { outfits, clothing, addOutfit, updateOutfit } = useWardrobeStore();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [showCreate, setShowCreate] = useState(false);
   const [newOutfitName, setNewOutfitName] = useState('');
   const [selectedOutfitIds, setSelectedOutfitIds] = useState<number[]>([]);
@@ -257,217 +474,3 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  container: {
-    flex: 1,
-    backgroundColor: theme.colors.card,
-    borderTopLeftRadius: theme.borderRadius.xl,
-    borderTopRightRadius: theme.borderRadius.xl,
-    paddingBottom: 0,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: theme.colors.text,
-    letterSpacing: -0.3,
-  },
-  createButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-  },
-  createButtonText: {
-    fontSize: 15,
-    color: theme.colors.primary,
-    fontWeight: '600',
-  },
-  list: {
-    flex: 1,
-  },
-  outfitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: theme.colors.border,
-    backgroundColor: theme.colors.card,
-  },
-  outfitItemActive: {
-    backgroundColor: `${theme.colors.primary}10`,
-    borderLeftWidth: 3,
-    borderLeftColor: theme.colors.primary,
-  },
-  outfitPreview: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 3,
-    width: 52,
-  },
-  outfitThumb: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    backgroundColor: theme.colors.borderLight,
-  },
-  emptyOutfitPreview: {
-    width: 24,
-    height: 24,
-    borderRadius: 4,
-    backgroundColor: theme.colors.borderLight,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  outfitInfo: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  outfitName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  outfitCount: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-    marginTop: 2,
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: theme.colors.border,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: theme.colors.card,
-    ...theme.shadows.sm,
-  },
-  checkboxActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  empty: {
-    alignItems: 'center',
-    paddingTop: 48,
-  },
-  emptyText: {
-    fontSize: 15,
-    color: theme.colors.textSecondary,
-    marginTop: 12,
-    fontWeight: '500',
-  },
-  emptySubtext: {
-    fontSize: 13,
-    color: theme.colors.textTertiary,
-    marginTop: 4,
-  },
-  confirmButton: {
-    margin: 16,
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 15,
-    borderRadius: theme.borderRadius.lg,
-    alignItems: 'center',
-    ...theme.shadows.md,
-  },
-  confirmButtonDisabled: {
-    backgroundColor: theme.colors.border,
-  },
-  confirmButtonText: {
-    color: theme.colors.white,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  createForm: {
-    padding: 20,
-  },
-  createTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: theme.colors.text,
-    marginBottom: 16,
-    letterSpacing: -0.3,
-  },
-  input: {
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.background,
-    marginBottom: 16,
-  },
-  selectedPreview: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    padding: 12,
-    backgroundColor: theme.colors.background,
-    borderRadius: theme.borderRadius.lg,
-    marginBottom: 20,
-  },
-  selectedThumb: {
-    width: 48,
-    height: 48,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.borderLight,
-  },
-  selectedName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: theme.colors.text,
-  },
-  selectedInfo: {
-    fontSize: 12,
-    color: theme.colors.textTertiary,
-    marginTop: 2,
-  },
-  createActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 13,
-    borderRadius: theme.borderRadius.md,
-    borderWidth: 1.5,
-    borderColor: theme.colors.border,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    fontSize: 15,
-    color: theme.colors.textSecondary,
-    fontWeight: '500',
-  },
-  saveButton: {
-    flex: 2,
-    paddingVertical: 13,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.primary,
-    alignItems: 'center',
-    ...theme.shadows.sm,
-  },
-  saveButtonText: {
-    fontSize: 15,
-    color: theme.colors.white,
-    fontWeight: '600',
-  },
-});

@@ -6,13 +6,13 @@ const THEME_STORAGE_KEY = 'app_theme';
 export async function getStoredThemeId(): Promise<ThemeId> {
   try {
     const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-    if (stored && ['light', 'dark', 'wood'].includes(stored)) {
+    if (stored && ['wood', 'spring', 'summer', 'winter'].includes(stored)) {
       return stored as ThemeId;
     }
   } catch (e) {
     console.warn('Failed to load theme from storage:', e);
   }
-  return 'light';
+  return 'wood';
 }
 
 export async function storeThemeId(themeId: ThemeId): Promise<void> {
