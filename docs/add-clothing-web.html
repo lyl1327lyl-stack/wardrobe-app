@@ -166,7 +166,13 @@
       padding: 12px 14px; background: var(--bg);
       text-align: center;
     }
-    .wear-count-text { font-size: 15px; font-weight: 600; color: var(--text); }
+    .wear-count-input {
+      width: 100%; border: 1.5px solid var(--border); border-radius: var(--radius-md);
+      padding: 12px 14px; background: var(--bg);
+      font-size: 15px; color: var(--text); text-align: center;
+      font-family: inherit; outline: none;
+    }
+    .wear-count-input:focus { border-color: var(--primary-light); background: var(--card); }
 
     /* Remarks */
     .remarks-input { min-height: 80px; padding-top: 12px; resize: none; }
@@ -271,7 +277,7 @@
             </div>
 
             <div class="form-group">
-              <div class="form-label">颜色 <span class="required">*</span></div>
+              <div class="form-label">颜色</div>
               <div class="color-scroll">
                 <div class="color-row">
                   <div class="color-item selected" onclick="selectColor(this)"><div class="color-swatch selected" style="background:#2D2A26"></div><span class="color-name">黑色</span></div>
@@ -348,7 +354,7 @@
                 </div>
                 <div style="flex:1">
                   <div class="form-label">穿着次数</div>
-                  <div class="wear-count-box"><span class="wear-count-text">0</span></div>
+                  <input type="number" class="wear-count-input" value="0" min="0" placeholder="0">
                 </div>
               </div>
             </div>

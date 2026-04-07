@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>衣物详情预览</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #FAFAF8;
+      --card-bg: #FFFFFF;
+      --profile-bg: #F7F3EE;
+      --accent: #A69080;
+      --accent-light: #D4C5B9;
+      --text: #2C2824;
+      --text-secondary: #7A7067;
+      --text-muted: #A89F97;
+      --divider: #E8E0D8;
+      --shadow: rgba(166, 144, 128, 0.15);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding-bottom: 120px;
+    }
+
+    /* 手机框架 */
+    .phone-frame {
+      max-width: 430px;
+      margin: 0 auto;
+      min-height: 100vh;
+      background: var(--bg);
+      position: relative;
+    }
+
+    /* 状态栏 */
+    .status-bar {
+      height: 54px;
+      background: var(--bg);
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    /* 顶栏 */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: var(--bg);
+    }
+
+    .header-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--profile-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s;
+    }
+
+    .header-btn:hover {
+      transform: scale(0.95);
+    }
+
+    .header-btn svg {
+      width: 22px;
+      height: 22px;
+      stroke: var(--text);
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .header-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    /* 图片区 */
+    .image-section {
+      padding: 8px 20px 0;
+    }
+
+    .image-wrapper {
+      width: 100%;
+      aspect-ratio: 1;
+      border-radius: 24px;
+      overflow: hidden;
+      background: linear-gradient(145deg, #E8E0D8 0%, #D9CEc4 100%);
+      position: relative;
+      box-shadow: 0 8px 32px var(--shadow);
+    }
+
+    .image-wrapper img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .color-dot {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #795548;
+      border: 4px solid rgba(255,255,255,0.95);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    /* 衣物档案卡片 */
+    .profile-card {
+      margin: 20px 20px 0;
+      background: var(--profile-bg);
+      border-radius: 24px;
+      padding: 20px 20px 16px;
+      box-shadow: 0 4px 20px var(--shadow);
+    }
+
+    .profile-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+      text-align: center;
+      margin-bottom: 16px;
+      letter-spacing: 1.5px;
+    }
+
+    /* 3x2 网格 */
+    .stats-grid {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-row {
+      display: flex;
+      flex: 1;
+    }
+
+    .stat-cell {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 8px;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.2px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.3px;
+    }
+
+    .row-divider {
+      height: 1px;
+      background: var(--divider);
+    }
+
+    .stat-divider {
+      width: 1px;
+      background: var(--divider);
+      margin: 8px 0;
+    }
+
+    .profile-divider {
+      height: 1px;
+      background: var(--divider);
+      margin: 14px 0;
+    }
+
+    /* 属性行 */
+    .profile-row {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .profile-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      width: 50px;
+    }
+
+    .profile-value {
+      font-size: 14px;
+      color: var(--text);
+      font-weight: 500;
+    }
+
+    .tag-list {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .tag {
+      background: var(--divider);
+      padding: 4px 10px;
+      border-radius: 12px;
+    }
+
+    .tag-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    /* 备注卡片 */
+    .remarks-card {
+      margin: 14px 20px 0;
+      background: var(--card-bg);
+      border-radius: 20px;
+      padding: 18px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    }
+
+    .remarks-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 8px;
+    }
+
+    .remarks-text {
+      font-size: 14px;
+      color: var(--text-secondary);
+      line-height: 22px;
+    }
+
+    /* 搭配按钮 */
+    .outfit-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin: 16px 20px 0;
+      padding: 16px;
+      background: var(--accent);
+      border-radius: 16px;
+      box-shadow: 0 4px 16px var(--shadow);
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .outfit-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px var(--shadow);
+    }
+
+    .outfit-btn-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .outfit-btn-icon svg {
+      width: 16px;
+      height: 16px;
+      stroke: white;
+      stroke-width: 3;
+      fill: none;
+    }
+
+    .outfit-btn-text {
+      font-size: 16px;
+      font-weight: 600;
+      color: white;
+      letter-spacing: 0.3px;
+    }
+
+    /* 底栏 */
+    .bottom-bar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 100%;
+      max-width: 430px;
+      background: white;
+      border-top: 1px solid var(--divider);
+      padding: 10px 20px 36px;
+      display: flex;
+      justify-content: space-around;
+      gap: 12px;
+    }
+
+    .bottom-btn {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .bottom-btn-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 3px 12px var(--shadow);
+      transition: transform 0.15s;
+    }
+
+    .bottom-btn:hover .bottom-btn-icon {
+      transform: translateY(-2px);
+    }
+
+    .bottom-btn-icon svg {
+      width: 22px;
+      height: 22px;
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .bottom-btn-text {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      letter-spacing: 0.2px;
+    }
+
+    /* 配色方案 */
+    .scheme-selector {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 100;
+    }
+
+    .scheme-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+
+    .scheme-btn:hover {
+      transform: scale(1.1);
+    }
+
+    .scheme-btn.active {
+      border-color: var(--text);
+    }
+
+    .scheme-warm { background: linear-gradient(135deg, #A69080, #D4C5B9); }
+    .scheme-rose { background: linear-gradient(135deg, #C4A5A5, #E8D5D5); }
+    .scheme-sage { background: linear-gradient(135deg, #8FA68F, #C5D4C5); }
+    .scheme-slate { background: linear-gradient(135deg, #7A8B9A, #B5C4D4); }
+    .scheme-coffee { background: linear-gradient(135deg, #8B7355, #C4B5A5); }
+  </style>
+</head>
+<body>
+  <div class="phone-frame">
+    <!-- 配色切换 -->
+    <div class="scheme-selector">
+      <button class="scheme-btn scheme-warm active" onclick="setScheme('warm')" title="温暖棕"></button>
+      <button class="scheme-btn scheme-rose" onclick="setScheme('rose')" title="玫瑰粉"></button>
+      <button class="scheme-btn scheme-sage" onclick="setScheme('sage')" title="鼠尾草绿"></button>
+      <button class="scheme-btn scheme-slate" onclick="setScheme('slate')" title="石板灰蓝"></button>
+      <button class="scheme-btn scheme-coffee" onclick="setScheme('coffee')" title="咖啡"></button>
+    </div>
+
+    <!-- 状态栏 -->
+    <div class="status-bar">9:41</div>
+
+    <!-- 顶栏 -->
+    <div class="header">
+      <div class="header-btn">
+        <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+      </div>
+      <span class="header-title">外套</span>
+      <div class="header-btn">
+        <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+      </div>
+    </div>
+
+    <!-- 图片 -->
+    <div class="image-section">
+      <div class="image-wrapper">
+        <img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=600&h=600&fit=crop" alt="衣物图片">
+        <div class="color-dot"></div>
+      </div>
+    </div>
+
+    <!-- 衣物档案 -->
+    <div class="profile-card">
+      <div class="profile-title">衣物档案</div>
+
+      <div class="stats-grid">
+        <!-- 第一行 -->
+        <div class="stat-row">
+          <div class="stat-cell">
+            <span class="stat-value">¥399</span>
+            <span class="stat-label">价格</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-cell">
+            <span class="stat-value">M</span>
+            <span class="stat-label">尺码</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-cell">
+            <span class="stat-value">2024-01</span>
+            <span class="stat-label">购买日期</span>
+          </div>
+        </div>
+        <div class="row-divider"></div>
+        <!-- 第二行 -->
+        <div class="stat-row">
+          <div class="stat-cell">
+            <span class="stat-value">12</span>
+            <span class="stat-label">穿着次数</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-cell">
+            <span class="stat-value">¥33</span>
+            <span class="stat-label">单次花费</span>
+          </div>
+          <div class="stat-divider"></div>
+          <div class="stat-cell">
+            <span class="stat-value">2026-03-15</span>
+            <span class="stat-label">上次穿着</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="profile-divider"></div>
+
+      <div class="profile-row">
+        <span class="profile-label">品牌</span>
+        <span class="profile-value">UNIQLO</span>
+      </div>
+
+      <div class="profile-row">
+        <span class="profile-label">季节</span>
+        <div class="tag-list">
+          <div class="tag"><span class="tag-text">春</span></div>
+          <div class="tag"><span class="tag-text">秋</span></div>
+        </div>
+      </div>
+
+      <div class="profile-row">
+        <span class="profile-label">场合</span>
+        <div class="tag-list">
+          <div class="tag"><span class="tag-text">日常</span></div>
+          <div class="tag"><span class="tag-text">工作</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 备注 -->
+    <div class="remarks-card">
+      <div class="remarks-title">备注</div>
+      <div class="remarks-text">经典款工装外套，面料扎实，百搭耐看。</div>
+    </div>
+
+    <!-- 搭配按钮 -->
+    <div class="outfit-btn">
+      <div class="outfit-btn-icon">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+      </div>
+      <span class="outfit-btn-text">加入搭配</span>
+    </div>
+  </div>
+
+  <!-- 底栏 -->
+  <div class="bottom-bar">
+    <div class="bottom-btn">
+      <div class="bottom-btn-icon" style="background: var(--accent);">
+        <svg viewBox="0 0 24 24" style="stroke: white;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+      </div>
+      <span class="bottom-btn-text">记录穿着</span>
+    </div>
+    <div class="bottom-btn">
+      <div class="bottom-btn-icon" style="background: #FFE5E5;">
+        <svg viewBox="0 0 24 24" style="stroke: #E53935;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </div>
+      <span class="bottom-btn-text">废衣篓</span>
+    </div>
+    <div class="bottom-btn">
+      <div class="bottom-btn-icon" style="background: #E3F2E8;">
+        <svg viewBox="0 0 24 24" style="stroke: #43A047;"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+      </div>
+      <span class="bottom-btn-text">卖出</span>
+    </div>
+  </div>
+
+  <script>
+    const schemes = {
+      warm: {
+        '--bg': '#FAFAF8',
+        '--card-bg': '#FFFFFF',
+        '--profile-bg': '#F7F3EE',
+        '--accent': '#A69080',
+        '--accent-light': '#D4C5B9',
+        '--text': '#2C2824',
+        '--text-secondary': '#7A7067',
+        '--text-muted': '#A89F97',
+        '--divider': '#E8E0D8',
+        '--shadow': 'rgba(166, 144, 128, 0.15)',
+      },
+      rose: {
+        '--bg': '#FBF8F8',
+        '--card-bg': '#FFFFFF',
+        '--profile-bg': '#F9F2F2',
+        '--accent': '#C4A5A5',
+        '--accent-light': '#E8D5D5',
+        '--text': '#3D2C2C',
+        '--text-secondary': '#7A6060',
+        '--text-muted': '#A89090',
+        '--divider': '#F0E4E4',
+        '--shadow': 'rgba(196, 165, 165, 0.2)',
+      },
+      sage: {
+        '--bg': '#F8FAF8',
+        '--card-bg': '#FFFFFF',
+        '--profile-bg': '#F2F5F2',
+        '--accent': '#8FA68F',
+        '--accent-light': '#C5D4C5',
+        '--text': '#2C342C',
+        '--text-secondary': '#607060',
+        '--text-muted': '#90A090',
+        '--divider': '#E0E8E0',
+        '--shadow': 'rgba(143, 166, 143, 0.15)',
+      },
+      slate: {
+        '--bg': '#F8F9FB',
+        '--card-bg': '#FFFFFF',
+        '--profile-bg': '#F0F2F5',
+        '--accent': '#7A8B9A',
+        '--accent-light': '#B5C4D4',
+        '--text': '#2C3038',
+        '--text-secondary': '#606878',
+        '--text-muted': '#9098A8',
+        '--divider': '#E0E4EC',
+        '--shadow': 'rgba(122, 139, 154, 0.15)',
+      },
+      coffee: {
+        '--bg': '#FAF8F6',
+        '--card-bg': '#FFFFFF',
+        '--profile-bg': '#F5F0EB',
+        '--accent': '#8B7355',
+        '--accent-light': '#C4B5A5',
+        '--text': '#2C2420',
+        '--text-secondary': '#7A6655',
+        '--text-muted': '#A89585',
+        '--divider': '#EDE5DC',
+        '--shadow': 'rgba(139, 115, 85, 0.15)',
+      },
+    };
+
+    function setScheme(name) {
+      const root = document.documentElement;
+      const colors = schemes[name];
+      Object.keys(colors).forEach(key => {
+        root.style.setProperty(key, colors[key]);
+      });
+      document.querySelectorAll('.scheme-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+    }
+  </script>
+</body>
+</html>

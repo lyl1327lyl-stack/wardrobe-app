@@ -4,7 +4,7 @@
 
 **Goal:** 重新设计搭配详情页，实现底部操作栏、删除确认弹层、衣物选择弹层（分类导航+搜索+多选）、拖动添加衣物、画板缩略图生成。
 
-**Architecture:** OutfitDetailScreen 从三点菜单改为底部操作栏（三按钮：保存/改名/删除）；新增 ClothingPickerModal 支持搜索+类型/季节横向分类+多选；BottomStrip 增加"+"按钮打开弹层；拖动衣物到画板区域添加；画板缩略图用于 OutfitsScreen 卡片封面。
+**Architecture:** OutfitDetailScreen 底部操作栏（三按钮：添加衣服/保存/删除）；ClothingPickerModal 支持搜索+类型/季节横向分类+多选；操作栏添加衣服按钮打开弹层；拖动衣物到画板区域添加；画板缩略图用于 OutfitsScreen 卡片封面。
 
 **Tech Stack:** React Native, PanResponder (drag), react-native-view-shot (thumbnail), TypeScript
 
@@ -14,7 +14,7 @@
 
 | 操作 | 文件路径 | 职责 |
 |------|---------|------|
-| 修改 | `src/screens/OutfitDetailScreen.tsx` | 底部操作栏、删除确认、拖动添加、"+"按钮 |
+| 修改 | `src/screens/OutfitDetailScreen.tsx` | 底部操作栏、拖动添加、添加衣服按钮 |
 | 重写 | `src/components/ClothingPickerModal.tsx` | 搜索框+类型/季节横向Tab+多选网格+确认添加 |
 | 修改 | `src/screens/OutfitsScreen.tsx` | 缩略图渲染（画板内容截图） |
 
@@ -23,151 +23,6 @@
 ---
 
 ## 二、实施任务
-
-### Task 1: OutfitDetailScreen 底部操作栏替换三点菜单
-
-**文件:**
-- Modify: `src/screens/OutfitDetailScreen.tsx:186-223` (header 区域)
-- Modify: `src/screens/OutfitDetailScreen.tsx:277-302` (三点菜单 Modal，删除)
-- Add: 底部操作栏 `ActionBar` 组件
-
-**变更说明:**
-1. 顶栏右侧移除三点菜单按钮，保留返回按钮和名称（可点击改名）
-2. 底部新增操作栏，水平排列三个按钮：`[保存] [改名] [删除]`
-3. 顶栏的"保存"按钮（当 hasUnsavedChanges 时显示）移到操作栏
-4. "改名"按钮点击弹出 TextInput Alert 或内联编辑（与 spec 一致：点击弹出输入框直接编辑名称）
-5. "删除"按钮点击弹出二次确认 Alert
-6. 三点菜单 Modal 代码整体删除
-
-**样式参考（底部操作栏）:**
-```tsx
-// 新增在 canvas 和 bottomStrip 之间
-<View style={styles.actionBar}>
-  <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
-    <Ionicons name="checkmark-circle-outline" size={20} color={theme.colors.primary} />
-    <Text style={[styles.actionBtnText, { color: theme.colors.primary }]}>保存</Text>
-  </TouchableOpacity>
-  <View style={styles.actionDivider} />
-  <TouchableOpacity style={styles.actionBtn} onPress={() => setIsEditingName(true)}>
-    <Ionicons name="create-outline" size={20} color={theme.colors.textSecondary} />
-    <Text style={styles.actionBtnText}>改名</Text>
-  </TouchableOpacity>
-  <View style={styles.actionDivider} />
-  <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
-    <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
-    <Text style={[styles.actionBtnText, { color: theme.colors.danger }]}>删除</Text>
-  </TouchableOpacity>
-</View>
-```
-
-**关键样式:**
-```tsx
-actionBar: {
-  flexDirection: 'row',
-  backgroundColor: theme.colors.card,
-  borderTopWidth: 1,
-  borderTopColor: theme.colors.border,
-  paddingVertical: 12,
-},
-actionBtn: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-},
-actionBtnText: {
-  fontSize: 14,
-  fontWeight: '500',
-  color: theme.colors.textSecondary,
-},
-actionDivider: {
-  width: 1,
-  height: 20,
-  backgroundColor: theme.colors.border,
-},
-```
-
-**步骤:**
-
-- [ ] **Step 1: 在 `OutfitDetailScreen` 的 canvas 和 bottomStrip 之间插入 ActionBar**
-
-在 `OutfitDetailScreen` 的 JSX return 中，找到 `</View>{/* 画板区域 */}` 后的位置，在 `bottomStrip` 前插入 ActionBar。
-
-```tsx
-{/* 底部操作栏 */}
-<View style={styles.actionBar}>
-  <TouchableOpacity style={styles.actionBtn} onPress={handleSave}>
-    <Ionicons name="checkmark-circle-outline" size={20} color={hasUnsavedChanges ? theme.colors.primary : theme.colors.textTertiary} />
-    <Text style={[styles.actionBtnText, { color: hasUnsavedChanges ? theme.colors.primary : theme.colors.textTertiary }]}>保存</Text>
-  </TouchableOpacity>
-  <View style={styles.actionDivider} />
-  <TouchableOpacity style={styles.actionBtn} onPress={() => setIsEditingName(true)}>
-    <Ionicons name="create-outline" size={20} color={theme.colors.textSecondary} />
-    <Text style={styles.actionBtnText}>改名</Text>
-  </TouchableOpacity>
-  <View style={styles.actionDivider} />
-  <TouchableOpacity style={styles.actionBtn} onPress={handleDelete}>
-    <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
-    <Text style={[styles.actionBtnText, { color: theme.colors.danger }]}>删除</Text>
-  </TouchableOpacity>
-</View>
-```
-
-- [ ] **Step 2: 移除顶栏右侧三点菜单**
-
-删除 `headerRight` 中的 `menuBtn` TouchableOpacity（约第 219-221 行）。
-
-- [ ] **Step 3: 移除顶栏的保存按钮（已迁移到操作栏）**
-
-删除 `headerRight` 中 `hasUnsavedChanges` 条件渲染的 `saveBtn`（约第 208-211 行），只保留 `showSaved` 的"已保存"指示器。
-
-- [ ] **Step 4: 删除三点菜单 Modal**
-
-删除整个 `Modal visible={showMenu}` 块（约第 277-302 行）以及 `showMenu` 相关状态（第 50 行）。
-
-- [ ] **Step 5: 清理状态 `showMenu`**
-
-从 `useState` 声明中移除 `showMenu`（第 50 行）。
-
-- [ ] **Step 6: 添加 ActionBar 样式到 styles**
-
-在 `StyleSheet.create` 末尾添加：
-```tsx
-actionBar: {
-  flexDirection: 'row',
-  backgroundColor: theme.colors.card,
-  borderTopWidth: 1,
-  borderTopColor: theme.colors.border,
-  paddingVertical: 12,
-},
-actionBtn: {
-  flex: 1,
-  flexDirection: 'row',
-  alignItems: 'center',
-  justifyContent: 'center',
-  gap: 6,
-},
-actionBtnText: {
-  fontSize: 14,
-  fontWeight: '500',
-  color: theme.colors.textSecondary,
-},
-actionDivider: {
-  width: 1,
-  height: 20,
-  backgroundColor: theme.colors.border,
-},
-```
-
-- [ ] **Step 7: 提交**
-
-```bash
-git add src/screens/OutfitDetailScreen.tsx
-git commit -m "feat(outfit): replace menu with bottom action bar in OutfitDetailScreen"
-```
-
----
 
 ### Task 2: OutfitDetailScreen 删除确认弹层
 
@@ -712,8 +567,6 @@ git commit -m "feat(outfit): add canvas thumbnail for outfit cards"
 ## 三、任务依赖关系
 
 ```
-Task 1 (底部操作栏)
-    ↓
 Task 2 (删除确认，已实现，验证即可)
     ↓
 Task 3 (ClothingPickerModal 重写) ← 独立
@@ -722,12 +575,12 @@ Task 4 (集成新弹层 + +按钮) ← 依赖 Task 3
     ↓
 Task 5 (拖动添加) ← 依赖 Task 4
     ↓
-Task 6 (缩略图) ← 依赖 Task 1-5
+Task 6 (缩略图) ← 依赖 Task 3-5
     ↓
 Task 7 (验证测试)
 ```
 
-**推荐顺序:** Task 1 → Task 3 → Task 4 → Task 5 → Task 6 → Task 7
+**推荐顺序:** Task 3 → Task 4 → Task 5 → Task 6 → Task 7
 (Task 2 验证即可，无需修改)
 
 ---
@@ -735,7 +588,7 @@ Task 7 (验证测试)
 ## 四、Spec Self-Review
 
 1. **Spec coverage:**
-   - 底部操作栏（三按钮）→ Task 1 ✓
+   - 底部操作栏（三按钮）→ ✓ 已实现
    - 删除确认弹层 → Task 2 ✓（已实现）
    - 添加衣物弹层（分类+搜索+多选）→ Task 3 ✓
    - 拖动添加 → Task 5 ✓
@@ -748,4 +601,4 @@ Task 7 (验证测试)
    - `ClothingPickerModal` Props 改为 `onConfirm` 回调 + `alreadyAddedIds` → Task 3
    - `addClothingToCanvasById` 复用 `addClothingToCanvas` 的位置逻辑 → Task 4
 
-4. **Spec gap:** 点击添加（作为备选）已包含在 BottomStrip 的 `onPress` 中（Task 4），无需额外任务。
+4. **Spec gap:** 点击添加（作为备选）已包含在操作栏的 `onPress` 中（Task 4），无需额外任务。

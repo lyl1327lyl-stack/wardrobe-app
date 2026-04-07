@@ -1,4 +1,4 @@
-import React, { useState, useLayoutEffect, useCallback, useRef } from 'react';
+import React, { useState, useLayoutEffect, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ImagePickerModal } from '../components/ImagePickerModal';
@@ -50,6 +51,7 @@ export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
   const { addClothing, updateClothing, getClothingById } = useWardrobeStore();
+  const insets = useSafeAreaInsets();
 
   const isEditing = !!(route.params?.id);
   const existingItem = isEditing ? getClothingById(route.params.id) : null;
@@ -67,9 +69,16 @@ export function AddClothingScreen() {
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [price, setPrice] = useState(existingItem?.price ? String(existingItem.price) : '');
-  const [wearCount] = useState(existingItem?.wearCount ?? 0);
+  const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
   const [showImagePicker, setShowImagePicker] = useState(false);
+
+  // 添加模式下自动打开图片选择器
+  useEffect(() => {
+    if (!isEditing) {
+      setTimeout(() => setShowImagePicker(true), 100);
+    }
+  }, [isEditing]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 初始状态快照，用于检测未保存更改
@@ -110,20 +119,32 @@ export function AddClothingScreen() {
   // 返回按钮 - 检测未保存更改
   const handleBack = useCallback(() => {
     if (hasChanges) {
-      Alert.alert(
-        '有未保存的更改',
-        '您想要保存更改、存为草稿还是放弃更改？',
-        [
-          { text: '放弃更改', style: 'destructive', onPress: () => navigation.goBack() },
-          { text: '存草稿', onPress: () => doSave(true) },
-          { text: '保存', onPress: () => doSave(false) },
-        ],
-        { cancelable: true }
-      );
+      if (isEditing) {
+        Alert.alert(
+          '有未保存的更改',
+          '您想要保存更改还是放弃更改？',
+          [
+            { text: '放弃更改', style: 'destructive', onPress: () => navigation.goBack() },
+            { text: '保存', onPress: () => doSave(false) },
+          ],
+          { cancelable: true }
+        );
+      } else {
+        Alert.alert(
+          '有未保存的更改',
+          '您想要保存更改、存为草稿还是放弃更改？',
+          [
+            { text: '放弃更改', style: 'destructive', onPress: () => navigation.goBack() },
+            { text: '存草稿', onPress: () => doSave(true) },
+            { text: '保存', onPress: () => doSave(false) },
+          ],
+          { cancelable: true }
+        );
+      }
     } else {
       navigation.goBack();
     }
-  }, [hasChanges, navigation]);
+  }, [hasChanges, isEditing, navigation]);
 
   // BackHandler 处理 Android 物理返回键
   useLayoutEffect(() => {
@@ -160,7 +181,6 @@ export function AddClothingScreen() {
   const doSave = async (asDraft: boolean) => {
     if (!asDraft) {
       if (!imageUri) { Alert.alert('请先添加衣服照片'); return; }
-      if (!color) { Alert.alert('请选择颜色'); return; }
       if (seasons.length === 0) { Alert.alert('请至少选择一个季节'); return; }
     }
 
@@ -218,7 +238,7 @@ export function AddClothingScreen() {
   return (
     <View style={styles.container}>
       {/* 自定义 Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
@@ -266,7 +286,7 @@ export function AddClothingScreen() {
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>颜色<Text style={styles.required}> *</Text></Text>
+              <Text style={styles.formLabel}>颜色</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorScroll}>
                 <View style={styles.colorRow}>
                   {COLORS.filter(c => c !== '其他').map(c => (
@@ -340,9 +360,14 @@ export function AddClothingScreen() {
               </View>
               <View style={[styles.inputField, { flex: 1 }]}>
                 <Text style={styles.formLabel}>穿着次数</Text>
-                <View style={styles.wearCountBox}>
-                  <Text style={styles.wearCountText}>{wearCount}</Text>
-                </View>
+                <TextInput
+                  style={styles.wearCountInput}
+                  value={wearCount === 0 ? '' : String(wearCount)}
+                  onChangeText={v => setWearCount(parseInt(v) || 0)}
+                  placeholder="0"
+                  placeholderTextColor={theme.colors.textTertiary}
+                  keyboardType="numeric"
+                />
               </View>
             </View>
           </View>
@@ -391,7 +416,7 @@ export function AddClothingScreen() {
         </View>
 
         {/* Bottom Buttons */}
-        <View style={styles.bottomBar}>
+        <View style={[styles.bottomBar, { paddingBottom: 36 + insets.bottom }]}>
           {!isEditing && (
             <TouchableOpacity style={styles.draftBtn} onPress={() => doSave(true)} activeOpacity={0.7} disabled={isSubmitting}>
               <Text style={styles.draftBtnText}>存草稿</Text>
@@ -424,7 +449,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 8,
-    paddingTop: Platform.OS === 'ios' ? 50 : 16,
+    paddingTop: 0,
     paddingBottom: 12,
     backgroundColor: theme.colors.card,
     borderBottomWidth: 1,
@@ -687,10 +712,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  wearCountText: {
+  wearCountInput: {
+    borderWidth: 1.5,
+    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.md,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    backgroundColor: theme.colors.background,
     fontSize: 15,
     color: theme.colors.text,
-    fontWeight: '600',
+    fontFamily: 'System',
+    textAlign: 'center',
   },
   remarksInput: {
     minHeight: 80,

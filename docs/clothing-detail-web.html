@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>衣物详情 - 衣柜应用</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cream: '#FAF7F2',
+            warmbrown: '#7D6B5D',
+            darkbrown: '#5A524A',
+            accent: '#C4A77D',
+            lightcream: '#F5F0E8',
+            sage: '#8B9B7A',
+            terracotta: '#C47D5A',
+          },
+          fontFamily: {
+            serif: ['Cormorant', 'serif'],
+            sans: ['Inter', 'sans-serif'],
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; }
+    .font-serif { font-family: 'Cormorant', serif; }
+
+    .image-container {
+      position: relative;
+      overflow: hidden;
+    }
+    .image-container::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(125,107,93,0.1) 0%, transparent 50%);
+      pointer-events: none;
+    }
+
+    .stat-card {
+      position: relative;
+      transition: all 0.3s ease;
+    }
+    .stat-card:hover {
+      transform: translateY(-2px);
+    }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 30px;
+      height: 2px;
+      background: #C4A77D;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    .stat-card:hover::before {
+      opacity: 1;
+    }
+
+    .action-btn {
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s ease;
+    }
+    .action-btn::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: -100%;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+      transition: left 0.5s ease;
+    }
+    .action-btn:hover::before {
+      left: 100%;
+    }
+
+    .tag-item {
+      transition: all 0.2s ease;
+    }
+    .tag-item:hover {
+      background: #F5F0E8;
+      transform: scale(1.02);
+    }
+
+    .color-indicator {
+      transition: transform 0.2s ease;
+    }
+    .color-indicator:hover {
+      transform: scale(1.1);
+    }
+
+    .fade-in {
+      animation: fadeIn 0.6s ease forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .slide-in-left {
+      animation: slideInLeft 0.6s ease forwards;
+    }
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    .slide-in-right {
+      animation: slideInRight 0.6s ease forwards;
+    }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+</head>
+<body class="bg-cream min-h-screen">
+  <!-- Navigation Bar -->
+  <nav class="fixed top-0 left-0 right-0 z-50 bg-cream/90 backdrop-blur-md border-b border-lightcream/50">
+    <div class="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-warmbrown rounded-lg flex items-center justify-center">
+          <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z"/>
+          </svg>
+        </div>
+        <span class="font-serif text-xl text-darkbrown font-semibold tracking-wide">我的衣柜</span>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="text-darkbrown/70 hover:text-darkbrown transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </button>
+        <button class="text-darkbrown/70 hover:text-darkbrown transition-colors">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Main Content -->
+  <main class="pt-24 pb-16">
+    <div class="max-w-7xl mx-auto px-6">
+      <!-- Breadcrumb -->
+      <nav class="mb-8 fade-in">
+        <ol class="flex items-center gap-2 text-sm text-darkbrown/50 font-sans">
+          <li><a href="#" class="hover:text-warmbrown transition-colors">衣柜</a></li>
+          <li><span>/</span></li>
+          <li><a href="#" class="hover:text-warmbrown transition-colors">上装</a></li>
+          <li><span>/</span></li>
+          <li class="text-darkbrown font-medium">针织毛衣</li>
+        </ol>
+      </nav>
+
+      <!-- Main Grid -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16">
+        <!-- Left: Image Gallery -->
+        <div class="slide-in-left">
+          <div class="image-container rounded-3xl bg-lightcream shadow-xl">
+            <img
+              src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=800&q=80"
+              alt="针织毛衣"
+              class="w-full aspect-square object-cover"
+            >
+            <!-- Color Dot -->
+            <div class="absolute bottom-6 right-6 z-10">
+              <div class="color-indicator w-12 h-12 rounded-full border-4 border-white shadow-lg flex items-center justify-center" style="background-color: #D4C4B0;">
+                <div class="w-4 h-4 rounded-full" style="background-color: #8B7355;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Thumbnail Gallery (decorative) -->
+          <div class="flex gap-3 mt-4">
+            <div class="w-20 h-20 rounded-xl overflow-hidden border-2 border-warmbrown/30 cursor-pointer hover:border-warmbrown transition-colors">
+              <img src="https://images.unsplash.com/photo-1576566588028-4147f3842f27?w=200&q=80" alt="角度1" class="w-full h-full object-cover">
+            </div>
+            <div class="w-20 h-20 rounded-xl overflow-hidden border-2 border-transparent cursor-pointer hover:border-warmbrown/30 transition-colors opacity-60">
+              <img src="https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200&q=80" alt="角度2" class="w-full h-full object-cover">
+            </div>
+            <div class="w-20 h-20 rounded-xl overflow-hidden border-2 border-transparent cursor-pointer hover:border-warmbrown/30 transition-colors opacity-60">
+              <img src="https://images.unsplash.com/photo-1594938298603-c8148c4dae35?w=200&q=80" alt="角度3" class="w-full h-full object-cover">
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Product Details -->
+        <div class="slide-in-right">
+          <!-- Header -->
+          <div class="mb-8">
+            <div class="flex items-center gap-2 mb-3">
+              <span class="px-3 py-1 bg-sage/20 text-sage text-xs font-medium rounded-full">春秋必备</span>
+              <span class="px-3 py-1 bg-accent/20 text-accent text-xs font-medium rounded-full">高性价比</span>
+            </div>
+            <h1 class="font-serif text-4xl lg:text-5xl text-darkbrown font-semibold mb-3 tracking-tight">
+              慵懒风针织毛衣
+            </h1>
+            <p class="text-darkbrown/60 font-sans text-base">
+              品牌：<span class="text-warmbrown font-medium">COS</span>
+            </p>
+          </div>
+
+          <!-- Stats Grid -->
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <h3 class="font-serif text-lg text-darkbrown font-semibold mb-5 text-center">衣物档案</h3>
+
+            <div class="grid grid-cols-3 divide-x divide-lightcream">
+              <div class="stat-card px-4 py-3 text-center">
+                <p class="text-2xl font-semibold text-darkbrown mb-1">¥599</p>
+                <p class="text-xs text-darkbrown/50 uppercase tracking-wider">价格</p>
+              </div>
+              <div class="stat-card px-4 py-3 text-center">
+                <p class="text-2xl font-semibold text-darkbrown mb-1">M</p>
+                <p class="text-xs text-darkbrown/50 uppercase tracking-wider">尺码</p>
+              </div>
+              <div class="stat-card px-4 py-3 text-center">
+                <p class="text-2xl font-semibold text-darkbrown mb-1">2024</p>
+                <p class="text-xs text-darkbrown/50 uppercase tracking-wider">年份</p>
+              </div>
+            </div>
+
+            <div class="h-px bg-lightcream my-5"></div>
+
+            <div class="grid grid-cols-3 divide-x divide-lightcream">
+              <div class="stat-card px-4 py-3 text-center">
+                <p class="text-2xl font-semibold text-darkbrown mb-1">12</p>
+                <p class="text-xs text-darkbrown/50 uppercase tracking-wider">穿着次数</p>
+              </div>
+              <div class="stat-card px-4 py-3 text-center">
+                <p class="text-2xl font-semibold text-terracotta mb-1">¥50</p>
+                <p class="text-xs text-darkbrown/50 uppercase tracking-wider">单次花费</p>
+              </div>
+              <div class="stat-card px-4 py-3 text-center">
+                <p class="text-lg font-semibold text-darkbrown mb-1">3天前</p>
+                <p class="text-xs text-darkbrown/50 uppercase tracking-wider">上次穿着</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tags Section -->
+          <div class="bg-white rounded-2xl p-6 shadow-sm mb-6">
+            <div class="mb-5">
+              <h4 class="text-xs text-darkbrown/50 uppercase tracking-wider mb-3 font-sans font-medium">季节</h4>
+              <div class="flex flex-wrap gap-2">
+                <span class="tag-item px-4 py-2 bg-lightcream rounded-full text-sm text-darkbrown cursor-pointer border border-transparent hover:border-accent/30">春</span>
+                <span class="tag-item px-4 py-2 bg-lightcream rounded-full text-sm text-darkbrown cursor-pointer border border-accent/50 bg-accent/10 border-accent/50">秋</span>
+              </div>
+            </div>
+            <div>
+              <h4 class="text-xs text-darkbrown/50 uppercase tracking-wider mb-3 font-sans font-medium">场合</h4>
+              <div class="flex flex-wrap gap-2">
+                <span class="tag-item px-4 py-2 bg-lightcream rounded-full text-sm text-darkbrown cursor-pointer border border-transparent hover:border-accent/30">日常</span>
+                <span class="tag-item px-4 py-2 bg-lightcream rounded-full text-sm text-darkbrown cursor-pointer border border-transparent hover:border-accent/30">通勤</span>
+                <span class="tag-item px-4 py-2 bg-lightcream rounded-full text-sm text-darkbrown cursor-pointer border border-transparent hover:border-accent/30">约会</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Remarks -->
+          <div class="bg-gradient-to-r from-white to-lightcream/50 rounded-2xl p-6 shadow-sm border-l-4 border-accent mb-8">
+            <h4 class="font-serif text-lg text-darkbrown font-semibold mb-3">备注</h4>
+            <p class="text-darkbrown/70 leading-relaxed">
+              购买于2024年秋季打折季，性价比很高。材质柔软舒适，适合春秋季穿着。搭配牛仔裤或休闲裤都很合适。
+            </p>
+          </div>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-wrap gap-4">
+            <button class="action-btn flex-1 bg-warmbrown text-white px-6 py-4 rounded-xl font-sans font-medium shadow-lg shadow-warmbrown/20 hover:bg-darkbrown transition-colors flex items-center justify-center gap-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+              记录穿着
+            </button>
+            <button class="action-btn flex-1 bg-white text-warmbrown border-2 border-warmbrown/20 px-6 py-4 rounded-xl font-sans font-medium hover:border-warmbrown hover:bg-lightcream transition-colors flex items-center justify-center gap-3">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+              </svg>
+              加入搭配
+            </button>
+            <button class="action-btn bg-white text-terracotta border-2 border-terracotta/20 px-5 py-4 rounded-xl hover:border-terracotta hover:bg-red-50 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+              </svg>
+            </button>
+            <button class="action-btn bg-white text-sage border-2 border-sage/20 px-5 py-4 rounded-xl hover:border-sage hover:bg-green-50 transition-colors">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Related Outfits Section -->
+      <section class="mt-20">
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h2 class="font-serif text-2xl text-darkbrown font-semibold">相关搭配</h2>
+            <p class="text-darkbrown/50 text-sm mt-1">这些搭配中都包含这件单品</p>
+          </div>
+          <a href="#" class="text-warmbrown hover:text-darkbrown transition-colors font-medium text-sm flex items-center gap-1">
+            查看全部
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </a>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Outfit Card 1 -->
+          <div class="group cursor-pointer">
+            <div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-lightcream mb-3 shadow-sm">
+              <img src="https://images.unsplash.com/photo-1509631179647-0177331693ae?w=400&q=80" alt="慵懒周末穿搭" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div class="absolute bottom-4 left-4 right-4">
+                <p class="text-white font-serif text-lg font-semibold">慵懒周末</p>
+                <p class="text-white/80 text-sm">3件单品</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Outfit Card 2 -->
+          <div class="group cursor-pointer">
+            <div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-lightcream mb-3 shadow-sm">
+              <img src="https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80" alt="都市通勤穿搭" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div class="absolute bottom-4 left-4 right-4">
+                <p class="text-white font-serif text-lg font-semibold">都市通勤</p>
+                <p class="text-white/80 text-sm">4件单品</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Outfit Card 3 -->
+          <div class="group cursor-pointer">
+            <div class="relative aspect-[3/4] rounded-2xl overflow-hidden bg-lightcream mb-3 shadow-sm">
+              <img src="https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=400&q=80" alt="秋季约会穿搭" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+              <div class="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div class="absolute bottom-4 left-4 right-4">
+                <p class="text-white font-serif text-lg font-semibold">秋季约会</p>
+                <p class="text-white/80 text-sm">3件单品</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-darkbrown text-white/70 py-12 mt-20">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center">
+            <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6z"/>
+            </svg>
+          </div>
+          <span class="font-serif text-lg text-white font-medium">我的衣柜</span>
+        </div>
+        <p class="text-sm">记录每一件衣物，打造你的专属风格</p>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>
