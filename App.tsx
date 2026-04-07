@@ -61,12 +61,12 @@ function WardrobeStackScreen() {
       <WardrobeStackNav.Screen
         name="AddClothing"
         component={AddClothingScreen}
-        options={{ title: '添加衣服' }}
+        options={{ title: '添加衣服', headerShown: false }}
       />
       <WardrobeStackNav.Screen
         name="EditClothing"
         component={AddClothingScreen}
-        options={{ title: '编辑衣服' }}
+        options={{ title: '编辑衣服', headerShown: false }}
       />
       <WardrobeStackNav.Screen
         name="CategoryDetail"
@@ -173,7 +173,7 @@ function AppNavigator() {
           component={AddClothingScreen}
           options={{
             title: '编辑衣服',
-            headerShown: true,
+            headerShown: false,
             presentation: 'card',
           }}
         />
