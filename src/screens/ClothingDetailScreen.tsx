@@ -254,7 +254,7 @@ export function ClothingDetailScreen() {
           <View style={styles.soldCard}>
             <View style={styles.discardCardHeader}>
               <View style={styles.discardCardTitle}>
-                <View style={[styles.discardIcon, { background: '#EEF2E8' }]}>
+                <View style={[styles.discardIcon, { backgroundColor: '#EEF2E8' }]}>
                   <Ionicons name="cash-outline" size={14} color="#8B9B7A" />
                 </View>
                 <Text style={[styles.discardCardTitleText, { color: '#8B9B7A' }]}>卖出详情</Text>
