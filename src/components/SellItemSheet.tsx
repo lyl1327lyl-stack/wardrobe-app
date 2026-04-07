@@ -19,7 +19,6 @@ interface SellItemSheetProps {
   onClose: () => void;
   clothingItem: ClothingItem;
   onSell: (soldPrice: number, soldPlatform: string) => void;
-  onPermanentDelete: () => void;
 }
 
 export function SellItemSheet({
@@ -27,7 +26,6 @@ export function SellItemSheet({
   onClose,
   clothingItem,
   onSell,
-  onPermanentDelete,
 }: SellItemSheetProps) {
   const [soldPrice, setSoldPrice] = useState('');
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null);
@@ -179,20 +177,6 @@ export function SellItemSheet({
               disabled={!isValid()}
             >
               <Text style={styles.confirmBtnText}>确认卖出</Text>
-            </TouchableOpacity>
-
-            {/* 永久删除 */}
-            <TouchableOpacity
-              style={styles.permanentDeleteBtn}
-              onPress={async () => {
-                resetState();
-                await onPermanentDelete();
-                onClose();
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="trash" size={16} color={theme.colors.warning} />
-              <Text style={styles.permanentDeleteBtnText}>直接永久删除</Text>
             </TouchableOpacity>
           </ScrollView>
         </View>

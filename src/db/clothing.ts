@@ -9,7 +9,7 @@ function localDateString(): string {
 
 export async function getAllClothing(): Promise<ClothingItem[]> {
   const db = await getDatabase();
-  const result = await db.getAllAsync<ClothingItem>('SELECT * FROM clothing_items WHERE deletedAt IS NULL ORDER BY createdAt DESC');
+  const result = await db.getAllAsync<ClothingItem>('SELECT * FROM clothing_items WHERE deletedAt IS NULL AND soldAt IS NULL ORDER BY createdAt DESC');
   return result.map(item => ({
     ...item,
     seasons: JSON.parse(item.seasons as unknown as string || '[]'),

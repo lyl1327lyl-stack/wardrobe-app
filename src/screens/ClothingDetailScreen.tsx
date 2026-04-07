@@ -435,7 +435,6 @@ export function ClothingDetailScreen() {
         onClose={() => setShowSellSheet(false)}
         clothingItem={item}
         onSell={handleSellConfirm}
-        onPermanentDelete={handleDiscardPermanentDelete}
       />
 
       <EditDiscardReasonSheet
