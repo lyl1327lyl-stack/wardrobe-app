@@ -364,13 +364,6 @@ export function WardrobeScreen() {
         </TouchableOpacity>
         <View style={styles.headerRight}>
           <TouchableOpacity
-            style={styles.settingsBtn}
-            onPress={() => navigation.navigate('PersonalCenter')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="settings-outline" size={24} color={theme.colors.textSecondary} />
-          </TouchableOpacity>
-          <TouchableOpacity
             style={styles.headerActionBtn}
             onPress={() => navigation.navigate('Trash')}
             activeOpacity={0.7}

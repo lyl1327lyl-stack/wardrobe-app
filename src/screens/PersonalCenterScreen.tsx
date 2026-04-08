@@ -99,18 +99,6 @@ export function PersonalCenterScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="close" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>个人中心</Text>
-        <View style={styles.placeholder} />
-      </View>
-
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
@@ -224,33 +212,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 56,
-    paddingBottom: 16,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  placeholder: {
-    width: 40,
-  },
   content: {
     flex: 1,
   },
   scrollContent: {
-    paddingTop: 12,
+    paddingTop: 60,
   },
   section: {
     marginHorizontal: 16,

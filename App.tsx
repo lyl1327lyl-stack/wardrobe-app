@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { View, Text, StyleSheet } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WardrobeScreen } from './src/screens/WardrobeScreen';
 import { AddClothingScreen } from './src/screens/AddClothingScreen';
@@ -30,6 +31,7 @@ function TabIcon({ name, focused, theme }: { name: string; focused: boolean; the
     '衣橱': { focused: 'shirt', unfocused: 'shirt-outline' },
     '搭配': { focused: 'grid', unfocused: 'grid-outline' },
     '统计': { focused: 'stats-chart', unfocused: 'stats-chart-outline' },
+    '个人中心': { focused: 'person', unfocused: 'person-outline' },
   };
   const iconName = focused ? icons[name].focused : icons[name].unfocused;
   return (
@@ -80,6 +82,7 @@ function WardrobeStackScreen() {
 // Tab 导航器
 function MainTabs() {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -91,8 +94,8 @@ function MainTabs() {
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
           paddingTop: 8,
-          paddingBottom: 8,
-          height: 60,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
+          height: 60 + (insets.bottom > 0 ? insets.bottom : 8),
         },
         tabBarLabelStyle: {
           fontSize: 11,
@@ -104,6 +107,7 @@ function MainTabs() {
       <Tab.Screen name="衣橱" component={WardrobeStackScreen} />
       <Tab.Screen name="搭配" component={OutfitsScreen} options={{ headerShown: false }} />
       <Tab.Screen name="统计" component={StatsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="个人中心" component={PersonalCenterScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
 }
