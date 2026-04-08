@@ -12,27 +12,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import {
-  ClothingType,
-  Season,
-  Occasion,
-  Style,
-  CLOTHING_TYPES,
-  SEASONS,
-  OCCASIONS,
-  STYLES,
-} from '../types';
-import {
-  getCustomOptions,
-  updateCustomTypes,
-  updateCustomSeasons,
-  updateCustomOccasions,
-  updateCustomStyles,
-  resetToDefaults,
-  CustomOptions,
-} from '../utils/customOptions';
 
 type OptionCategory = 'types' | 'seasons' | 'occasions' | 'styles';
 
@@ -234,26 +216,51 @@ export function CustomOptionsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CustomOptions'>>();
   const { clothing } = useWardrobeStore();
+
+  // ✅ Zustand 必须用 selector 订阅，否则 UI 不会响应更新
+  const types = useCustomOptionsStore(state => state.types);
+  const seasons = useCustomOptionsStore(state => state.seasons);
+  const occasions = useCustomOptionsStore(state => state.occasions);
+  const storeStyles = useCustomOptionsStore(state => state.styles);
+  const isLoading = useCustomOptionsStore(state => state.isLoading);
+  const load = useCustomOptionsStore(state => state.load);
+  const updateCategory = useCustomOptionsStore(state => state.updateCategory);
+  const resetToDefaults = useCustomOptionsStore(state => state.resetToDefaults);
+
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const [options, setOptions] = useState<CustomOptions | null>(null);
+  // 如果传入了特定分类，则进入单分类模式（不显示分类列表，直接展开该分类）
+  const forcedCategory = route.params?.category;
   const [expandedCategory, setExpandedCategory] = useState<OptionCategory | null>(
-    route.params?.category || null
+    forcedCategory || null
   );
   const [showAddModal, setShowAddModal] = useState(false);
   const [addModalCategory, setAddModalCategory] = useState<OptionCategory | null>(null);
   const [editingValue, setEditingValue] = useState('');
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [newOptionText, setNewOptionText] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadOptions();
-  }, []);
+    load();
+  }, [load]);
 
-  const loadOptions = async () => {
-    const opts = await getCustomOptions();
-    setOptions(opts);
+  const getOptionsForCategory = (category: OptionCategory): string[] => {
+    switch (category) {
+      case 'types':
+        return types;
+      case 'seasons':
+        return seasons;
+      case 'occasions':
+        return occasions;
+      case 'styles':
+        return storeStyles;
+    }
+  };
+
+  const updateCategoryOptions = async (category: OptionCategory, newOptions: string[]) => {
+    await updateCategory(category, newOptions);
   };
 
   // Check if an option is in use by any clothing item
@@ -265,13 +272,13 @@ export function CustomOptionsScreen() {
             if (item.type === value) return true;
             break;
           case 'seasons':
-            if (item.seasons.includes(value as Season)) return true;
+            if (item.seasons.includes(value)) return true;
             break;
           case 'occasions':
-            if (item.occasions.includes(value as Occasion)) return true;
+            if (item.occasions.includes(value)) return true;
             break;
           case 'styles':
-            if (item.styles && item.styles.includes(value as Style)) return true;
+            if (item.styles && item.styles.includes(value)) return true;
             break;
         }
       }
@@ -279,41 +286,6 @@ export function CustomOptionsScreen() {
     },
     [clothing]
   );
-
-  const getOptionsForCategory = (category: OptionCategory): string[] => {
-    if (!options) return [];
-    switch (category) {
-      case 'types':
-        return options.types;
-      case 'seasons':
-        return options.seasons;
-      case 'occasions':
-        return options.occasions;
-      case 'styles':
-        return options.styles;
-    }
-  };
-
-  const updateCategoryOptions = async (
-    category: OptionCategory,
-    newOptions: string[]
-  ) => {
-    switch (category) {
-      case 'types':
-        await updateCustomTypes(newOptions as ClothingType[]);
-        break;
-      case 'seasons':
-        await updateCustomSeasons(newOptions as Season[]);
-        break;
-      case 'occasions':
-        await updateCustomOccasions(newOptions as Occasion[]);
-        break;
-      case 'styles':
-        await updateCustomStyles(newOptions as Style[]);
-        break;
-    }
-    await loadOptions();
-  };
 
   const handleToggleExpand = (category: OptionCategory) => {
     setExpandedCategory(expandedCategory === category ? null : category);
@@ -332,7 +304,9 @@ export function CustomOptionsScreen() {
         text: '删除',
         style: 'destructive',
         onPress: async () => {
-          const newOpts = opts.filter((_, i) => i !== index);
+          // 直接从当前状态重新计算，避免闭包问题
+          const currentOpts = getOptionsForCategory(category);
+          const newOpts = currentOpts.filter((_, i) => i !== index);
           await updateCategoryOptions(category, newOpts);
         },
       },
@@ -357,6 +331,7 @@ export function CustomOptionsScreen() {
   };
 
   const handleSaveOption = async () => {
+    if (isSaving) return;
     if (!addModalCategory || !newOptionText.trim()) {
       Alert.alert('请输入选项名称');
       return;
@@ -364,7 +339,7 @@ export function CustomOptionsScreen() {
     const trimmed = newOptionText.trim();
     const currentOpts = getOptionsForCategory(addModalCategory);
 
-    // Check for duplicate
+    // Check for duplicate (only for new items, not when editing same item)
     if (editingIndex === null && currentOpts.includes(trimmed)) {
       Alert.alert('选项已存在', '请使用不同的名称');
       return;
@@ -380,8 +355,18 @@ export function CustomOptionsScreen() {
       newOpts = [...currentOpts, trimmed];
     }
 
-    await updateCategoryOptions(addModalCategory, newOpts);
+    setIsSaving(true);
+    // 先关闭 modal，确保用户立即看到反馈
     setShowAddModal(false);
+    // 重置表单状态
+    setNewOptionText('');
+    setEditingIndex(null);
+    setAddModalCategory(null);
+    try {
+      await updateCategoryOptions(addModalCategory, newOpts);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleReset = () => {
@@ -392,13 +377,12 @@ export function CustomOptionsScreen() {
         style: 'destructive',
         onPress: async () => {
           await resetToDefaults();
-          await loadOptions();
         },
       },
     ]);
   };
 
-  if (!options) {
+  if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.header}>
@@ -418,38 +402,61 @@ export function CustomOptionsScreen() {
         <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>管理分类选项</Text>
-        <TouchableOpacity style={styles.headerBtn} onPress={handleReset}>
-          <Ionicons name="refresh" size={20} color={theme.colors.textSecondary} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>
+          {forcedCategory ? `${CATEGORIES.find(c => c.key === forcedCategory)?.label}管理` : '管理分类选项'}
+        </Text>
+        {!forcedCategory && (
+          <TouchableOpacity style={styles.headerBtn} onPress={handleReset}>
+            <Ionicons name="refresh" size={20} color={theme.colors.textSecondary} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {CATEGORIES.map((cat) => {
+        {/* 如果传入了特定分类参数，只显示该分类；否则显示所有分类列表 */}
+        {(forcedCategory ? CATEGORIES.filter(c => c.key === forcedCategory) : CATEGORIES).map((cat) => {
           const catOptions = getOptionsForCategory(cat.key);
           const isExpanded = expandedCategory === cat.key;
+          // 单分类模式（forcedCategory）下，强制展开且不显示header
+          const isSingleCategoryMode = !!forcedCategory;
           return (
             <View key={cat.key} style={styles.section}>
-              <TouchableOpacity
-                style={styles.sectionHeader}
-                onPress={() => handleToggleExpand(cat.key)}
-                activeOpacity={0.7}
-              >
-                <View style={styles.sectionIcon}>
-                  <Ionicons name={cat.icon} size={20} color={theme.colors.primary} />
-                </View>
-                <View style={styles.sectionInfo}>
-                  <Text style={styles.sectionTitle}>{cat.label}</Text>
-                  <Text style={styles.sectionCount}>{catOptions.length} 个选项</Text>
-                </View>
-                <Ionicons
-                  name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                  size={20}
-                  color={theme.colors.textTertiary}
-                />
-              </TouchableOpacity>
+              {!isSingleCategoryMode && (
+                <TouchableOpacity
+                  style={styles.sectionHeader}
+                  onPress={() => handleToggleExpand(cat.key)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.sectionIcon}>
+                    <Ionicons name={cat.icon} size={20} color={theme.colors.primary} />
+                  </View>
+                  <View style={styles.sectionInfo}>
+                    <Text style={styles.sectionTitle}>{cat.label}</Text>
+                    <Text style={styles.sectionCount}>{catOptions.length} 个选项</Text>
+                  </View>
+                  <Ionicons
+                    name={isExpanded ? 'chevron-up' : 'chevron-down'}
+                    size={20}
+                    color={theme.colors.textTertiary}
+                  />
+                </TouchableOpacity>
+              )}
 
-              {isExpanded && (
+              {/* 单分类模式下显示分类标题 */}
+              {isSingleCategoryMode && (
+                <View style={styles.sectionHeader}>
+                  <View style={styles.sectionIcon}>
+                    <Ionicons name={cat.icon} size={20} color={theme.colors.primary} />
+                  </View>
+                  <View style={styles.sectionInfo}>
+                    <Text style={styles.sectionTitle}>{cat.label}</Text>
+                    <Text style={styles.sectionCount}>{catOptions.length} 个选项</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* 单分类模式或展开时显示选项列表 */}
+              {(isSingleCategoryMode || isExpanded) && (
                 <View style={styles.optionList}>
                   {catOptions.map((opt, idx) => {
                     const inUse = isOptionInUse(cat.key, opt);
@@ -536,11 +543,12 @@ export function CustomOptionsScreen() {
                 <Text style={styles.modalCancelText}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={styles.modalConfirm}
+                style={[styles.modalConfirm, isSaving && { opacity: 0.6 }]}
                 onPress={handleSaveOption}
                 activeOpacity={0.8}
+                disabled={isSaving}
               >
-                <Text style={styles.modalConfirmText}>保存</Text>
+                <Text style={styles.modalConfirmText}>{isSaving ? '保存中...' : '保存'}</Text>
               </TouchableOpacity>
             </View>
           </View>

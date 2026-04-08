@@ -18,8 +18,9 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ImagePickerModal } from '../components/ImagePickerModal';
 import { processImage } from '../utils/imageUtils';
-import { ClothingType, Season, Occasion, Style, ClothingItem, CLOTHING_TYPES, SEASONS, OCCASIONS, COLORS, STYLES } from '../types';
+import { ClothingItem, COLORS } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { Theme } from '../utils/theme';
 
 type RouteParams = { EditClothing?: { id: number } };
@@ -185,6 +186,7 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       flexWrap: 'wrap',
       gap: 8,
+      paddingRight: 18,
     },
     chip: {
       paddingHorizontal: 14,
@@ -393,20 +395,29 @@ export function AddClothingScreen() {
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
   const { addClothing, updateClothing, getClothingById } = useWardrobeStore();
   const { theme } = useTheme();
+    const customTypes = useCustomOptionsStore(state => state.types);
+  const customSeasons = useCustomOptionsStore(state => state.seasons);
+  const customOccasions = useCustomOptionsStore(state => state.occasions);
+  const customStyles = useCustomOptionsStore(state => state.styles);
+  const load = useCustomOptionsStore(state => state.load);
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
+
+  useEffect(() => {
+    load();
+  }, []);
 
   const isEditing = !!(route.params?.id);
   const existingItem = isEditing ? getClothingById(route.params.id) : null;
 
   const [imageUri, setImageUri] = useState(existingItem?.imageUri || '');
-  const [type, setType] = useState<ClothingType>(existingItem?.type || '上衣');
+  const [type, setType] = useState(existingItem?.type || '');
   const [color, setColor] = useState(existingItem?.color || '');
   const [brand, setBrand] = useState(existingItem?.brand || '');
   const [size, setSize] = useState(existingItem?.size || '');
-  const [seasons, setSeasons] = useState<Season[]>(existingItem?.seasons || []);
-  const [occasions, setOccasions] = useState<Occasion[]>(existingItem?.occasions || []);
-  const [clothingStyles, setClothingStyles] = useState<Style[]>(existingItem?.styles || []);
+  const [seasons, setSeasons] = useState<string[]>(existingItem?.seasons || []);
+  const [occasions, setOccasions] = useState<string[]>(existingItem?.occasions || []);
+  const [clothingStyles, setClothingStyles] = useState<string[]>(existingItem?.styles || []);
   const [purchaseDate, setPurchaseDate] = useState<Date | null>(
     existingItem?.purchaseDate ? new Date(existingItem.purchaseDate) : null
   );
@@ -498,15 +509,15 @@ export function AddClothingScreen() {
     return () => backHandler.remove();
   }, [handleBack]);
 
-  const toggleSeason = (s: Season) => {
+  const toggleSeason = (s: string) => {
     setSeasons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
 
-  const toggleOccasion = (o: Occasion) => {
+  const toggleOccasion = (o: string) => {
     setOccasions(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o]);
   };
 
-  const toggleStyle = (s: Style) => {
+  const toggleStyle = (s: string) => {
     setClothingStyles(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
 
@@ -545,7 +556,7 @@ export function AddClothingScreen() {
         color: asDraft && !color ? '' : color,
         brand,
         size,
-        seasons: asDraft && seasons.length === 0 ? (['春'] as Season[]) : seasons,
+        seasons: asDraft && seasons.length === 0 ? (['春'] as string[]) : seasons,
         occasions,
         purchaseDate: purchaseDate ? formatDate(purchaseDate) : '',
         price: parseFloat(price) || 0,
@@ -619,7 +630,7 @@ export function AddClothingScreen() {
               <Text style={styles.formLabel}>类型<Text style={styles.required}> *</Text></Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
                 <View style={styles.chipRow}>
-                  {CLOTHING_TYPES.map(t => (
+                  {(customTypes || []).map(t => (
                     <TouchableOpacity key={t} style={[styles.chip, type === t && styles.chipActive]} onPress={() => setType(t)}>
                       <Text style={[styles.chipLabel, type === t && styles.chipLabelActive]}>{t}</Text>
                     </TouchableOpacity>
@@ -645,7 +656,7 @@ export function AddClothingScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>季节<Text style={styles.required}> *</Text></Text>
               <View style={styles.chipRow}>
-                {SEASONS.map(s => (
+                {(customSeasons || []).map(s => (
                   <TouchableOpacity key={s} style={[styles.chip, seasons.includes(s) && styles.chipActive]} onPress={() => toggleSeason(s)}>
                     <Text style={[styles.chipLabel, seasons.includes(s) && styles.chipLabelActive]}>{s}</Text>
                   </TouchableOpacity>
@@ -720,7 +731,7 @@ export function AddClothingScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>场合</Text>
               <View style={styles.chipRow}>
-                {OCCASIONS.map(o => (
+                {(customOccasions || []).map(o => (
                   <TouchableOpacity key={o} style={[styles.chip, occasions.includes(o) && styles.chipActive]} onPress={() => toggleOccasion(o)}>
                     <Text style={[styles.chipLabel, occasions.includes(o) && styles.chipLabelActive]}>{o}</Text>
                   </TouchableOpacity>
@@ -731,7 +742,7 @@ export function AddClothingScreen() {
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>风格</Text>
               <View style={styles.chipRow}>
-                {STYLES.map(s => (
+                {(customStyles || []).map(s => (
                   <TouchableOpacity key={s} style={[styles.chip, clothingStyles.includes(s) && styles.chipActive]} onPress={() => toggleStyle(s)}>
                     <Text style={[styles.chipLabel, clothingStyles.includes(s) && styles.chipLabelActive]}>{s}</Text>
                   </TouchableOpacity>

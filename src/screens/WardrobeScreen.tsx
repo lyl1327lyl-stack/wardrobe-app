@@ -10,10 +10,10 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
-import { ClothingItem, CLOTHING_TYPES, Season } from '../types';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import { getCustomSeasons } from '../utils/customOptions';
 
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
@@ -305,15 +305,17 @@ export function WardrobeScreen() {
   const navigation = useNavigation<any>();
   const { clothing, trashClothing, soldClothing, loadData } = useWardrobeStore();
   const { theme } = useTheme();
+  const types = useCustomOptionsStore(state => state.types);
+  const seasons = useCustomOptionsStore(state => state.seasons);
+  const load = useCustomOptionsStore(state => state.load);
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
-  const [customSeasons, setCustomSeasons] = useState<Season[]>(['春', '夏', '秋', '冬']);
 
   useEffect(() => {
     loadData();
-    getCustomSeasons().then(setCustomSeasons);
+    load();
   }, []);
 
   useFocusEffect(
@@ -345,9 +347,9 @@ export function WardrobeScreen() {
   };
 
   const filteredClothing = getFilteredClothing();
-  const availableTypes = CLOTHING_TYPES.filter(type => getClothingByType(type).length > 0);
+  const availableTypes = (types || []).filter(type => getClothingByType(type).length > 0);
   const isEmpty = filteredClothing.length === 0;
-  const seasonOptions: ('全部' | Season)[] = ['全部', ...customSeasons];
+  const seasonOptions: ('全部' | Season)[] = ['全部', ...(seasons || [])];
 
   return (
     <View style={styles.container}>
