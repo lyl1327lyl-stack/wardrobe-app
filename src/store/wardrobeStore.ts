@@ -48,6 +48,7 @@ interface WardrobeState {
   getClothingByScene: (scene: Scene) => ClothingItem[];
   getDaysSinceLastWorn: (id: number) => number | null;
   wearMultipleClothing: (ids: number[]) => Promise<void>;
+  migrateClothingType: (oldType: string, newType: string) => Promise<number>;
 }
 
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
@@ -318,5 +319,15 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
           : c
       ),
     }));
+  },
+
+  migrateClothingType: async (oldType: string, newType: string) => {
+    const count = await clothingDb.migrateClothingType(oldType, newType);
+    // Update in-memory state for all lists that might contain this type
+    set(state => ({
+      clothing: state.clothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
+      soldClothing: state.soldClothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
+    }));
+    return count;
   },
 }));

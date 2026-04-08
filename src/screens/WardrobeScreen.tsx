@@ -422,11 +422,11 @@ export function WardrobeScreen() {
                 <View style={styles.categoryHeader}>
                   <View style={styles.categoryTitleRow}>
                     <Ionicons
-                      name={TYPE_CONFIG[type]?.icon || 'shirt'}
+                      name="shirt-outline"
                       size={18}
                       color={theme.colors.accent}
                     />
-                    <Text style={styles.categoryTitle}>{TYPE_CONFIG[type]?.label || type}</Text>
+                    <Text style={styles.categoryTitle}>{type}</Text>
                     <Text style={styles.categoryCount}>{items.length}件</Text>
                   </View>
                   <TouchableOpacity

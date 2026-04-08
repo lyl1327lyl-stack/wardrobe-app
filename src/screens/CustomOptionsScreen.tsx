@@ -216,6 +216,7 @@ export function CustomOptionsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CustomOptions'>>();
   const { clothing } = useWardrobeStore();
+  const migrateClothingType = useWardrobeStore(state => state.migrateClothingType);
 
   // ✅ Zustand 必须用 selector 订阅，否则 UI 不会响应更新
   const types = useCustomOptionsStore(state => state.types);
@@ -346,7 +347,9 @@ export function CustomOptionsScreen() {
     }
 
     let newOpts: string[];
-    if (editingIndex !== null) {
+    const isEditing = editingIndex !== null;
+    const oldValue = isEditing ? currentOpts[editingIndex] : null;
+    if (isEditing) {
       // Edit existing
       newOpts = [...currentOpts];
       newOpts[editingIndex] = trimmed;
@@ -364,6 +367,10 @@ export function CustomOptionsScreen() {
     setAddModalCategory(null);
     try {
       await updateCategoryOptions(addModalCategory, newOpts);
+      // When renaming a type, migrate all clothing items to the new type
+      if (isEditing && addModalCategory === 'types' && oldValue && oldValue !== trimmed) {
+        await migrateClothingType(oldValue, trimmed);
+      }
     } finally {
       setIsSaving(false);
     }

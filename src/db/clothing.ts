@@ -171,3 +171,12 @@ export async function getClothingStats(): Promise<{ total: number; byType: Recor
   });
   return { total: items.length, byType };
 }
+
+export async function migrateClothingType(oldType: string, newType: string): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.runAsync(
+    'UPDATE clothing_items SET type = ? WHERE type = ?',
+    [newType, oldType]
+  );
+  return result.changes;
+}
