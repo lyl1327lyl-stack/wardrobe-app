@@ -1,41 +1,56 @@
 import { useState, useEffect, useCallback } from 'react';
-import {
-  loadOptionsFromStorage,
-  DEFAULT_OPTIONS,
-  CustomOptions,
-} from '../utils/customOptions';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { CustomCategories } from '../utils/customOptions';
 
 interface UseCustomOptionsReturn {
-  options: CustomOptions;
+  categories: CustomCategories;
+  seasons: string[];
+  occasions: string[];
+  styles: string[];
   isLoading: boolean;
   refresh: () => Promise<void>;
-  updateCategory: (category: keyof CustomOptions, options: string[]) => Promise<void>;
+  updateCategory: (category: 'seasons' | 'occasions' | 'styles', options: string[]) => Promise<void>;
+  getAllChildTypes: () => string[];
+  getParentOfChild: (child: string) => string | undefined;
+  getChildrenOf: (parent: string) => string[];
+  getParents: () => string[];
 }
 
 export function useCustomOptions(): UseCustomOptionsReturn {
-  const store = useCustomOptionsStore();
-  const [isLoading, setIsLoading] = useState(true);
+  const categories = useCustomOptionsStore(state => state.categories);
+  const seasons = useCustomOptionsStore(state => state.seasons);
+  const occasions = useCustomOptionsStore(state => state.occasions);
+  const styles = useCustomOptionsStore(state => state.styles);
+  const isLoading = useCustomOptionsStore(state => state.isLoading);
+  const load = useCustomOptionsStore(state => state.load);
+  const updateCategory = useCustomOptionsStore(state => state.updateCategory);
+  const getAllChildTypes = useCustomOptionsStore(state => state.getAllChildTypes);
+  const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
+  const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
+  const getParents = useCustomOptionsStore(state => state.getParents);
+  const [localLoading, setLocalLoading] = useState(true);
 
   const refresh = useCallback(async () => {
-    await store.load();
-  }, [store]);
+    await load();
+  }, [load]);
 
   useEffect(() => {
-    store.load().then(() => {
-      setIsLoading(false);
+    load().then(() => {
+      setLocalLoading(false);
     });
-  }, []);
+  }, [load]);
 
   return {
-    options: {
-      types: store.types,
-      seasons: store.seasons,
-      occasions: store.occasions,
-      styles: store.styles,
-    },
-    isLoading: store.isLoading || isLoading,
+    categories,
+    seasons,
+    occasions,
+    styles,
+    isLoading: isLoading || localLoading,
     refresh,
-    updateCategory: store.updateCategory,
+    updateCategory,
+    getAllChildTypes,
+    getParentOfChild,
+    getChildrenOf,
+    getParents,
   };
 }

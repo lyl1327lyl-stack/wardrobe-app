@@ -5,6 +5,12 @@ export type Occasion = string;
 export type Scene = '工作' | '运动' | '约会' | '宅家';
 export type Style = string;
 
+// 两级分类筛选状态
+export interface CategoryFilter {
+  parent?: string;
+  child?: string;
+}
+
 export interface ClothingItem {
   id: number;
   imageUri: string;
@@ -59,7 +65,6 @@ export interface OutfitRecommendation {
   score: number; // 匹配度评分 0-100
 }
 
-export const CLOTHING_TYPES: string[] = ['上衣', '裤子', '裙子', '鞋子', '配饰', '外套'];
 export const SEASONS: string[] = ['春', '夏', '秋', '冬'];
 export const OCCASIONS: string[] = ['日常', '工作', '运动', '正式', '休闲'];
 export const SCENES: Scene[] = ['工作', '运动', '约会', '宅家'];

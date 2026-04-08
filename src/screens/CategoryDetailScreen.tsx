@@ -11,6 +11,7 @@ import {
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
@@ -114,6 +115,7 @@ export function CategoryDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CategoryDetail'>>();
   const { clothing, loadData } = useWardrobeStore();
+  const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -124,7 +126,9 @@ export function CategoryDetailScreen() {
   }, []);
 
   const getFilteredClothing = () => {
-    let items = clothing.filter(item => item.type === type);
+    // type 现在是父分类，获取所有子分类进行筛选
+    const children = getChildrenOf(type);
+    let items = clothing.filter(item => children.includes(item.type));
     if (season !== '全部') {
       items = items.filter(item => item.seasons.includes(season as Season));
     }

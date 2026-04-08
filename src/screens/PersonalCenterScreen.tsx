@@ -9,8 +9,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
 import { ThemeId, themes } from '../utils/theme';
+import { OPTIONS_STORAGE_KEY } from '../utils/customOptions';
+import { useWardrobeStore } from '../store/wardrobeStore';
 
 const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'wood', label: '暖阳原木', icon: 'leaf-outline' },
@@ -37,7 +40,7 @@ const MENU_ITEMS: MenuSection[] = [
   {
     title: '管理分类选项',
     items: [
-      { key: 'types', label: '类型管理', icon: 'shirt-outline', action: 'types' },
+      { key: 'categories', label: '类型管理', icon: 'shirt-outline', action: 'categories' },
       { key: 'seasons', label: '季节管理', icon: 'flower-outline', action: 'seasons' },
       { key: 'occasions', label: '场合管理', icon: 'calendar-outline', action: 'occasions' },
       { key: 'styles', label: '风格管理', icon: 'brush-outline', action: 'styles' },
@@ -48,7 +51,8 @@ const MENU_ITEMS: MenuSection[] = [
     items: [
       { key: 'export', label: '备份导出', icon: 'download-outline', action: 'export' },
       { key: 'import', label: '数据导入', icon: 'cloud-upload-outline', action: 'import' },
-      { key: 'clear', label: '清空数据', icon: 'trash-outline', action: 'clear', danger: true },
+      { key: 'clearClothes', label: '清空所有衣服', icon: 'trash-outline', action: 'clearClothes', danger: true },
+      { key: 'clearOptions', label: '重置分类选项', icon: 'refresh-outline', action: 'clearOptions' },
     ],
   },
   {
@@ -72,7 +76,7 @@ export function PersonalCenterScreen() {
     if (!action) return;
 
     switch (action) {
-      case 'types':
+      case 'categories':
       case 'seasons':
       case 'occasions':
       case 'styles':
@@ -84,13 +88,46 @@ export function PersonalCenterScreen() {
       case 'import':
         Alert.alert('数据导入', '功能开发中');
         break;
-      case 'clear':
+      case 'clearOptions':
         Alert.alert(
-          '清空数据',
-          '确定要清空所有数据吗？此操作不可恢复。',
+          '重置分类',
+          '确定要重置分类选项到默认值吗？',
           [
             { text: '取消', style: 'cancel' },
-            { text: '确定', style: 'destructive', onPress: () => {} },
+            {
+              text: '确定',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  await AsyncStorage.removeItem(OPTIONS_STORAGE_KEY);
+                  Alert.alert('已重置', '请重新加载应用');
+                } catch (e) {
+                  Alert.alert('错误', '重置失败');
+                }
+              },
+            },
+          ]
+        );
+        break;
+      case 'clearClothes':
+        Alert.alert(
+          '清空衣服',
+          '确定要清空所有衣服数据吗？此操作不可恢复！',
+          [
+            { text: '取消', style: 'cancel' },
+            {
+              text: '清空',
+              style: 'destructive',
+              onPress: async () => {
+                try {
+                  const clearAllClothing = useWardrobeStore.getState().clearAllClothing;
+                  await clearAllClothing();
+                  Alert.alert('已清空', '所有衣服数据已删除');
+                } catch (e) {
+                  Alert.alert('错误', '清空失败');
+                }
+              },
+            },
           ]
         );
         break;

@@ -30,6 +30,7 @@ interface WardrobeState {
   restoreFromSold: (id: number) => Promise<void>;
   emptySold: () => Promise<void>;
   deleteClothing: (id: number) => Promise<void>;
+  clearAllClothing: () => Promise<void>;
   wearClothing: (id: number) => Promise<void>;
   addOutfit: (outfit: Omit<Outfit, 'id'>) => Promise<number>;
   updateOutfit: (outfit: Outfit) => Promise<void>;
@@ -183,6 +184,11 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     set(state => ({
       clothing: state.clothing.filter(c => c.id !== id),
     }));
+  },
+
+  clearAllClothing: async () => {
+    await clothingDb.deleteAllClothing();
+    set({ clothing: [], trashClothing: [], soldClothing: [] });
   },
 
   wearClothing: async (id) => {

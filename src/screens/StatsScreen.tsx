@@ -2,7 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
-import { CLOTHING_TYPES, STYLES } from '../types';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { STYLES } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 
@@ -180,17 +181,25 @@ const makeStyles = (theme: Theme) =>
 
 export function StatsScreen() {
   const { clothing } = useWardrobeStore();
+  const categories = useCustomOptionsStore(state => state.categories);
+  const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const stats = useMemo(() => {
     const total = clothing.length;
     const byType: Record<string, number> = {};
+    const byParent: Record<string, number> = {};
     const bySeason: Record<string, number> = {};
     const byStyle: Record<string, number> = {};
 
     clothing.forEach(item => {
       byType[item.type] = (byType[item.type] || 0) + 1;
+      // 按父分类聚合
+      const parent = getParentOfChild(item.type);
+      if (parent) {
+        byParent[parent] = (byParent[parent] || 0) + 1;
+      }
       item.seasons.forEach(s => {
         bySeason[s] = (bySeason[s] || 0) + 1;
       });
@@ -206,8 +215,8 @@ export function StatsScreen() {
     const sortedByWear = [...clothing].sort((a, b) => b.wearCount - a.wearCount);
     const mostWorn = sortedByWear.find(c => c.wearCount > 0);
 
-    return { total, byType, bySeason, byStyle, totalValue, totalWear, mostWorn, sortedByWear };
-  }, [clothing]);
+    return { total, byType, byParent, bySeason, byStyle, totalValue, totalWear, mostWorn, sortedByWear };
+  }, [clothing, getParentOfChild]);
 
   const avgWear = stats.total > 0 ? (stats.totalWear / stats.total).toFixed(1) : '0';
   const costPerWear = stats.totalWear > 0 ? (stats.totalValue / stats.totalWear).toFixed(1) : '0';
@@ -260,12 +269,12 @@ export function StatsScreen() {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>类型分布</Text>
         <View style={styles.barGroup}>
-          {CLOTHING_TYPES.map((type, idx) => {
-            const count = stats.byType[type] || 0;
+          {Object.keys(categories).map((parent, idx) => {
+            const count = stats.byParent[parent] || 0;
             const percent = stats.total > 0 ? (count / stats.total * 100) : 0;
             return (
-              <View key={type} style={styles.barRow}>
-                <Text style={styles.barLabel}>{type}</Text>
+              <View key={parent} style={styles.barRow}>
+                <Text style={styles.barLabel}>{parent}</Text>
                 <View style={styles.barContainer}>
                   <View
                     style={[

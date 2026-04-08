@@ -16,7 +16,7 @@ import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 
-type OptionCategory = 'types' | 'seasons' | 'occasions' | 'styles';
+type OptionCategory = 'categories' | 'seasons' | 'occasions' | 'styles' | 'sizes';
 
 type RouteParams = {
   CustomOptions: { category?: OptionCategory };
@@ -29,10 +29,11 @@ interface CategoryConfig {
 }
 
 const CATEGORIES: CategoryConfig[] = [
-  { key: 'types', label: '类型', icon: 'shirt-outline' },
+  { key: 'categories', label: '类型', icon: 'grid-outline' },
   { key: 'seasons', label: '季节', icon: 'flower-outline' },
   { key: 'occasions', label: '场合', icon: 'calendar-outline' },
   { key: 'styles', label: '风格', icon: 'brush-outline' },
+  { key: 'sizes', label: '尺码', icon: 'resize-outline' },
 ];
 
 const makeStyles = (theme: Theme) =>
@@ -110,11 +111,120 @@ const makeStyles = (theme: Theme) =>
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
     },
+    // 两级分类样式 - 重新设计
+    parentCard: {
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    parentCardLast: {
+      borderBottomWidth: 0,
+    },
+    parentHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    parentExpandBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: theme.colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    parentInfo: {
+      flex: 1,
+    },
+    parentName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    parentMeta: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      marginTop: 2,
+    },
+    parentActions: {
+      flexDirection: 'row',
+      gap: 4,
+    },
+    actionBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      backgroundColor: theme.colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // 子分类列表
+    childList: {
+      backgroundColor: theme.colors.background,
+      paddingLeft: 16,
+    },
+    childRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingRight: 16,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      gap: 10,
+    },
+    childRowLast: {
+      borderBottomWidth: 0,
+    },
+    childDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.colors.textTertiary,
+      marginLeft: 8,
+    },
+    childName: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+    },
+    childActions: {
+      flexDirection: 'row',
+      gap: 2,
+    },
+    childActionBtn: {
+      width: 28,
+      height: 28,
+      borderRadius: 6,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // 添加子分类按钮
+    addChildBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 12,
+      marginLeft: 16,
+      marginRight: 16,
+      marginBottom: 12,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: theme.colors.primary,
+      borderStyle: 'dashed',
+    },
+    addChildBtnText: {
+      fontSize: 13,
+      color: theme.colors.primary,
+      fontWeight: '500',
+    },
+    // 一维分类选项
     optionItem: {
       flexDirection: 'row',
       alignItems: 'center',
+      paddingVertical: 14,
       paddingHorizontal: 16,
-      paddingVertical: 12,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
@@ -170,6 +280,12 @@ const makeStyles = (theme: Theme) =>
       marginBottom: 16,
       textAlign: 'center',
     },
+    modalSubtitle: {
+      fontSize: 14,
+      color: theme.colors.textTertiary,
+      marginBottom: 16,
+      textAlign: 'center',
+    },
     modalInput: {
       borderWidth: 1.5,
       borderColor: theme.colors.border,
@@ -210,6 +326,10 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.white,
       fontWeight: '600',
     },
+    actionRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
   });
 
 export function CustomOptionsScreen() {
@@ -218,28 +338,38 @@ export function CustomOptionsScreen() {
   const { clothing } = useWardrobeStore();
   const migrateClothingType = useWardrobeStore(state => state.migrateClothingType);
 
-  // ✅ Zustand 必须用 selector 订阅，否则 UI 不会响应更新
-  const types = useCustomOptionsStore(state => state.types);
+  // Zustand selectors
+  const categories = useCustomOptionsStore(state => state.categories);
   const seasons = useCustomOptionsStore(state => state.seasons);
   const occasions = useCustomOptionsStore(state => state.occasions);
   const storeStyles = useCustomOptionsStore(state => state.styles);
+  const sizes = useCustomOptionsStore(state => state.sizes);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
   const load = useCustomOptionsStore(state => state.load);
   const updateCategory = useCustomOptionsStore(state => state.updateCategory);
   const resetToDefaults = useCustomOptionsStore(state => state.resetToDefaults);
+  const addParent = useCustomOptionsStore(state => state.addParent);
+  const renameParent = useCustomOptionsStore(state => state.renameParent);
+  const deleteParent = useCustomOptionsStore(state => state.deleteParent);
+  const addChild = useCustomOptionsStore(state => state.addChild);
+  const renameChild = useCustomOptionsStore(state => state.renameChild);
+  const deleteChild = useCustomOptionsStore(state => state.deleteChild);
+  const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
 
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  // 如果传入了特定分类，则进入单分类模式（不显示分类列表，直接展开该分类）
+  // 如果传入了特定分类，则进入单分类模式
   const forcedCategory = route.params?.category;
   const [expandedCategory, setExpandedCategory] = useState<OptionCategory | null>(
     forcedCategory || null
   );
+  const [expandedParent, setExpandedParent] = useState<string | null>(null);
+
+  // Modal 状态
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addModalCategory, setAddModalCategory] = useState<OptionCategory | null>(null);
-  const [editingValue, setEditingValue] = useState('');
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [modalMode, setModalMode] = useState<'addParent' | 'addChild' | 'edit'>('addParent');
+  const [editTarget, setEditTarget] = useState<{ parent?: string; child?: string }>({});
   const [newOptionText, setNewOptionText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -247,31 +377,46 @@ export function CustomOptionsScreen() {
     load();
   }, [load]);
 
+  // 获取选项列表
   const getOptionsForCategory = (category: OptionCategory): string[] => {
     switch (category) {
-      case 'types':
-        return types;
+      case 'categories':
+        return Object.keys(categories);
       case 'seasons':
         return seasons;
       case 'occasions':
         return occasions;
       case 'styles':
         return storeStyles;
+      case 'sizes':
+        return sizes;
     }
   };
 
-  const updateCategoryOptions = async (category: OptionCategory, newOptions: string[]) => {
-    await updateCategory(category, newOptions);
+  // 获取子分类
+  const getChildrenOf = (parent: string): string[] => {
+    return categories[parent] || [];
   };
 
-  // Check if an option is in use by any clothing item
+  // 检查选项是否被使用
   const isOptionInUse = useCallback(
     (category: OptionCategory, value: string): boolean => {
+      if (category === 'categories') {
+        // 检查任何衣物的 type 是否等于这个子分类
+        for (const item of clothing) {
+          if (item.type === value) return true;
+        }
+        // 也检查父分类是否被使用
+        const children = getChildrenOf(value);
+        for (const child of children) {
+          for (const item of clothing) {
+            if (item.type === child) return true;
+          }
+        }
+        return false;
+      }
       for (const item of clothing) {
         switch (category) {
-          case 'types':
-            if (item.type === value) return true;
-            break;
           case 'seasons':
             if (item.seasons.includes(value)) return true;
             break;
@@ -281,17 +426,93 @@ export function CustomOptionsScreen() {
           case 'styles':
             if (item.styles && item.styles.includes(value)) return true;
             break;
+          case 'sizes':
+            if (item.size === value) return true;
+            break;
         }
       }
       return false;
     },
-    [clothing]
+    [clothing, categories]
   );
+
+  // 检查子分类是否被使用
+  const isChildInUse = (parent: string, child: string): boolean => {
+    for (const item of clothing) {
+      if (item.type === child) return true;
+    }
+    return false;
+  };
 
   const handleToggleExpand = (category: OptionCategory) => {
     setExpandedCategory(expandedCategory === category ? null : category);
+    if (category !== 'categories') {
+      setExpandedParent(null);
+    }
   };
 
+  const handleToggleParent = (parent: string) => {
+    setExpandedParent(expandedParent === parent ? null : parent);
+  };
+
+  // 打开添加弹窗
+  const handleAddOption = (category: OptionCategory, parent?: string) => {
+    setModalMode(parent ? 'addChild' : 'addParent');
+    setEditTarget(parent ? { parent } : {});
+    setNewOptionText('');
+    setShowAddModal(true);
+  };
+
+  // 打开编辑弹窗
+  const handleEditOption = (category: OptionCategory, parent: string, child?: string) => {
+    setModalMode('edit');
+    setEditTarget(child ? { parent, child } : { parent });
+    setNewOptionText(child || parent);
+    setShowAddModal(true);
+  };
+
+  // 删除父分类
+  const handleDeleteParent = async (parent: string) => {
+    const children = getChildrenOf(parent);
+    if (children.length > 0) {
+      Alert.alert('无法删除', '请先删除该分类下的所有子分类');
+      return;
+    }
+    if (isOptionInUse('categories', parent)) {
+      Alert.alert('无法删除', '该分类正被部分衣服使用');
+      return;
+    }
+    Alert.alert('确认删除', `确定要删除分类「${parent}」吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteParent(parent);
+        },
+      },
+    ]);
+  };
+
+  // 删除子分类
+  const handleDeleteChild = async (parent: string, child: string) => {
+    if (isChildInUse(parent, child)) {
+      Alert.alert('无法删除', '该子分类正被部分衣服使用，请先修改这些衣服的分类');
+      return;
+    }
+    Alert.alert('确认删除', `确定要删除「${child}」吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '删除',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteChild(parent, child);
+        },
+      },
+    ]);
+  };
+
+  // 删除一维分类选项
   const handleDeleteOption = async (category: OptionCategory, index: number) => {
     const opts = getOptionsForCategory(category);
     const value = opts[index];
@@ -305,74 +526,61 @@ export function CustomOptionsScreen() {
         text: '删除',
         style: 'destructive',
         onPress: async () => {
-          // 直接从当前状态重新计算，避免闭包问题
-          const currentOpts = getOptionsForCategory(category);
-          const newOpts = currentOpts.filter((_, i) => i !== index);
-          await updateCategoryOptions(category, newOpts);
+          const newOpts = [...opts];
+          newOpts.splice(index, 1);
+          await updateCategory(category as 'seasons' | 'occasions' | 'styles' | 'sizes', newOpts);
         },
       },
     ]);
   };
 
-  const handleAddOption = (category: OptionCategory) => {
-    setAddModalCategory(category);
-    setEditingValue('');
-    setEditingIndex(null);
-    setNewOptionText('');
-    setShowAddModal(true);
-  };
-
-  const handleEditOption = (category: OptionCategory, index: number) => {
-    const opts = getOptionsForCategory(category);
-    setAddModalCategory(category);
-    setEditingValue(opts[index]);
-    setEditingIndex(index);
-    setNewOptionText(opts[index]);
-    setShowAddModal(true);
-  };
-
+  // 保存选项
   const handleSaveOption = async () => {
     if (isSaving) return;
-    if (!addModalCategory || !newOptionText.trim()) {
+    if (!newOptionText.trim()) {
       Alert.alert('请输入选项名称');
       return;
     }
     const trimmed = newOptionText.trim();
-    const currentOpts = getOptionsForCategory(addModalCategory);
-
-    // Check for duplicate (only for new items, not when editing same item)
-    if (editingIndex === null && currentOpts.includes(trimmed)) {
-      Alert.alert('选项已存在', '请使用不同的名称');
-      return;
-    }
-
-    let newOpts: string[];
-    const isEditing = editingIndex !== null;
-    const oldValue = isEditing ? currentOpts[editingIndex] : null;
-    if (isEditing) {
-      // Edit existing
-      newOpts = [...currentOpts];
-      newOpts[editingIndex] = trimmed;
-    } else {
-      // Add new
-      newOpts = [...currentOpts, trimmed];
-    }
 
     setIsSaving(true);
-    // 先关闭 modal，确保用户立即看到反馈
     setShowAddModal(false);
-    // 重置表单状态
-    setNewOptionText('');
-    setEditingIndex(null);
-    setAddModalCategory(null);
+
     try {
-      await updateCategoryOptions(addModalCategory, newOpts);
-      // When renaming a type, migrate all clothing items to the new type
-      if (isEditing && addModalCategory === 'types' && oldValue && oldValue !== trimmed) {
-        await migrateClothingType(oldValue, trimmed);
+      if (modalMode === 'addParent') {
+        if (categories[trimmed]) {
+          Alert.alert('分类已存在', '请使用不同的名称');
+          return;
+        }
+        await addParent(trimmed);
+      } else if (modalMode === 'addChild') {
+        const parent = editTarget.parent!;
+        if (categories[parent]?.includes(trimmed)) {
+          Alert.alert('子分类已存在', '请使用不同的名称');
+          return;
+        }
+        await addChild(parent, trimmed);
+      } else {
+        // edit mode
+        const { parent, child } = editTarget;
+        if (child) {
+          // 编辑子分类
+          if (child !== trimmed) {
+            await renameChild(parent!, child, trimmed);
+            // 如果是 type 子分类，需要迁移衣物的 type
+            await migrateClothingType(child, trimmed);
+          }
+        } else if (parent) {
+          // 编辑父分类
+          if (parent !== trimmed) {
+            await renameParent(parent, trimmed);
+          }
+        }
       }
     } finally {
       setIsSaving(false);
+      setNewOptionText('');
+      setEditTarget({});
     }
   };
 
@@ -387,6 +595,23 @@ export function CustomOptionsScreen() {
         },
       },
     ]);
+  };
+
+  // 获取弹窗标题
+  const getModalTitle = () => {
+    switch (modalMode) {
+      case 'addParent': return '添加分类';
+      case 'addChild': return '添加子分类';
+      case 'edit': return editTarget.child ? '编辑子分类' : '编辑分类';
+    }
+  };
+
+  // 获取弹窗提示
+  const getModalSubtitle = () => {
+    if (modalMode === 'addChild') {
+      return `当前分类：${editTarget.parent}`;
+    }
+    return undefined;
   };
 
   if (isLoading) {
@@ -424,8 +649,9 @@ export function CustomOptionsScreen() {
         {(forcedCategory ? CATEGORIES.filter(c => c.key === forcedCategory) : CATEGORIES).map((cat) => {
           const catOptions = getOptionsForCategory(cat.key);
           const isExpanded = expandedCategory === cat.key;
-          // 单分类模式（forcedCategory）下，强制展开且不显示header
           const isSingleCategoryMode = !!forcedCategory;
+          const isCategories = cat.key === 'categories';
+
           return (
             <View key={cat.key} style={styles.section}>
               {!isSingleCategoryMode && (
@@ -439,7 +665,9 @@ export function CustomOptionsScreen() {
                   </View>
                   <View style={styles.sectionInfo}>
                     <Text style={styles.sectionTitle}>{cat.label}</Text>
-                    <Text style={styles.sectionCount}>{catOptions.length} 个选项</Text>
+                    <Text style={styles.sectionCount}>
+                      {isCategories ? `${catOptions.length} 个分类` : `${catOptions.length} 个选项`}
+                    </Text>
                   </View>
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
@@ -457,13 +685,121 @@ export function CustomOptionsScreen() {
                   </View>
                   <View style={styles.sectionInfo}>
                     <Text style={styles.sectionTitle}>{cat.label}</Text>
-                    <Text style={styles.sectionCount}>{catOptions.length} 个选项</Text>
+                    <Text style={styles.sectionCount}>
+                      {isCategories ? `${catOptions.length} 个分类` : `${catOptions.length} 个选项`}
+                    </Text>
                   </View>
                 </View>
               )}
 
-              {/* 单分类模式或展开时显示选项列表 */}
-              {(isSingleCategoryMode || isExpanded) && (
+              {/* 两级分类：类型 */}
+              {isCategories && (isSingleCategoryMode || isExpanded) && (
+                <View style={styles.optionList}>
+                  {catOptions.map((parent, idx) => {
+                    const children = getChildrenOf(parent);
+                    const isParentExpanded = expandedParent === parent;
+                    const isLastParent = idx === catOptions.length - 1;
+                    return (
+                      <View key={parent} style={[styles.parentCard, isLastParent && styles.parentCardLast]}>
+                        {/* 父分类行 */}
+                        <View style={styles.parentHeader}>
+                          <TouchableOpacity
+                            style={styles.parentExpandBtn}
+                            onPress={() => handleToggleParent(parent)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons
+                              name={isParentExpanded ? 'chevron-down' : 'chevron-forward'}
+                              size={16}
+                              color={theme.colors.textSecondary}
+                            />
+                          </TouchableOpacity>
+                          <View style={styles.parentInfo}>
+                            <Text style={styles.parentName}>{parent}</Text>
+                            <Text style={styles.parentMeta}>{children.length} 个子分类</Text>
+                          </View>
+                          <View style={styles.parentActions}>
+                            <TouchableOpacity
+                              style={styles.actionBtn}
+                              onPress={() => handleEditOption('categories', parent)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="pencil-outline" size={16} color={theme.colors.textSecondary} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                              style={styles.actionBtn}
+                              onPress={() => handleDeleteParent(parent)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="close-circle-outline" size={16} color={theme.colors.textTertiary} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+
+                        {/* 子分类列表 */}
+                        {isParentExpanded && children.length > 0 && (
+                          <View style={styles.childList}>
+                            {children.map((child, childIdx) => {
+                              const inUse = isChildInUse(parent, child);
+                              const isLast = childIdx === children.length - 1;
+                              return (
+                                <View key={child} style={[styles.childRow, isLast && styles.childRowLast]}>
+                                  <View style={styles.childDot} />
+                                  <Text style={styles.childName}>{child}</Text>
+                                  <View style={styles.childActions}>
+                                    <TouchableOpacity
+                                      style={styles.childActionBtn}
+                                      onPress={() => handleEditOption('categories', parent, child)}
+                                      activeOpacity={0.7}
+                                    >
+                                      <Ionicons name="pencil-outline" size={14} color={theme.colors.textTertiary} />
+                                    </TouchableOpacity>
+                                    {!inUse ? (
+                                      <TouchableOpacity
+                                        style={styles.childActionBtn}
+                                        onPress={() => handleDeleteChild(parent, child)}
+                                        activeOpacity={0.7}
+                                      >
+                                        <Ionicons name="close-circle-outline" size={14} color={theme.colors.textTertiary} />
+                                      </TouchableOpacity>
+                                    ) : (
+                                      <Ionicons name="lock-closed-outline" size={14} color={theme.colors.textTertiary} />
+                                    )}
+                                  </View>
+                                </View>
+                              );
+                            })}
+                          </View>
+                        )}
+
+                        {/* 添加子分类按钮 */}
+                        {isParentExpanded && (
+                          <TouchableOpacity
+                            style={styles.addChildBtn}
+                            onPress={() => handleAddOption('categories', parent)}
+                            activeOpacity={0.7}
+                          >
+                            <Ionicons name="add-outline" size={16} color={theme.colors.primary} />
+                            <Text style={styles.addChildBtnText}>添加子分类</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  })}
+                  {/* 添加分类按钮 */}
+                  <TouchableOpacity
+                    style={styles.addChildBtn}
+                    onPress={() => handleAddOption('categories')}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="add-outline" size={18} color={theme.colors.primary} />
+                    <Text style={styles.addChildBtnText}>添加分类</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* 一维分类：季节/场合/风格 */}
+              {!isCategories && (isSingleCategoryMode || isExpanded) && (
                 <View style={styles.optionList}>
                   {catOptions.map((opt, idx) => {
                     const inUse = isOptionInUse(cat.key, opt);
@@ -474,7 +810,7 @@ export function CustomOptionsScreen() {
                           styles.optionItem,
                           idx === catOptions.length - 1 && styles.optionItemLast,
                         ]}
-                        onPress={() => handleEditOption(cat.key, idx)}
+                        onPress={() => handleEditOption(cat.key, opt as any)}
                         activeOpacity={0.7}
                       >
                         <Text
@@ -529,9 +865,10 @@ export function CustomOptionsScreen() {
       <Modal visible={showAddModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>
-              {editingIndex !== null ? '编辑选项' : '添加选项'}
-            </Text>
+            <Text style={styles.modalTitle}>{getModalTitle()}</Text>
+            {getModalSubtitle() && (
+              <Text style={styles.modalSubtitle}>{getModalSubtitle()}</Text>
+            )}
             <TextInput
               style={styles.modalInput}
               value={newOptionText}

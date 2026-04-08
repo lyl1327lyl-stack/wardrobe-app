@@ -155,6 +155,11 @@ export async function permanentDeleteClothing(id: number): Promise<void> {
   await db.runAsync('DELETE FROM clothing_items WHERE id = ?', [id]);
 }
 
+export async function deleteAllClothing(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM clothing_items');
+}
+
 export async function incrementWearCount(id: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(

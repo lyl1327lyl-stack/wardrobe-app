@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
-import { ClothingItem, ClothingType, Season } from '../types';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { ClothingItem, Season, CategoryFilter } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 
@@ -25,7 +26,6 @@ interface Props {
   alreadyAddedIds: number[];
 }
 
-const CLOTHING_TYPES: ('全部' | ClothingType)[] = ['全部', '上衣', '裤子', '裙子', '鞋子', '配饰', '外套'];
 const SEASONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 const SEASON_EMOJI: Record<Season, string> = { '春': '🌸', '夏': '☀️', '秋': '🍂', '冬': '❄️' };
 
@@ -181,24 +181,33 @@ const makeStyles = (theme: Theme) =>
 
 export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedIds }: Props) {
   const { clothing } = useWardrobeStore();
+  const categories = useCustomOptionsStore(state => state.categories);
+  const getParents = useCustomOptionsStore(state => state.getParents);
+  const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [selectedType, setSelectedType] = useState<'全部' | ClothingType>('全部');
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>({});
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
 
   React.useEffect(() => {
     if (visible) {
       setSelectedIds([]);
       setSearchKeyword('');
-      setSelectedType('全部');
+      setSelectedCategory({});
       setSelectedSeason('全部');
     }
   }, [visible]);
 
   const filteredClothing = clothing.filter(item => {
-    if (selectedType !== '全部' && item.type !== selectedType) return false;
+    // Filter by category (两级联动)
+    if (selectedCategory.child) {
+      if (item.type !== selectedCategory.child) return false;
+    } else if (selectedCategory.parent) {
+      const children = getChildrenOf(selectedCategory.parent);
+      if (!children.includes(item.type)) return false;
+    }
     if (selectedSeason !== '全部' && !item.seasons.includes(selectedSeason as Season)) return false;
     if (searchKeyword) {
       const kw = searchKeyword.toLowerCase();
@@ -271,22 +280,55 @@ export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedI
             )}
           </View>
 
-          {/* Type Tabs */}
+          {/* Type Tabs - 两级联动 */}
           <View style={styles.tabSection}>
             <Text style={styles.tabLabel}>类型</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
-              {CLOTHING_TYPES.map(type => (
-                <TouchableOpacity
-                  key={type}
-                  style={[styles.tab, selectedType === type && styles.tabActive]}
-                  onPress={() => setSelectedType(type)}
-                >
-                  <Text style={[styles.tabText, selectedType === type && styles.tabTextActive]}>
-                    {type}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {/* 全部 */}
+              <TouchableOpacity
+                key="全部"
+                style={[styles.tab, !selectedCategory.parent && !selectedCategory.child && styles.tabActive]}
+                onPress={() => setSelectedCategory({})}
+              >
+                <Text style={[styles.tabText, !selectedCategory.parent && !selectedCategory.child && styles.tabTextActive]}>
+                  全部
+                </Text>
+              </TouchableOpacity>
+              {/* 父分类 */}
+              {getParents().map(parent => {
+                const isActive = selectedCategory.parent === parent && !selectedCategory.child;
+                return (
+                  <TouchableOpacity
+                    key={parent}
+                    style={[styles.tab, isActive && styles.tabActive]}
+                    onPress={() => setSelectedCategory({ parent })}
+                  >
+                    <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                      {parent}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
+            {/* 子分类（当选择了父分类后显示） */}
+            {selectedCategory.parent && (
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={[styles.tabRow, { marginTop: 6 }]}>
+                {getChildrenOf(selectedCategory.parent).map(child => {
+                  const isActive = selectedCategory.child === child;
+                  return (
+                    <TouchableOpacity
+                      key={child}
+                      style={[styles.tab, isActive && styles.tabActive]}
+                      onPress={() => setSelectedCategory({ parent: selectedCategory.parent, child })}
+                    >
+                      <Text style={[styles.tabText, isActive && styles.tabTextActive]}>
+                        {child}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            )}
           </View>
 
           {/* Season Tabs */}

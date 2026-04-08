@@ -11,6 +11,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { DEFAULT_OPTIONS, getAllChildren } from '../utils/customOptions';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
@@ -25,13 +26,14 @@ const SEASON_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color
   '冬': { name: 'snow', color: '#4FC3F7' },
 };
 
-const TYPE_CONFIG: Record<string, { icon: keyof typeof Ionicons.glyphMap; label: string }> = {
-  '上衣': { icon: 'shirt', label: '上衣' },
-  '裤子': { icon: 'man', label: '裤子' },
-  '裙子': { icon: 'ribbon', label: '裙子' },
-  '鞋子': { icon: 'footsteps', label: '鞋子' },
-  '配饰': { icon: 'glasses', label: '配饰' },
-  '外套': { icon: 'cloudy', label: '外套' },
+// 父分类图标映射
+const PARENT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
+  '上装': 'shirt-outline',
+  '下装': 'layers-outline',
+  '外套': 'snow-outline',
+  '鞋': 'footsteps-outline',
+  '配饰': 'sparkles-outline',
+  '包包': 'bag-outline',
 };
 
 // Create styles dynamically based on theme
@@ -305,7 +307,8 @@ export function WardrobeScreen() {
   const navigation = useNavigation<any>();
   const { clothing, trashClothing, soldClothing, loadData } = useWardrobeStore();
   const { theme } = useTheme();
-  const types = useCustomOptionsStore(state => state.types);
+  const categories = useCustomOptionsStore(state => state.categories);
+  const isLoading = useCustomOptionsStore(state => state.isLoading);
   const seasons = useCustomOptionsStore(state => state.seasons);
   const load = useCustomOptionsStore(state => state.load);
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -328,8 +331,8 @@ export function WardrobeScreen() {
     navigation.navigate('ClothingDetail', { id: item.id });
   };
 
-  const handleViewAll = (type: string) => {
-    navigation.navigate('CategoryDetail', { type, season: selectedSeason });
+  const handleViewAll = (parent: string) => {
+    navigation.navigate('CategoryDetail', { type: parent, season: selectedSeason });
   };
 
   const getFilteredClothing = () => {
@@ -337,8 +340,9 @@ export function WardrobeScreen() {
     return clothing.filter(item => item.seasons.includes(selectedSeason as Season));
   };
 
-  const getClothingByType = (type: string) => {
-    return getFilteredClothing().filter(item => item.type === type);
+  const getClothingByParent = (parent: string) => {
+    const children = (effectiveCategories && effectiveCategories[parent]) || [];
+    return getFilteredClothing().filter(item => children.includes(item.type));
   };
 
   const getTitle = () => {
@@ -347,7 +351,26 @@ export function WardrobeScreen() {
   };
 
   const filteredClothing = getFilteredClothing();
-  const availableTypes = (types || []).filter(type => getClothingByType(type).length > 0);
+  const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
+  const parentCategories = Object.keys(effectiveCategories);
+
+  // 获取所有已知的子分类
+  const allKnownChildren = getAllChildren(effectiveCategories);
+
+  // 获取未分类的衣服（类型不在任何已知子分类中）
+  const getUncategorizedClothing = () => {
+    return filteredClothing.filter(item => !allKnownChildren.includes(item.type));
+  };
+
+  // Find parents that have clothes with matching types
+  const parentsWithClothing = parentCategories.filter(parent => getClothingByParent(parent).length > 0);
+  // If some parents have clothes, show only those. Otherwise show all (to ensure something displays)
+  const availableParents = parentsWithClothing.length > 0 ? parentsWithClothing : parentCategories;
+
+  // 未分类的衣服
+  const uncategorizedItems = getUncategorizedClothing();
+  const hasUncategorized = uncategorizedItems.length > 0;
+
   const isEmpty = filteredClothing.length === 0;
   const seasonOptions: ('全部' | Season)[] = ['全部', ...(seasons || [])];
 
@@ -412,26 +435,26 @@ export function WardrobeScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {/* 分类横向卡片 */}
-          {availableTypes.map(type => {
-            const items = getClothingByType(type);
+          {availableParents.map(parent => {
+            const items = getClothingByParent(parent);
             if (items.length === 0) return null;
 
             return (
-              <View key={type} style={styles.categoryCard}>
+              <View key={parent} style={styles.categoryCard}>
                 {/* 类别标题栏 */}
                 <View style={styles.categoryHeader}>
                   <View style={styles.categoryTitleRow}>
                     <Ionicons
-                      name="shirt-outline"
+                      name={PARENT_ICONS[parent] || 'shirt-outline'}
                       size={18}
                       color={theme.colors.accent}
                     />
-                    <Text style={styles.categoryTitle}>{type}</Text>
+                    <Text style={styles.categoryTitle}>{parent}</Text>
                     <Text style={styles.categoryCount}>{items.length}件</Text>
                   </View>
                   <TouchableOpacity
                     style={styles.viewAllBtn}
-                    onPress={() => handleViewAll(type)}
+                    onPress={() => handleViewAll(parent)}
                     activeOpacity={0.7}
                   >
                     <Text style={styles.viewAllText}>查看更多</Text>
@@ -471,6 +494,51 @@ export function WardrobeScreen() {
               </View>
             );
           })}
+          {/* 未分类卡片 */}
+          {hasUncategorized && (
+            <View style={styles.categoryCard}>
+              <View style={styles.categoryHeader}>
+                <View style={styles.categoryTitleRow}>
+                  <Ionicons
+                    name="help-circle-outline"
+                    size={18}
+                    color={theme.colors.accent}
+                  />
+                  <Text style={styles.categoryTitle}>未分类</Text>
+                  <Text style={styles.categoryCount}>{uncategorizedItems.length}件</Text>
+                </View>
+              </View>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoryScroll}
+              >
+                {uncategorizedItems.slice(0, 4).map(item => {
+                  const costPerWear = item.price > 0 && item.wearCount > 0
+                    ? Math.round(item.price / item.wearCount)
+                    : null;
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.itemCard}
+                      onPress={() => handlePress(item)}
+                      activeOpacity={0.85}
+                    >
+                      <Image
+                        source={{ uri: item.thumbnailUri || item.imageUri }}
+                        style={styles.itemImage}
+                      />
+                      {costPerWear !== null && (
+                        <View style={styles.costBadge}>
+                          <Text style={styles.costText}>{costPerWear}元/次</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
           <View style={styles.bottomPadding} />
         </ScrollView>
       )}
