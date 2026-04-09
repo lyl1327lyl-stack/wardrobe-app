@@ -647,6 +647,7 @@ export function AddClothingScreen() {
     price: '',
     remarks: '',
   });
+  const [isInitialStateReady, setIsInitialStateReady] = useState(false);
 
   // 当数据加载完成且 existingItem 可用时，初始化 initialState
   useEffect(() => {
@@ -664,6 +665,7 @@ export function AddClothingScreen() {
         price: existingItem.price != null ? String(existingItem.price) : '',
         remarks: existingItem.remarks || '',
       };
+      setIsInitialStateReady(true);
     }
   }, [isDataReady, existingItem]);
 
@@ -675,7 +677,7 @@ export function AddClothingScreen() {
     clothingStyles, purchaseDate: purchaseDate ? formatDate(purchaseDate) : '', price, remarks,
   };
 
-  const hasChanges = hasUnsavedChanges(initialState.current, currentState);
+  const hasChanges = isInitialStateReady && hasUnsavedChanges(initialState.current, currentState);
 
   // 隐藏父级 TabBar
   useLayoutEffect(() => {
