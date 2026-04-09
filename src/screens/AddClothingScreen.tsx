@@ -526,11 +526,45 @@ export function AddClothingScreen() {
   }, []);
 
   const isEditing = !!(route.params?.id);
+  console.log('[EDIT] route.params:', route.params, 'isDataReady:', isDataReady);
   const existingItem = isDataReady && isEditing ? getClothingById(route.params.id) : null;
+  console.log('[EDIT] existingItem:', existingItem?.type, 'parentType:', existingItem?.parentType);
+
+  const getInitialParent = (item: any): string => {
+    if (!item) return '';
+    if (item.parentType) {
+      if (item.parentType === item.type) return item.type;
+      const childrenOfParent = getChildrenOf(item.parentType);
+      if (childrenOfParent.includes(item.type)) return item.parentType;
+      return item.type;
+    }
+    if (!getChildrenOf(item.type).length) return item.type;
+    return '';
+  };
+
+  const getInitialChild = (item: any): string => {
+    if (!item) return '';
+    if (item.parentType && item.parentType !== item.type) {
+      const childrenOfParent = getChildrenOf(item.parentType);
+      if (childrenOfParent.includes(item.type)) return item.type;
+    }
+    return '';
+  };
 
   const [imageUri, setImageUri] = useState(existingItem?.imageUri || '');
-  const [selectedParent, setSelectedParent] = useState<string>('');
-  const [selectedChild, setSelectedChild] = useState<string>(existingItem?.type || '');
+  const [selectedParent, setSelectedParent] = useState<string>(getInitialParent(existingItem));
+  const [selectedChild, setSelectedChild] = useState<string>(getInitialChild(existingItem));
+
+  // 当 existingItem 变化时，同步更新状态
+  useEffect(() => {
+    if (existingItem) {
+      const newParent = getInitialParent(existingItem);
+      const newChild = getInitialChild(existingItem);
+      console.log('[EDIT useEffect] setParent:', newParent, 'setChild:', newChild);
+      setSelectedParent(newParent);
+      setSelectedChild(newChild);
+    }
+  }, [existingItem]);
   const [color, setColor] = useState(existingItem?.color || '');
   const [brand, setBrand] = useState(existingItem?.brand || '');
   const [size, setSize] = useState(existingItem?.size || '');
@@ -735,7 +769,8 @@ export function AddClothingScreen() {
       const clothingData = {
         imageUri: processedUri,
         thumbnailUri,
-        type: selectedChild || selectedParent || '', // 优先用子分类，其次父分类，最后空字符串
+        type: selectedChild || selectedParent || '',
+        parentType: selectedChild ? selectedParent : (selectedParent || ''),
         color: asDraft && !color ? '' : color,
         brand,
         size,
@@ -754,6 +789,7 @@ export function AddClothingScreen() {
         soldPrice: existingItem?.soldPrice || null,
         soldPlatform: existingItem?.soldPlatform || null,
       };
+      console.log('[SAVE] selectedParent:', selectedParent, 'selectedChild:', selectedChild, '-> type:', clothingData.type, 'parentType:', clothingData.parentType);
 
       if (isEditing && existingItem) {
         await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);

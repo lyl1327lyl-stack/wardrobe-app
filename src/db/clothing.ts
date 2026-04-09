@@ -1,5 +1,6 @@
 import { getDatabase } from './database';
 import { ClothingItem } from '../types';
+import { getParentOf, DEFAULT_CATEGORIES } from '../utils/customOptions';
 
 // 本地日期字符串，避免时区偏移
 function localDateString(): string {
@@ -7,40 +8,49 @@ function localDateString(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+// 从 DB 行中解析 parentType，对旧数据做兼容
+function parseParentType(row: any): string {
+  // 新字段有值直接返回
+  if (row.parentType) return row.parentType;
+  // 旧数据：通过 type 查找父分类
+  return getParentOf(DEFAULT_CATEGORIES, row.type) ?? '';
+}
+
+// 解析 JSON 字段的通用映射
+function parseClothingRow<T extends ClothingItem>(row: T): ClothingItem {
+  return {
+    ...row,
+    id: Number(row.id),
+    seasons: JSON.parse(row.seasons as unknown as string || '[]'),
+    occasions: JSON.parse(row.occasions as unknown as string || '[]'),
+    styles: JSON.parse((row as any).styles || '[]'),
+    parentType: parseParentType(row),
+  };
+}
+
 export async function getAllClothing(): Promise<ClothingItem[]> {
   const db = await getDatabase();
   const result = await db.getAllAsync<ClothingItem>('SELECT * FROM clothing_items WHERE deletedAt IS NULL AND soldAt IS NULL ORDER BY createdAt DESC');
-  return result.map(item => ({
-    ...item,
-    id: Number(item.id),
-    seasons: JSON.parse(item.seasons as unknown as string || '[]'),
-    occasions: JSON.parse(item.occasions as unknown as string || '[]'),
-    styles: JSON.parse((item as any).styles || '[]'),
-  }));
+  return result.map(item => parseClothingRow(item));
 }
 
 export async function getClothingById(id: number): Promise<ClothingItem | null> {
   const db = await getDatabase();
   const result = await db.getFirstAsync<ClothingItem>('SELECT * FROM clothing_items WHERE id = ?', [id]);
   if (!result) return null;
-  return {
-    ...result,
-    id: Number(result.id),
-    seasons: JSON.parse(result.seasons as unknown as string || '[]'),
-    occasions: JSON.parse(result.occasions as unknown as string || '[]'),
-    styles: JSON.parse((result as any).styles || '[]'),
-  };
+  return parseClothingRow(result);
 }
 
 export async function addClothing(item: Omit<ClothingItem, 'id'>): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    `INSERT INTO clothing_items (imageUri, thumbnailUri, type, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO clothing_items (imageUri, thumbnailUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       item.imageUri,
       item.thumbnailUri,
       item.type,
+      item.parentType ?? '',
       item.color,
       item.brand,
       item.size,
@@ -62,7 +72,7 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     `UPDATE clothing_items SET
-      imageUri = ?, thumbnailUri = ?, type = ?, color = ?, brand = ?, size = ?, remarks = ?,
+      imageUri = ?, thumbnailUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
       seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wearCount = ?, lastWornAt = ?,
       soldAt = ?, soldPrice = ?, soldPlatform = ?
      WHERE id = ?`,
@@ -70,6 +80,7 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
       item.imageUri,
       item.thumbnailUri,
       item.type,
+      item.parentType ?? '',
       item.color,
       item.brand,
       item.size,
@@ -115,13 +126,7 @@ export async function getTrashClothing(): Promise<ClothingItem[]> {
   const result = await db.getAllAsync<ClothingItem>(
     'SELECT * FROM clothing_items WHERE deletedAt IS NOT NULL AND soldAt IS NULL ORDER BY deletedAt DESC'
   );
-  return result.map(item => ({
-    ...item,
-    id: Number(item.id),
-    seasons: JSON.parse(item.seasons as unknown as string || '[]'),
-    occasions: JSON.parse(item.occasions as unknown as string || '[]'),
-    styles: JSON.parse((item as any).styles || '[]'),
-  }));
+  return result.map(item => parseClothingRow(item));
 }
 
 export async function getSoldClothing(): Promise<ClothingItem[]> {
@@ -129,13 +134,7 @@ export async function getSoldClothing(): Promise<ClothingItem[]> {
   const result = await db.getAllAsync<ClothingItem>(
     'SELECT * FROM clothing_items WHERE soldAt IS NOT NULL ORDER BY soldAt DESC'
   );
-  return result.map(item => ({
-    ...item,
-    id: Number(item.id),
-    seasons: JSON.parse(item.seasons as unknown as string || '[]'),
-    occasions: JSON.parse(item.occasions as unknown as string || '[]'),
-    styles: JSON.parse((item as any).styles || '[]'),
-  }));
+  return result.map(item => parseClothingRow(item));
 }
 
 export async function sellClothing(id: number, soldPrice: number, soldPlatform: string): Promise<void> {

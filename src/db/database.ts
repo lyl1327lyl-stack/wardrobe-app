@@ -82,6 +82,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   await addColumnIfNotExists('clothing_items', 'soldPrice', 'REAL');
   await addColumnIfNotExists('clothing_items', 'soldPlatform', 'TEXT');
   await addColumnIfNotExists('clothing_items', 'styles', 'TEXT DEFAULT "[]"');
+  await addColumnIfNotExists('clothing_items', 'parentType', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
 
   return dbInstance;

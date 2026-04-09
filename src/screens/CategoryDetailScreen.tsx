@@ -126,9 +126,12 @@ export function CategoryDetailScreen() {
   }, []);
 
   const getFilteredClothing = () => {
-    // type 现在是父分类，获取所有子分类进行筛选
-    const children = getChildrenOf(type);
-    let items = clothing.filter(item => children.includes(item.type));
+    // type 是父分类名称，直接用 parentType 匹配（兼容 parentType 为空的旧数据）
+    let items = clothing.filter(item => {
+      if (item.parentType === type) return true;
+      if (!item.parentType && item.type === type) return true;
+      return false;
+    });
     if (season !== '全部') {
       items = items.filter(item => item.seasons.includes(season as Season));
     }

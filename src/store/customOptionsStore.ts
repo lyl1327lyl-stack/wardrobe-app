@@ -130,6 +130,11 @@ export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
       console.warn('[CustomOptionsStore] child already exists:', child);
       return;
     }
+    // 禁止添加与已有父分类同名的子分类，避免归属歧义
+    if (categories[child] !== undefined) {
+      console.warn('[CustomOptionsStore] child name conflicts with existing parent:', child);
+      return;
+    }
     const newCategories = {
       ...categories,
       [parent]: [...categories[parent], child],

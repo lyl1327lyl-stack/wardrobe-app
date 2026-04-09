@@ -16,6 +16,7 @@ export interface ClothingItem {
   imageUri: string;
   thumbnailUri: string;
   type: string;
+  parentType: string;  // 一级分类名称（空字符串表示直接选了一级分类）
   color: string;
   brand: string;
   size: string;

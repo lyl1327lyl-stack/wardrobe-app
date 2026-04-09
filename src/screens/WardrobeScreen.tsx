@@ -463,32 +463,30 @@ export function WardrobeScreen() {
   // 获取所有已知的子分类
   const allKnownChildren = useMemo(() => getAllChildren(effectiveCategories), [effectiveCategories]);
 
-  // 获取未分类的衣服（类型既不是任何子分类，也不是任何父分类）
+  // 获取未分类的衣服（parentType 为空且 type 也不是任何已知父分类）
   const uncategorizedItems = useMemo(() => {
     return filteredClothing.filter(item => {
-      const type = item.type;
-      // 如果是父分类名称，则属于该父分类，不是未分类
-      if (parentCategories.includes(type)) return false;
-      // 如果是子分类名称，则属于该父分类，不是未分类
-      if (allKnownChildren.includes(type)) return false;
+      // 有 parentType 的都已被 getClothingByParent 处理，不属于未分类
+      if (item.parentType) return false;
+      // parentType 为空时：如果 type 正好是某个父分类名称，可归属到该父分类（不算未分类）
+      if (parentCategories.includes(item.type)) return false;
       // 其他情况视为未分类
       return true;
     });
-  }, [filteredClothing, allKnownChildren, parentCategories]);
+  }, [filteredClothing, parentCategories]);
 
-  // 根据父分类获取衣服（包括直接匹配父分类名称的情况）
+  // 根据父分类获取衣服（直接用 parentType 字段匹配，消除歧义）
   const getClothingByParent = useMemo(() => {
     return (parent: string) => {
-      const children = effectiveCategories[parent] || [];
       return filteredClothing.filter(item => {
-        // 直接匹配父分类名称
-        if (item.type === parent) return true;
-        // 匹配子分类
-        if (children.includes(item.type)) return true;
+        // 直接匹配 parentType
+        if (item.parentType === parent) return true;
+        // parentType 为空时，如果 type 正好是这个父分类名称（直接选了一级分类的情况）
+        if (!item.parentType && item.type === parent) return true;
         return false;
       });
     };
-  }, [filteredClothing, effectiveCategories]);
+  }, [filteredClothing]);
 
   // Find parents that have clothes with matching types
   const parentsWithClothing = useMemo(() => {

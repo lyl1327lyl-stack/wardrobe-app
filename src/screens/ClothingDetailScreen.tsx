@@ -596,7 +596,7 @@ export function ClothingDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{item.type}</Text>
+        <Text style={styles.headerTitle}>{item.parentType && item.parentType !== item.type ? `${item.parentType} > ${item.type}` : item.type}</Text>
         {!isTrash && !isSold ? (
           <TouchableOpacity
             style={styles.editBtn}
