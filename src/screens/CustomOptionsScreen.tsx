@@ -379,7 +379,7 @@ export function CustomOptionsScreen() {
 
   // Modal 状态
   const [showAddModal, setShowAddModal] = useState(false);
-  const [modalMode, setModalMode] = useState<'addParent' | 'addChild' | 'edit'>('addParent');
+  const [modalMode, setModalMode] = useState<'addParent' | 'addChild' | 'addOption' | 'edit'>('addParent');
   const [editTarget, setEditTarget] = useState<{ parent?: string; child?: string }>({});
   const [newOptionText, setNewOptionText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
@@ -468,8 +468,16 @@ export function CustomOptionsScreen() {
 
   // 打开添加弹窗
   const handleAddOption = (category: OptionCategory, parent?: string) => {
-    setModalMode(parent ? 'addChild' : 'addParent');
-    setEditTarget(parent ? { parent } : {});
+    if (parent) {
+      setModalMode('addChild');
+      setEditTarget({ parent });
+    } else if (category === 'categories') {
+      setModalMode('addParent');
+      setEditTarget({});
+    } else {
+      setModalMode('addOption');
+      setEditTarget({ parent: category });
+    }
     setNewOptionText('');
     setShowAddModal(true);
   };
@@ -571,6 +579,14 @@ export function CustomOptionsScreen() {
           return;
         }
         await addChild(parent, trimmed);
+      } else if (modalMode === 'addOption') {
+        const cat = editTarget.parent as OptionCategory;
+        const opts = getOptionsForCategory(cat);
+        if (opts.includes(trimmed)) {
+          Alert.alert('选项已存在', '请使用不同的名称');
+          return;
+        }
+        await updateCategory(cat as 'seasons' | 'occasions' | 'styles' | 'sizes', [...opts, trimmed]);
       } else {
         // edit mode
         const { parent, child } = editTarget;
@@ -613,6 +629,7 @@ export function CustomOptionsScreen() {
     switch (modalMode) {
       case 'addParent': return '添加分类';
       case 'addChild': return '添加子分类';
+      case 'addOption': return '添加选项';
       case 'edit': return editTarget.child ? '编辑子分类' : '编辑分类';
     }
   };

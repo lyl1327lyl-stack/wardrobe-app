@@ -463,16 +463,30 @@ export function WardrobeScreen() {
   // 获取所有已知的子分类
   const allKnownChildren = useMemo(() => getAllChildren(effectiveCategories), [effectiveCategories]);
 
-  // 获取未分类的衣服（类型不在任何已知子分类中）
+  // 获取未分类的衣服（类型既不是任何子分类，也不是任何父分类）
   const uncategorizedItems = useMemo(() => {
-    return filteredClothing.filter(item => !allKnownChildren.includes(item.type));
-  }, [filteredClothing, allKnownChildren]);
+    return filteredClothing.filter(item => {
+      const type = item.type;
+      // 如果是父分类名称，则属于该父分类，不是未分类
+      if (parentCategories.includes(type)) return false;
+      // 如果是子分类名称，则属于该父分类，不是未分类
+      if (allKnownChildren.includes(type)) return false;
+      // 其他情况视为未分类
+      return true;
+    });
+  }, [filteredClothing, allKnownChildren, parentCategories]);
 
-  // 根据父分类获取衣服
+  // 根据父分类获取衣服（包括直接匹配父分类名称的情况）
   const getClothingByParent = useMemo(() => {
     return (parent: string) => {
       const children = effectiveCategories[parent] || [];
-      return filteredClothing.filter(item => children.includes(item.type));
+      return filteredClothing.filter(item => {
+        // 直接匹配父分类名称
+        if (item.type === parent) return true;
+        // 匹配子分类
+        if (children.includes(item.type)) return true;
+        return false;
+      });
     };
   }, [filteredClothing, effectiveCategories]);
 

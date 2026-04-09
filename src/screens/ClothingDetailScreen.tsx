@@ -41,7 +41,7 @@ function calcCostPerWear(price: number, wearCount: number): string {
 }
 
 function getDaysAgo(dateStr: string | null): string {
-  if (!dateStr) return '从未';
+  if (!dateStr) return '--';
   try {
     const d = new Date(dateStr);
     const now = new Date();
