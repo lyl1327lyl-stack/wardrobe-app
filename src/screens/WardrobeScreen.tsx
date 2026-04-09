@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -6,6 +6,7 @@ import {
   Text,
   Image,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,6 +16,7 @@ import { DEFAULT_OPTIONS, getAllChildren } from '../utils/customOptions';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
+import { SellItemSheet } from '../components/SellItemSheet';
 
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
@@ -168,6 +170,13 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 10,
       overflow: 'hidden',
       backgroundColor: theme.colors.borderLight,
+      position: 'relative',
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    itemCardSelected: {
+      borderWidth: 3,
+      borderColor: theme.colors.primary,
     },
     itemImage: {
       width: '100%',
@@ -187,6 +196,17 @@ const makeStyles = (theme: Theme) =>
       fontSize: 10,
       color: theme.colors.white,
       fontWeight: '600',
+    },
+    selectBadge: {
+      position: 'absolute',
+      top: 6,
+      right: 6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     bottomPadding: {
       height: 100,
@@ -301,11 +321,46 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.primary,
       fontWeight: '600',
     },
+    batchActionBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.colors.card,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    batchCount: {
+      fontSize: 14,
+      fontWeight: '500',
+    },
+    batchButtons: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    batchBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+    },
+    batchBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
   });
 
 export function WardrobeScreen() {
   const navigation = useNavigation<any>();
-  const { clothing, trashClothing, soldClothing, loadData } = useWardrobeStore();
+  const { clothing, trashClothing, soldClothing, loadData, moveMultipleToTrash, sellMultipleClothing } = useWardrobeStore();
   const { theme } = useTheme();
   const categories = useCustomOptionsStore(state => state.categories);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
@@ -315,6 +370,11 @@ export function WardrobeScreen() {
 
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
   const [showSeasonPicker, setShowSeasonPicker] = useState(false);
+
+  // 批量选择状态
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [showSellSheet, setShowSellSheet] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -335,84 +395,161 @@ export function WardrobeScreen() {
     navigation.navigate('CategoryDetail', { type: parent, season: selectedSeason });
   };
 
-  const getFilteredClothing = () => {
-    if (selectedSeason === '全部') return clothing;
-    return clothing.filter(item => item.seasons.includes(selectedSeason as Season));
-  };
-
-  const getClothingByParent = (parent: string) => {
-    const children = (effectiveCategories && effectiveCategories[parent]) || [];
-    return getFilteredClothing().filter(item => children.includes(item.type));
-  };
+  const getItemId = (item: ClothingItem) => Number(item.id);
 
   const getTitle = () => {
     if (selectedSeason === '全部') return '我的衣橱';
     return `${selectedSeason}季衣橱`;
   };
 
-  const filteredClothing = getFilteredClothing();
+  // 使用 useMemo 确保稳定的数组引用
+  const filteredClothing = useMemo(() => {
+    if (selectedSeason === '全部') return clothing;
+    return clothing.filter(item => item.seasons.includes(selectedSeason as Season));
+  }, [selectedSeason, clothing]);
+
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
 
   // 获取所有已知的子分类
-  const allKnownChildren = getAllChildren(effectiveCategories);
+  const allKnownChildren = useMemo(() => getAllChildren(effectiveCategories), [effectiveCategories]);
 
   // 获取未分类的衣服（类型不在任何已知子分类中）
-  const getUncategorizedClothing = () => {
+  const uncategorizedItems = useMemo(() => {
     return filteredClothing.filter(item => !allKnownChildren.includes(item.type));
-  };
+  }, [filteredClothing, allKnownChildren]);
+
+  // 根据父分类获取衣服
+  const getClothingByParent = useMemo(() => {
+    return (parent: string) => {
+      const children = effectiveCategories[parent] || [];
+      return filteredClothing.filter(item => children.includes(item.type));
+    };
+  }, [filteredClothing, effectiveCategories]);
 
   // Find parents that have clothes with matching types
-  const parentsWithClothing = parentCategories.filter(parent => getClothingByParent(parent).length > 0);
+  const parentsWithClothing = useMemo(() => {
+    return parentCategories.filter(parent => getClothingByParent(parent).length > 0);
+  }, [parentCategories, getClothingByParent]);
+
   // If some parents have clothes, show only those. Otherwise show all (to ensure something displays)
-  const availableParents = parentsWithClothing.length > 0 ? parentsWithClothing : parentCategories;
+  const availableParents = useMemo(() => {
+    return parentsWithClothing.length > 0 ? [...new Set(parentsWithClothing)] : [...new Set(parentCategories)];
+  }, [parentsWithClothing, parentCategories]);
 
-  // 未分类的衣服
-  const uncategorizedItems = getUncategorizedClothing();
   const hasUncategorized = uncategorizedItems.length > 0;
-
   const isEmpty = filteredClothing.length === 0;
   const seasonOptions: ('全部' | Season)[] = ['全部', ...(seasons || [])];
+
+  // 批量选择相关函数
+  const toggleSelect = useCallback((id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  }, []);
+
+  const selectAll = useCallback(() => {
+    if (selectedIds.length === filteredClothing.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredClothing.map(item => Number(item.id)));
+    }
+  }, [selectedIds.length, filteredClothing]);
+
+  const cancelSelection = useCallback(() => {
+    setIsSelecting(false);
+    setSelectedIds([]);
+  }, []);
+
+  const handleLongPress = useCallback((id: number) => {
+    if (!isSelecting) {
+      setIsSelecting(true);
+      setSelectedIds([Number(id)]);
+    }
+  }, [isSelecting]);
+
+  const handleBatchTrash = () => {
+    if (selectedIds.length === 0) return;
+    Alert.alert(
+      '移至废衣篓',
+      `确定要将 ${selectedIds.length} 件衣服移至废衣篓吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确定',
+          onPress: async () => {
+            await moveMultipleToTrash(selectedIds.map(id => Number(id)));
+            cancelSelection();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBatchSell = () => {
+    if (selectedIds.length === 0) return;
+    setShowSellSheet(true);
+  };
+
+  const handleSellConfirm = async (price: number, platform: string) => {
+    await sellMultipleClothing(selectedIds.map(id => Number(id)), price, platform);
+    setShowSellSheet(false);
+    cancelSelection();
+  };
 
   return (
     <View style={styles.container}>
       {/* 顶部标题栏 */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.titleButton}
-          onPress={() => setShowSeasonPicker(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.headerTitle}>{getTitle()}</Text>
-          <Text style={styles.headerCount}>{filteredClothing.length} 件</Text>
-          <Ionicons name="chevron-down" size={22} color={theme.colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => navigation.navigate('Trash')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.headerActionText}>废衣篓</Text>
-            {trashClothing.length > 0 && (
-              <View style={styles.headerBadge}>
-                <Text style={styles.headerBadgeText}>{trashClothing.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.headerActionBtn}
-            onPress={() => navigation.navigate('SoldItems')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.headerActionText}>已卖出</Text>
-            {soldClothing.length > 0 && (
-              <View style={[styles.headerBadge, { backgroundColor: '#4CAF50' }]}>
-                <Text style={styles.headerBadgeText}>{soldClothing.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        {isSelecting ? (
+          <>
+            <TouchableOpacity style={styles.titleButton} onPress={cancelSelection} activeOpacity={0.7}>
+              <Ionicons name="close" size={24} color={theme.colors.text} />
+              <Text style={styles.headerTitle}>取消</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={selectAll} activeOpacity={0.7}>
+              <Text style={[styles.headerCount, { color: theme.colors.primary }]}>
+                {selectedIds.length === filteredClothing.length ? '取消全选' : '全选'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={styles.titleButton}
+              onPress={() => setShowSeasonPicker(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.headerTitle}>{getTitle()}</Text>
+              <Text style={styles.headerCount}>{filteredClothing.length} 件</Text>
+              <Ionicons name="chevron-down" size={22} color={theme.colors.text} />
+            </TouchableOpacity>
+            <View style={styles.headerRight}>
+              <TouchableOpacity
+                style={styles.headerActionBtn}
+                onPress={() => navigation.navigate('Trash')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.headerActionText}>废衣篓</Text>
+                {trashClothing.length > 0 && (
+                  <View style={styles.headerBadge}>
+                    <Text style={styles.headerBadgeText}>{trashClothing.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerActionBtn}
+                onPress={() => navigation.navigate('SoldItems')}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.headerActionText}>已卖出</Text>
+                {soldClothing.length > 0 && (
+                  <View style={[styles.headerBadge, { backgroundColor: '#4CAF50' }]}>
+                    <Text style={styles.headerBadgeText}>{soldClothing.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
       </View>
 
       {/* 内容区域 */}
@@ -468,21 +605,31 @@ export function WardrobeScreen() {
                   contentContainerStyle={styles.categoryScroll}
                 >
                   {items.slice(0, 4).map(item => {
+                    const itemId = getItemId(item);
                     const costPerWear = item.price > 0 && item.wearCount > 0
                       ? Math.round(item.price / item.wearCount)
                       : null;
+                    const isSelected = selectedIds.includes(itemId);
+                    const imageUri = item.thumbnailUri || item.imageUri;
                     return (
                       <TouchableOpacity
-                        key={item.id}
-                        style={styles.itemCard}
-                        onPress={() => handlePress(item)}
+                        key={`card-${itemId}`}
+                        style={[styles.itemCard, isSelecting && isSelected && styles.itemCardSelected]}
+                        onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
+                        onLongPress={() => handleLongPress(itemId)}
                         activeOpacity={0.85}
                       >
                         <Image
-                          source={{ uri: item.thumbnailUri || item.imageUri }}
+                          source={{ uri: imageUri }}
                           style={styles.itemImage}
+                          resizeMode="cover"
                         />
-                        {costPerWear !== null && (
+                        {isSelecting && isSelected && (
+                          <View style={styles.selectBadge}>
+                            <Ionicons name="checkmark" size={14} color={theme.colors.white} />
+                          </View>
+                        )}
+                        {costPerWear !== null && !isSelecting && (
                           <View style={styles.costBadge}>
                             <Text style={styles.costText}>{costPerWear}元/次</Text>
                           </View>
@@ -514,21 +661,31 @@ export function WardrobeScreen() {
                 contentContainerStyle={styles.categoryScroll}
               >
                 {uncategorizedItems.slice(0, 4).map(item => {
+                  const itemId = getItemId(item);
                   const costPerWear = item.price > 0 && item.wearCount > 0
                     ? Math.round(item.price / item.wearCount)
                     : null;
+                  const isSelected = selectedIds.includes(itemId);
+                  const imageUri = item.thumbnailUri || item.imageUri;
                   return (
                     <TouchableOpacity
-                      key={item.id}
-                      style={styles.itemCard}
-                      onPress={() => handlePress(item)}
+                      key={`card-${itemId}`}
+                      style={[styles.itemCard, isSelecting && isSelected && styles.itemCardSelected]}
+                      onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
+                      onLongPress={() => handleLongPress(itemId)}
                       activeOpacity={0.85}
                     >
                       <Image
-                        source={{ uri: item.thumbnailUri || item.imageUri }}
+                        source={{ uri: imageUri }}
                         style={styles.itemImage}
+                        resizeMode="cover"
                       />
-                      {costPerWear !== null && (
+                      {isSelecting && isSelected && (
+                        <View style={styles.selectBadge}>
+                          <Ionicons name="checkmark" size={14} color={theme.colors.white} />
+                        </View>
+                      )}
+                      {costPerWear !== null && !isSelecting && (
                         <View style={styles.costBadge}>
                           <Text style={styles.costText}>{costPerWear}元/次</Text>
                         </View>
@@ -596,6 +753,52 @@ export function WardrobeScreen() {
           </View>
         </View>
       )}
+
+      {/* 批量操作栏 */}
+      {isSelecting && (
+        <View style={[styles.batchActionBar, { paddingBottom: 20 }]}>
+          <Text style={[styles.batchCount, { color: theme.colors.textSecondary }]}>
+            已选择 {selectedIds.length} 件
+          </Text>
+          <View style={styles.batchButtons}>
+            <TouchableOpacity
+              style={[styles.batchBtn, { backgroundColor: theme.colors.warning }]}
+              onPress={handleBatchTrash}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="trash-outline" size={20} color={theme.colors.white} />
+              <Text style={styles.batchBtnText}>废衣篓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchBtn, { backgroundColor: '#4CAF50' }]}
+              onPress={handleBatchSell}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="cash-outline" size={20} color={theme.colors.white} />
+              <Text style={styles.batchBtnText}>卖出</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {/* 添加按钮 - 非选择模式显示 */}
+      {!isSelecting && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={() => navigation.navigate('AddClothing')}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={28} color={theme.colors.white} />
+        </TouchableOpacity>
+      )}
+
+      {/* 卖出表单 */}
+      <SellItemSheet
+        visible={showSellSheet}
+        onClose={() => setShowSellSheet(false)}
+        onSell={handleSellConfirm}
+        title="批量卖出"
+      />
     </View>
   );
 }

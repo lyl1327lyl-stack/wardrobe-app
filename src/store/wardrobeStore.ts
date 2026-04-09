@@ -50,6 +50,12 @@ interface WardrobeState {
   getDaysSinceLastWorn: (id: number) => number | null;
   wearMultipleClothing: (ids: number[]) => Promise<void>;
   migrateClothingType: (oldType: string, newType: string) => Promise<number>;
+  // 批量操作
+  moveMultipleToTrash: (ids: number[], reason?: string) => Promise<void>;
+  restoreMultipleFromTrash: (ids: number[]) => Promise<void>;
+  sellMultipleClothing: (ids: number[], soldPrice: number, soldPlatform: string) => Promise<void>;
+  restoreMultipleFromSold: (ids: number[]) => Promise<void>;
+  permanentDeleteMultiple: (ids: number[]) => Promise<void>;
 }
 
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
@@ -335,5 +341,74 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       soldClothing: state.soldClothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
     }));
     return count;
+  },
+
+  moveMultipleToTrash: async (ids, reason = '') => {
+    const { clothing } = get();
+    const itemsToMove = clothing.filter(c => ids.includes(c.id));
+    const deletedItems = itemsToMove.map(item => ({
+      ...item,
+      deletedAt: localDateString(),
+      discardReason: reason,
+    }));
+    await Promise.all(ids.map(id => clothingDb.softDeleteClothing(id, reason)));
+    set(state => ({
+      clothing: state.clothing.filter(c => !ids.includes(c.id)),
+      trashClothing: [...deletedItems, ...state.trashClothing],
+    }));
+  },
+
+  restoreMultipleFromTrash: async (ids) => {
+    const { trashClothing } = get();
+    const itemsToRestore = trashClothing.filter(c => ids.includes(c.id));
+    const restoredItems = itemsToRestore.map(item => ({ ...item, deletedAt: null }));
+    await Promise.all(ids.map(id => clothingDb.restoreClothing(id)));
+    set(state => ({
+      trashClothing: state.trashClothing.filter(c => !ids.includes(c.id)),
+      clothing: [...restoredItems, ...state.clothing],
+    }));
+  },
+
+  sellMultipleClothing: async (ids, soldPrice, soldPlatform) => {
+    const { clothing } = get();
+    const itemsToSell = clothing.filter(c => ids.includes(c.id));
+    const soldAtStr = localDateString();
+    const soldItems = itemsToSell.map(item => ({
+      ...item,
+      soldAt: soldAtStr,
+      soldPrice,
+      soldPlatform,
+      deletedAt: null,
+      discardReason: null,
+    }));
+    await Promise.all(ids.map(id => clothingDb.sellClothing(id, soldPrice, soldPlatform)));
+    set(state => ({
+      clothing: state.clothing.filter(c => !ids.includes(c.id)),
+      soldClothing: [...soldItems, ...state.soldClothing],
+    }));
+  },
+
+  restoreMultipleFromSold: async (ids) => {
+    const { soldClothing } = get();
+    const itemsToRestore = soldClothing.filter(c => ids.includes(c.id));
+    const restoredItems = itemsToRestore.map(item => ({
+      ...item,
+      soldAt: null,
+      soldPrice: null,
+      soldPlatform: null,
+    }));
+    await Promise.all(ids.map(id => clothingDb.restoreSoldClothing(id)));
+    set(state => ({
+      soldClothing: state.soldClothing.filter(c => !ids.includes(c.id)),
+      clothing: [...restoredItems, ...state.clothing],
+    }));
+  },
+
+  permanentDeleteMultiple: async (ids) => {
+    await Promise.all(ids.map(id => clothingDb.permanentDeleteClothing(id)));
+    set(state => ({
+      trashClothing: state.trashClothing.filter(c => !ids.includes(c.id)),
+      soldClothing: state.soldClothing.filter(c => !ids.includes(c.id)),
+    }));
   },
 }));

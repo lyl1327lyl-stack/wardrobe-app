@@ -6,6 +6,7 @@ export async function getAllOutfits(): Promise<Outfit[]> {
   const result = await db.getAllAsync<any>('SELECT * FROM outfits ORDER BY createdAt DESC');
   return result.map(item => ({
     ...item,
+    id: Number(item.id),
     itemIds: JSON.parse(item.itemIds || '[]'),
     itemPositions: JSON.parse(item.itemPositions || '{}'),
   }));

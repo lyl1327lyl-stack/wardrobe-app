@@ -18,8 +18,9 @@ import { Theme } from '../utils/theme';
 interface SellItemSheetProps {
   visible: boolean;
   onClose: () => void;
-  clothingItem: ClothingItem;
+  clothingItem?: ClothingItem;
   onSell: (soldPrice: number, soldPlatform: string) => void;
+  title?: string;
 }
 
 const makeStyles = (theme: Theme) =>
@@ -152,6 +153,7 @@ export function SellItemSheet({
   onClose,
   clothingItem,
   onSell,
+  title = '确认卖出',
 }: SellItemSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -224,7 +226,7 @@ export function SellItemSheet({
           <View style={styles.handle} />
 
           <View style={styles.header}>
-            <Text style={styles.title}>确认卖出</Text>
+            <Text style={styles.title}>{title}</Text>
             <TouchableOpacity onPress={handleClose}>
               <Ionicons name="close" size={22} color={theme.colors.textTertiary} />
             </TouchableOpacity>

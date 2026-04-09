@@ -12,6 +12,7 @@ export async function getAllClothing(): Promise<ClothingItem[]> {
   const result = await db.getAllAsync<ClothingItem>('SELECT * FROM clothing_items WHERE deletedAt IS NULL AND soldAt IS NULL ORDER BY createdAt DESC');
   return result.map(item => ({
     ...item,
+    id: Number(item.id),
     seasons: JSON.parse(item.seasons as unknown as string || '[]'),
     occasions: JSON.parse(item.occasions as unknown as string || '[]'),
     styles: JSON.parse((item as any).styles || '[]'),
@@ -24,6 +25,7 @@ export async function getClothingById(id: number): Promise<ClothingItem | null> 
   if (!result) return null;
   return {
     ...result,
+    id: Number(result.id),
     seasons: JSON.parse(result.seasons as unknown as string || '[]'),
     occasions: JSON.parse(result.occasions as unknown as string || '[]'),
     styles: JSON.parse((result as any).styles || '[]'),
@@ -115,6 +117,7 @@ export async function getTrashClothing(): Promise<ClothingItem[]> {
   );
   return result.map(item => ({
     ...item,
+    id: Number(item.id),
     seasons: JSON.parse(item.seasons as unknown as string || '[]'),
     occasions: JSON.parse(item.occasions as unknown as string || '[]'),
     styles: JSON.parse((item as any).styles || '[]'),
@@ -128,6 +131,7 @@ export async function getSoldClothing(): Promise<ClothingItem[]> {
   );
   return result.map(item => ({
     ...item,
+    id: Number(item.id),
     seasons: JSON.parse(item.seasons as unknown as string || '[]'),
     occasions: JSON.parse(item.occasions as unknown as string || '[]'),
     styles: JSON.parse((item as any).styles || '[]'),

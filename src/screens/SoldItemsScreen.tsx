@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -80,6 +80,13 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 12,
       overflow: 'hidden',
       backgroundColor: theme.colors.card,
+      position: 'relative',
+      borderWidth: 1,
+      borderColor: 'transparent',
+    },
+    itemCardSelected: {
+      borderWidth: 3,
+      borderColor: theme.colors.primary,
     },
     itemImage: {
       width: '100%',
@@ -178,13 +185,134 @@ const makeStyles = (theme: Theme) =>
       textAlign: 'center',
       lineHeight: 20,
     },
+    selectBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 10,
+    },
+    batchActionBar: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.colors.card,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      paddingHorizontal: 20,
+      paddingTop: 12,
+      paddingBottom: 34,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    batchCount: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+    },
+    batchButtons: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    batchBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+    },
+    batchBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
   });
 
 export function SoldItemsScreen() {
   const navigation = useNavigation<any>();
-  const { soldClothing, restoreFromSold, permanentDelete, emptySold } = useWardrobeStore();
+  const { soldClothing, restoreFromSold, permanentDelete, emptySold, restoreMultipleFromSold, permanentDeleteMultiple } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // 批量选择相关函数
+  const toggleSelect = (id: number) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
+  };
+
+  const selectAll = () => {
+    if (selectedIds.length === soldClothing.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(soldClothing.map(item => Number(item.id)));
+    }
+  };
+
+  const cancelSelection = () => {
+    setIsSelecting(false);
+    setSelectedIds([]);
+  };
+
+  const handleLongPress = (id: number) => {
+    if (!isSelecting) {
+      setIsSelecting(true);
+      setSelectedIds([Number(id)]);
+    }
+  };
+
+  const handleBatchRestore = () => {
+    if (selectedIds.length === 0) return;
+    Alert.alert(
+      '恢复衣服',
+      `确定要恢复 ${selectedIds.length} 件衣服吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确定',
+          onPress: async () => {
+            await restoreMultipleFromSold(selectedIds.map(id => Number(id)));
+            cancelSelection();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedIds.length === 0) return;
+    Alert.alert(
+      '永久删除',
+      `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复！`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '删除',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              for (const item of soldClothing.filter(c => selectedIds.includes(Number(c.id)))) {
+                await deleteImage(item.imageUri, item.thumbnailUri);
+              }
+              await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
+              cancelSelection();
+            } catch (e) {
+              console.error('批量删除失败:', e);
+              Alert.alert('删除失败，请重试');
+            }
+          },
+        },
+      ]
+    );
+  };
 
   const handleRestore = (item: ClothingItem) => {
     Alert.alert(
@@ -239,61 +367,91 @@ export function SoldItemsScreen() {
     );
   };
 
-  const renderItem = ({ item }: { item: ClothingItem }) => (
-    <TouchableOpacity
-      style={styles.itemCard}
-      onPress={() => navigation.navigate('ClothingDetail', { id: item.id, source: 'sold' })}
-      activeOpacity={0.85}
-    >
-      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />
-      <View style={styles.itemOverlay}>
-        <Text style={styles.itemType}>{item.type}</Text>
-        <Text style={styles.itemSoldDate}>{formatSoldDate(item.soldAt)}</Text>
-      </View>
-      {item.soldPrice != null && (
-        <View style={styles.priceTag}>
-          <Text style={styles.priceText}>¥{item.soldPrice}</Text>
-        </View>
-      )}
-      <View style={styles.actionButtons}>
-        <TouchableOpacity
-          style={styles.restoreBtn}
-          onPress={() => handleRestore(item)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="arrow-undo" size={16} color={theme.colors.white} />
-          <Text style={styles.restoreBtnText}>恢复</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => handlePermanentDelete(item)}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="trash" size={16} color={theme.colors.white} />
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
+  const renderItem = ({ item }: { item: ClothingItem }) => {
+    const itemId = Number(item.id);
+    const isSelected = selectedIds.includes(itemId);
+    return (
+      <TouchableOpacity
+        style={[styles.itemCard, isSelecting && isSelected && styles.itemCardSelected]}
+        onPress={() => isSelecting ? toggleSelect(itemId) : navigation.navigate('ClothingDetail', { id: item.id, source: 'sold' })}
+        onLongPress={() => handleLongPress(itemId)}
+        activeOpacity={0.85}
+      >
+        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />
+        {isSelecting && isSelected && (
+          <View style={styles.selectBadge}>
+            <Ionicons name="checkmark" size={14} color={theme.colors.white} />
+          </View>
+        )}
+        {!isSelecting && (
+          <>
+            <View style={styles.itemOverlay}>
+              <Text style={styles.itemType}>{item.type}</Text>
+              <Text style={styles.itemSoldDate}>{formatSoldDate(item.soldAt)}</Text>
+            </View>
+            {item.soldPrice != null && (
+              <View style={styles.priceTag}>
+                <Text style={styles.priceText}>¥{item.soldPrice}</Text>
+              </View>
+            )}
+            <View style={styles.actionButtons}>
+              <TouchableOpacity
+                style={styles.restoreBtn}
+                onPress={() => handleRestore(item)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="arrow-undo" size={16} color={theme.colors.white} />
+                <Text style={styles.restoreBtnText}>恢复</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.deleteBtn}
+                onPress={() => handlePermanentDelete(item)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="trash" size={16} color={theme.colors.white} />
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <View style={styles.container}>
       {/* 顶部导航栏 */}
       <View style={styles.navBar}>
-        <TouchableOpacity style={styles.navBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.navTitle}>已卖出</Text>
-        <TouchableOpacity
-          style={[styles.navBtn, soldClothing.length === 0 && styles.navBtnDisabled]}
-          onPress={handleEmptySold}
-          disabled={soldClothing.length === 0}
-        >
-          <Ionicons
-            name="trash-outline"
-            size={22}
-            color={soldClothing.length === 0 ? theme.colors.border : theme.colors.warning}
-          />
-        </TouchableOpacity>
+        {isSelecting ? (
+          <>
+            <TouchableOpacity style={styles.navBtn} onPress={cancelSelection}>
+              <Ionicons name="close" size={22} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.navTitle}>选择 {selectedIds.length} 项</Text>
+            <TouchableOpacity style={styles.navBtn} onPress={selectAll}>
+              <Text style={{ color: theme.colors.primary, fontSize: 14, fontWeight: '600' }}>
+                {selectedIds.length === soldClothing.length ? '取消全选' : '全选'}
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <TouchableOpacity style={styles.navBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.navTitle}>已卖出</Text>
+            <TouchableOpacity
+              style={[styles.navBtn, soldClothing.length === 0 && styles.navBtnDisabled]}
+              onPress={handleEmptySold}
+              disabled={soldClothing.length === 0}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={22}
+                color={soldClothing.length === 0 ? theme.colors.border : theme.colors.warning}
+              />
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       {/* 内容 */}
@@ -309,12 +467,38 @@ export function SoldItemsScreen() {
         <FlatList
           data={soldClothing}
           renderItem={renderItem}
-          keyExtractor={item => item.id.toString()}
+          keyExtractor={item => String(item.id)}
           numColumns={COLUMN}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          extraData={selectedIds}
         />
+      )}
+
+      {/* 批量操作栏 */}
+      {isSelecting && (
+        <View style={styles.batchActionBar}>
+          <Text style={styles.batchCount}>已选择 {selectedIds.length} 件</Text>
+          <View style={styles.batchButtons}>
+            <TouchableOpacity
+              style={[styles.batchBtn, { backgroundColor: theme.colors.primary }]}
+              onPress={handleBatchRestore}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="arrow-undo" size={20} color={theme.colors.white} />
+              <Text style={styles.batchBtnText}>恢复</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchBtn, { backgroundColor: theme.colors.warning }]}
+              onPress={handleBatchDelete}
+              activeOpacity={0.8}
+            >
+              <Ionicons name="trash" size={20} color={theme.colors.white} />
+              <Text style={styles.batchBtnText}>删除</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       )}
     </View>
   );
