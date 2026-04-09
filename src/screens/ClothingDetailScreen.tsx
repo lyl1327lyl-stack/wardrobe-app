@@ -615,7 +615,7 @@ export function ClothingDetailScreen() {
         <View style={styles.imageSection}>
           <View style={styles.imageWrapper}>
             <Image source={{ uri: item.imageUri }} style={styles.image} />
-            <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />
+            {item.color && <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />}
           </View>
         </View>
 

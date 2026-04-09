@@ -501,7 +501,8 @@ const makeStyles = (theme: Theme) =>
 export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
-  const { addClothing, updateClothing, getClothingById } = useWardrobeStore();
+  const { addClothing, updateClothing, getClothingById, loadData } = useWardrobeStore();
+  const wardrobeIsLoading = useWardrobeStore(state => state.isLoading);
   const { theme } = useTheme();
   const categories = useCustomOptionsStore(state => state.categories);
   const getParents = useCustomOptionsStore(state => state.getParents);
@@ -512,21 +513,23 @@ export function AddClothingScreen() {
   const customStyles = useCustomOptionsStore(state => state.styles);
   const customSizes = useCustomOptionsStore(state => state.sizes);
   const load = useCustomOptionsStore(state => state.load);
+  const customIsLoading = useCustomOptionsStore(state => state.isLoading);
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
 
+  // 数据是否已加载完成
+  const isDataReady = !customIsLoading && !wardrobeIsLoading;
+
   useEffect(() => {
     load();
+    loadData();
   }, []);
 
   const isEditing = !!(route.params?.id);
-  const existingItem = isEditing ? getClothingById(route.params.id) : null;
-
-  // 从 existingItem 反推父分类
-  const existingParent = existingItem ? getParentOfChild(existingItem.type) : undefined;
+  const existingItem = isDataReady && isEditing ? getClothingById(route.params.id) : null;
 
   const [imageUri, setImageUri] = useState(existingItem?.imageUri || '');
-  const [selectedParent, setSelectedParent] = useState<string>(existingParent || '');
+  const [selectedParent, setSelectedParent] = useState<string>('');
   const [selectedChild, setSelectedChild] = useState<string>(existingItem?.type || '');
   const [color, setColor] = useState(existingItem?.color || '');
   const [brand, setBrand] = useState(existingItem?.brand || '');
@@ -549,28 +552,75 @@ export function AddClothingScreen() {
       setTimeout(() => setShowImagePicker(true), 100);
     }
   }, [isEditing]);
+
+  // 当 categories 加载完成且编辑模式有 id 时，初始化父分类
+  useEffect(() => {
+    if (!customIsLoading && route.params?.id && categories) {
+      // 从 store 获取最新数据
+      const item = getClothingById(route.params.id);
+      if (item) {
+        const type = item.type;
+        // 直接从 categories 状态查找父分类
+        let foundParent: string | undefined;
+        for (const [parent, children] of Object.entries(categories)) {
+          if (children.includes(type)) {
+            foundParent = parent;
+            break;
+          }
+        }
+        // 如果找不到，检查 type 是否本身就是父分类
+        if (!foundParent && type) {
+          const allParents = Object.keys(categories);
+          if (allParents.includes(type)) {
+            foundParent = type;
+          }
+        }
+        setSelectedParent(foundParent || '');
+        setSelectedChild(foundParent && foundParent !== type ? type : '');
+      }
+    }
+  }, [customIsLoading, route.params?.id, categories, getClothingById]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 初始状态快照，用于检测未保存更改
   const initialState = useRef({
-    imageUri: existingItem?.imageUri || '',
-    type: existingItem?.type || '',
-    color: existingItem?.color || '',
-    brand: existingItem?.brand || '',
-    size: existingItem?.size || '',
-    seasons: existingItem?.seasons || [],
-    occasions: existingItem?.occasions || [],
-    clothingStyles: existingItem?.styles || [],
-    purchaseDate: existingItem?.purchaseDate || '',
-    price: existingItem?.price || '',
-    remarks: existingItem?.remarks || '',
+    imageUri: '',
+    type: '',
+    color: '',
+    brand: '',
+    size: '',
+    seasons: [] as string[],
+    occasions: [] as string[],
+    clothingStyles: [] as string[],
+    purchaseDate: '',
+    price: '',
+    remarks: '',
   });
+
+  // 当数据加载完成且 existingItem 可用时，初始化 initialState
+  useEffect(() => {
+    if (isDataReady && existingItem) {
+      initialState.current = {
+        imageUri: existingItem.imageUri || '',
+        type: existingItem.type || '',
+        color: existingItem.color || '',
+        brand: existingItem.brand || '',
+        size: existingItem.size || '',
+        seasons: existingItem.seasons || [],
+        occasions: existingItem.occasions || [],
+        clothingStyles: existingItem.styles || [],
+        purchaseDate: existingItem.purchaseDate || '',
+        price: existingItem.price != null ? String(existingItem.price) : '',
+        remarks: existingItem.remarks || '',
+      };
+    }
+  }, [isDataReady, existingItem]);
 
   // 跟踪是否正在导航到选项管理页面（跳过未保存检查）
   const skipUnsavedCheck = useRef(false);
 
   const currentState = {
-    imageUri, type: selectedChild, color, brand, size, seasons, occasions,
+    imageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, occasions,
     clothingStyles, purchaseDate: purchaseDate ? formatDate(purchaseDate) : '', price, remarks,
   };
 
@@ -848,7 +898,7 @@ export function AddClothingScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorScroll}>
                 <View style={styles.colorRow}>
                   {COLORS.filter(c => c !== '其他').map(c => (
-                    <TouchableOpacity key={c} style={styles.colorItem} onPress={() => setColor(c)}>
+                    <TouchableOpacity key={c} style={styles.colorItem} onPress={() => setColor(color === c ? '' : c)}>
                       <View style={[styles.colorSwatch, { backgroundColor: getColorHex(c) }, color === c && styles.colorSwatchActive, c === '白色' && styles.colorSwatchWhite]} />
                       <Text style={[styles.colorName, color === c && styles.colorNameActive]}>{c}</Text>
                     </TouchableOpacity>
@@ -891,7 +941,7 @@ export function AddClothingScreen() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
                 <View style={styles.chipRow}>
                   {(customSizes || []).map(s => (
-                    <TouchableOpacity key={s} style={[styles.chip, size === s && styles.chipActive]} onPress={() => setSize(s)}>
+                    <TouchableOpacity key={s} style={[styles.chip, size === s && styles.chipActive]} onPress={() => setSize(size === s ? '' : s)}>
                       <Text style={[styles.chipLabel, size === s && styles.chipLabelActive]}>{s}</Text>
                     </TouchableOpacity>
                   ))}
