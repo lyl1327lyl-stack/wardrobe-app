@@ -554,7 +554,7 @@ export function AddClothingScreen() {
   // 初始状态快照，用于检测未保存更改
   const initialState = useRef({
     imageUri: existingItem?.imageUri || '',
-    type: existingItem?.type || '上衣',
+    type: existingItem?.type || '',
     color: existingItem?.color || '',
     brand: existingItem?.brand || '',
     size: existingItem?.size || '',
@@ -565,6 +565,9 @@ export function AddClothingScreen() {
     price: existingItem?.price || '',
     remarks: existingItem?.remarks || '',
   });
+
+  // 跟踪是否正在导航到选项管理页面（跳过未保存检查）
+  const skipUnsavedCheck = useRef(false);
 
   const currentState = {
     imageUri, type: selectedChild, color, brand, size, seasons, occasions,
@@ -588,6 +591,13 @@ export function AddClothingScreen() {
 
   // 返回按钮 - 检测未保存更改
   const handleBack = useCallback(() => {
+    // 如果是导航到选项管理页面后返回，跳过未保存检查
+    if (skipUnsavedCheck.current) {
+      skipUnsavedCheck.current = false;
+      navigation.goBack();
+      return;
+    }
+
     if (hasChanges) {
       if (isEditing) {
         Alert.alert(
@@ -639,6 +649,7 @@ export function AddClothingScreen() {
 
   // 跳转到分类管理页面
   const openOptionManager = (field: 'categories' | 'seasons' | 'occasions' | 'styles' | 'sizes') => {
+    skipUnsavedCheck.current = true;
     navigation.navigate('CustomOptions', { category: field });
   };
 
@@ -674,7 +685,7 @@ export function AddClothingScreen() {
       const clothingData = {
         imageUri: processedUri,
         thumbnailUri,
-        type: selectedChild,
+        type: selectedChild || selectedParent || '', // 优先用子分类，其次父分类，最后空字符串
         color: asDraft && !color ? '' : color,
         brand,
         size,

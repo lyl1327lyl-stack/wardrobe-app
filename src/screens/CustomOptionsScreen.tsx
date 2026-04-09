@@ -69,6 +69,17 @@ const makeStyles = (theme: Theme) =>
     headerRight: {
       width: 40,
     },
+    headerSaveBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 14,
+      backgroundColor: theme.colors.primary,
+    },
+    headerSaveBtnText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
     content: {
       flex: 1,
     },
@@ -637,7 +648,11 @@ export function CustomOptionsScreen() {
         <Text style={styles.headerTitle}>
           {forcedCategory ? `${CATEGORIES.find(c => c.key === forcedCategory)?.label}管理` : '管理分类选项'}
         </Text>
-        {!forcedCategory && (
+        {forcedCategory ? (
+          <TouchableOpacity style={styles.headerSaveBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Text style={styles.headerSaveBtnText}>完成</Text>
+          </TouchableOpacity>
+        ) : (
           <TouchableOpacity style={styles.headerBtn} onPress={handleReset}>
             <Ionicons name="refresh" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>

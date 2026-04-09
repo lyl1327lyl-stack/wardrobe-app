@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { deleteImage } from '../utils/imageUtils';
 import { ClothingItem } from '../types';
@@ -462,10 +462,13 @@ export function ClothingDetailScreen() {
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
 
-  useEffect(() => {
-    const found = getClothingByIdIncludingAll(route.params.id);
-    setItem(found || null);
-  }, [route.params.id]);
+  // 使用 useFocusEffect 在屏幕获得焦点时刷新数据
+  useFocusEffect(
+    useCallback(() => {
+      const found = getClothingByIdIncludingAll(route.params.id);
+      setItem(found || null);
+    }, [route.params.id, getClothingByIdIncludingAll])
+  );
 
   // 根据路由或物品状态判断来源
   const source: DetailSource = route.params.source ||
