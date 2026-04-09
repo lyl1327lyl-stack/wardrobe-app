@@ -554,17 +554,6 @@ export function AddClothingScreen() {
   const [imageUri, setImageUri] = useState(existingItem?.imageUri || '');
   const [selectedParent, setSelectedParent] = useState<string>(getInitialParent(existingItem));
   const [selectedChild, setSelectedChild] = useState<string>(getInitialChild(existingItem));
-
-  // 当 existingItem 变化时，同步更新状态
-  useEffect(() => {
-    if (existingItem) {
-      const newParent = getInitialParent(existingItem);
-      const newChild = getInitialChild(existingItem);
-      console.log('[EDIT useEffect] setParent:', newParent, 'setChild:', newChild);
-      setSelectedParent(newParent);
-      setSelectedChild(newChild);
-    }
-  }, [existingItem]);
   const [color, setColor] = useState(existingItem?.color || '');
   const [brand, setBrand] = useState(existingItem?.brand || '');
   const [size, setSize] = useState(existingItem?.size || '');
@@ -579,6 +568,34 @@ export function AddClothingScreen() {
   const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
   const [showImagePicker, setShowImagePicker] = useState(false);
+
+  // 当 existingItem 加载完成时，同步更新所有状态
+  useEffect(() => {
+    if (existingItem) {
+      setImageUri(existingItem.imageUri || '');
+      setColor(existingItem.color || '');
+      setBrand(existingItem.brand || '');
+      setSize(existingItem.size || '');
+      setSeasons(existingItem.seasons || []);
+      setOccasions(existingItem.occasions || []);
+      setClothingStyles(existingItem.styles || []);
+      setPurchaseDate(existingItem.purchaseDate ? new Date(existingItem.purchaseDate) : null);
+      setPrice(existingItem.price ? String(existingItem.price) : '');
+      setWearCount(existingItem.wearCount ?? 0);
+      setRemarks(existingItem.remarks || '');
+    }
+  }, [existingItem]);
+
+  // 同步分类状态
+  useEffect(() => {
+    if (existingItem) {
+      const newParent = getInitialParent(existingItem);
+      const newChild = getInitialChild(existingItem);
+      console.log('[EDIT useEffect] setParent:', newParent, 'setChild:', newChild);
+      setSelectedParent(newParent);
+      setSelectedChild(newChild);
+    }
+  }, [existingItem]);
 
   // 添加模式下自动打开图片选择器
   useEffect(() => {
