@@ -17,6 +17,7 @@ import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { SellItemSheet } from '../components/SellItemSheet';
+import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
 
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
@@ -327,33 +328,80 @@ const makeStyles = (theme: Theme) =>
       left: 0,
       right: 0,
       backgroundColor: theme.colors.card,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
       paddingHorizontal: 20,
-      paddingTop: 12,
+      paddingTop: 16,
+      paddingBottom: 40,
+      alignItems: 'center',
+      ...theme.shadows.lg,
+    },
+    batchCountWrap: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
+      marginBottom: 14,
+      gap: 8,
+    },
+    batchCountDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.primary,
     },
     batchCount: {
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
     },
-    batchButtons: {
+    batchCountSub: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+    },
+    batchButtonsRow: {
       flexDirection: 'row',
       gap: 12,
     },
     batchBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 20,
+      justifyContent: 'center',
+      gap: 8,
+      paddingHorizontal: 24,
+      paddingVertical: 14,
+      borderRadius: 28,
+      minWidth: 120,
+    },
+    batchBtnSecondary: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+    },
+    batchBtnDanger: {
+      backgroundColor: theme.colors.warning,
+    },
+    batchBtnSuccess: {
+      backgroundColor: '#4CAF50',
+    },
+    batchBtnIconWrap: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    batchBtnSecondaryIcon: {
+      backgroundColor: 'rgba(0,0,0,0.05)',
     },
     batchBtnText: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
+    },
+    batchBtnSecondaryText: {
+      color: theme.colors.textSecondary,
+    },
+    batchBtnWhiteText: {
       color: theme.colors.white,
     },
   });
@@ -375,6 +423,7 @@ export function WardrobeScreen() {
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showSellSheet, setShowSellSheet] = useState(false);
+  const [showBatchDiscardSheet, setShowBatchDiscardSheet] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -468,20 +517,12 @@ export function WardrobeScreen() {
 
   const handleBatchTrash = () => {
     if (selectedIds.length === 0) return;
-    Alert.alert(
-      '移至废衣篓',
-      `确定要将 ${selectedIds.length} 件衣服移至废衣篓吗？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确定',
-          onPress: async () => {
-            await moveMultipleToTrash(selectedIds.map(id => Number(id)));
-            cancelSelection();
-          },
-        },
-      ]
-    );
+    setShowBatchDiscardSheet(true);
+  };
+
+  const handleBatchDiscardConfirm = async (reason: string) => {
+    await moveMultipleToTrash(selectedIds.map(id => Number(id)), reason);
+    cancelSelection();
   };
 
   const handleBatchSell = () => {
@@ -756,26 +797,36 @@ export function WardrobeScreen() {
 
       {/* 批量操作栏 */}
       {isSelecting && (
-        <View style={[styles.batchActionBar, { paddingBottom: 20 }]}>
-          <Text style={[styles.batchCount, { color: theme.colors.textSecondary }]}>
-            已选择 {selectedIds.length} 件
-          </Text>
-          <View style={styles.batchButtons}>
+        <View style={styles.batchActionBar}>
+          <View style={styles.batchCountWrap}>
+            <View style={styles.batchCountDot} />
+            <Text style={styles.batchCount}>
+              已选择 {selectedIds.length} 件
+            </Text>
+            <Text style={styles.batchCountSub}>
+              {selectedIds.length === filteredClothing.length ? '· 全部衣物' : ''}
+            </Text>
+          </View>
+          <View style={styles.batchButtonsRow}>
             <TouchableOpacity
-              style={[styles.batchBtn, { backgroundColor: theme.colors.warning }]}
+              style={[styles.batchBtn, styles.batchBtnSecondary]}
               onPress={handleBatchTrash}
               activeOpacity={0.8}
             >
-              <Ionicons name="trash-outline" size={20} color={theme.colors.white} />
-              <Text style={styles.batchBtnText}>废衣篓</Text>
+              <View style={[styles.batchBtnIconWrap, styles.batchBtnSecondaryIcon]}>
+                <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>废衣篓</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.batchBtn, { backgroundColor: '#4CAF50' }]}
+              style={[styles.batchBtn, styles.batchBtnSuccess]}
               onPress={handleBatchSell}
               activeOpacity={0.8}
             >
-              <Ionicons name="cash-outline" size={20} color={theme.colors.white} />
-              <Text style={styles.batchBtnText}>卖出</Text>
+              <View style={styles.batchBtnIconWrap}>
+                <Ionicons name="cash-outline" size={18} color={theme.colors.white} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnWhiteText]}>卖出</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -798,6 +849,14 @@ export function WardrobeScreen() {
         onClose={() => setShowSellSheet(false)}
         onSell={handleSellConfirm}
         title="批量卖出"
+      />
+
+      {/* 批量丢弃原因选择 */}
+      <BatchDiscardReasonSheet
+        visible={showBatchDiscardSheet}
+        onClose={() => setShowBatchDiscardSheet(false)}
+        itemCount={selectedIds.length}
+        onConfirm={handleBatchDiscardConfirm}
       />
     </View>
   );

@@ -203,35 +203,80 @@ const makeStyles = (theme: Theme) =>
       left: 0,
       right: 0,
       backgroundColor: theme.colors.card,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
       paddingHorizontal: 20,
-      paddingTop: 12,
-      paddingBottom: 34,
+      paddingTop: 16,
+      paddingBottom: 40,
+      alignItems: 'center',
+      ...theme.shadows.lg,
+    },
+    batchCountWrap: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      justifyContent: 'center',
+      marginBottom: 14,
+      gap: 8,
+    },
+    batchCountDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: theme.colors.primary,
     },
     batchCount: {
-      fontSize: 14,
-      fontWeight: '500',
-      color: theme.colors.textSecondary,
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
     },
-    batchButtons: {
+    batchCountSub: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+    },
+    batchButtonsRow: {
       flexDirection: 'row',
       gap: 12,
     },
     batchBtn: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: 20,
+      justifyContent: 'center',
+      gap: 8,
+      paddingHorizontal: 24,
+      paddingVertical: 14,
+      borderRadius: 28,
+      minWidth: 120,
+    },
+    batchBtnSecondary: {
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+    },
+    batchBtnDanger: {
+      backgroundColor: theme.colors.warning,
+    },
+    batchBtnPrimary: {
+      backgroundColor: theme.colors.primary,
+    },
+    batchBtnIconWrap: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    batchBtnSecondaryIcon: {
+      backgroundColor: 'rgba(0,0,0,0.05)',
     },
     batchBtnText: {
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '600',
+    },
+    batchBtnSecondaryText: {
+      color: theme.colors.textSecondary,
+    },
+    batchBtnWhiteText: {
       color: theme.colors.white,
     },
   });
@@ -479,23 +524,35 @@ export function SoldItemsScreen() {
       {/* 批量操作栏 */}
       {isSelecting && (
         <View style={styles.batchActionBar}>
-          <Text style={styles.batchCount}>已选择 {selectedIds.length} 件</Text>
-          <View style={styles.batchButtons}>
+          <View style={styles.batchCountWrap}>
+            <View style={styles.batchCountDot} />
+            <Text style={styles.batchCount}>
+              已选择 {selectedIds.length} 件
+            </Text>
+            <Text style={styles.batchCountSub}>
+              {selectedIds.length === soldClothing.length ? '· 全部衣物' : ''}
+            </Text>
+          </View>
+          <View style={styles.batchButtonsRow}>
             <TouchableOpacity
-              style={[styles.batchBtn, { backgroundColor: theme.colors.primary }]}
+              style={[styles.batchBtn, styles.batchBtnPrimary]}
               onPress={handleBatchRestore}
               activeOpacity={0.8}
             >
-              <Ionicons name="arrow-undo" size={20} color={theme.colors.white} />
-              <Text style={styles.batchBtnText}>恢复</Text>
+              <View style={styles.batchBtnIconWrap}>
+                <Ionicons name="arrow-undo" size={18} color={theme.colors.white} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnWhiteText]}>恢复</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.batchBtn, { backgroundColor: theme.colors.warning }]}
+              style={[styles.batchBtn, styles.batchBtnDanger]}
               onPress={handleBatchDelete}
               activeOpacity={0.8}
             >
-              <Ionicons name="trash" size={20} color={theme.colors.white} />
-              <Text style={styles.batchBtnText}>删除</Text>
+              <View style={styles.batchBtnIconWrap}>
+                <Ionicons name="trash" size={18} color={theme.colors.white} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnWhiteText]}>永久删除</Text>
             </TouchableOpacity>
           </View>
         </View>
