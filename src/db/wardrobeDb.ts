@@ -45,18 +45,18 @@ export async function getDefaultWardrobe(): Promise<Wardrobe | null> {
   };
 }
 
-export async function addWardrobe(name: string, icon: string): Promise<number> {
+export async function addWardrobe(name: string): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    'INSERT INTO wardrobes (name, icon, isDefault, createdAt) VALUES (?, ?, 0, ?)',
-    [name, icon, localDateString()]
+    'INSERT INTO wardrobes (name, isDefault, createdAt) VALUES (?, 0, ?)',
+    [name, localDateString()]
   );
   return result.lastInsertRowId;
 }
 
-export async function updateWardrobe(id: number, name: string, icon: string): Promise<void> {
+export async function updateWardrobe(id: number, name: string): Promise<void> {
   const db = await getDatabase();
-  await db.runAsync('UPDATE wardrobes SET name = ?, icon = ? WHERE id = ?', [name, icon, id]);
+  await db.runAsync('UPDATE wardrobes SET name = ? WHERE id = ?', [name, id]);
 }
 
 export async function deleteWardrobe(id: number): Promise<void> {

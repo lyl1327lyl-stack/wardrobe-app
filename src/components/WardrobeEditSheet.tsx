@@ -13,26 +13,21 @@ import {
 } from 'react-native';
 import { Wardrobe } from '../types';
 
-const WARDROBE_ICONS = ['👗', '👚', '👘', '👙', '🧥', '👔', '👖', '🎒', '💼', '👜', '👝', '👛', '🛍️', '🏠', '🗄️', '👒', '🧣', '👑'];
-
 interface Props {
   visible: boolean;
   wardrobe?: Wardrobe | null;
   onClose: () => void;
-  onSave: (name: string, icon: string) => void;
+  onSave: (name: string) => void;
 }
 
 export default function WardrobeEditSheet({ visible, wardrobe, onClose, onSave }: Props) {
   const [name, setName] = useState('');
-  const [icon, setIcon] = useState('👗');
 
   useEffect(() => {
     if (wardrobe) {
       setName(wardrobe.name);
-      setIcon(wardrobe.icon);
     } else {
       setName('');
-      setIcon('👗');
     }
   }, [wardrobe, visible]);
 
@@ -42,7 +37,7 @@ export default function WardrobeEditSheet({ visible, wardrobe, onClose, onSave }
       Alert.alert('请输入衣橱名称');
       return;
     }
-    onSave(trimmedName, icon);
+    onSave(trimmedName);
     onClose();
   };
 
@@ -78,27 +73,15 @@ export default function WardrobeEditSheet({ visible, wardrobe, onClose, onSave }
               maxLength={20}
             />
 
-            <Text style={styles.label}>选择图标</Text>
-            <View style={styles.iconGrid}>
-              {WARDROBE_ICONS.map((emoji) => (
-                <TouchableOpacity
-                  key={emoji}
-                  style={[
-                    styles.iconButton,
-                    icon === emoji && styles.iconButtonSelected,
-                  ]}
-                  onPress={() => setIcon(emoji)}
-                >
-                  <Text style={styles.iconText}>{emoji}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <View style={styles.preview}>
-              <Text style={styles.previewText}>{icon} {name || '衣橱名称'}</Text>
-            </View>
-
-            <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <TouchableOpacity style={styles.saveButton} onPress={() => {
+              const trimmedName = name.trim();
+              if (!trimmedName) {
+                Alert.alert('请输入衣橱名称');
+                return;
+              }
+              onSave(trimmedName);
+              onClose();
+            }}>
               <Text style={styles.saveButtonText}>保存</Text>
             </TouchableOpacity>
           </ScrollView>
@@ -159,38 +142,35 @@ const styles = StyleSheet.create({
     color: '#333',
     backgroundColor: '#fafafa',
   },
-  iconGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  iconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    backgroundColor: '#f5f5f5',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
   iconButtonSelected: {
     borderColor: '#007AFF',
-    backgroundColor: '#e8f4ff',
+    backgroundColor: '#E3F2FD',
   },
   iconText: {
     fontSize: 24,
   },
   preview: {
     marginTop: 20,
-    paddingVertical: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#F0F4F8',
     borderRadius: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  previewIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#E3F2FD',
+    justifyContent: 'center',
     alignItems: 'center',
   },
   previewText: {
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '500',
     color: '#333',
   },
   saveButton: {

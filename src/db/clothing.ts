@@ -1,6 +1,7 @@
 import { getDatabase } from './database';
 import { ClothingItem } from '../types';
 import { getParentOf, DEFAULT_CATEGORIES } from '../utils/customOptions';
+import * as SQLite from 'expo-sqlite';
 
 // 本地日期字符串，避免时区偏移
 function localDateString(): string {
@@ -30,7 +31,7 @@ function parseClothingRow<T extends ClothingItem>(row: T): ClothingItem {
 
 export async function getAllClothing(): Promise<ClothingItem[]> {
   const db = await getDatabase();
-  const result = await db.getAllAsync<ClothingItem>('SELECT * FROM clothing_items WHERE deletedAt IS NULL AND soldAt IS NULL ORDER BY createdAt DESC');
+  const result = await db.getAllAsync<ClothingItem>('SELECT * FROM clothing_items WHERE deletedAt IS NULL AND soldAt IS NULL AND isDraft = 0 ORDER BY createdAt DESC');
   return result.map(item => parseClothingRow(item));
 }
 
@@ -203,4 +204,126 @@ export async function moveMultipleClothingToWardrobe(ids: number[], wardrobeId: 
     `UPDATE clothing_items SET wardrobeId = ? WHERE id IN (${placeholders})`,
     [wardrobeId, ...ids]
   );
+}
+
+// ============ 草稿箱功能 ============
+
+// 确保 isDraft 列存在
+async function ensureIsDraftColumn(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const result = await db.getAllAsync<{ name: string }>('PRAGMA table_info(clothing_items)');
+    const hasColumn = result.some((col: { name: string }) => col.name === 'isDraft');
+    if (!hasColumn) {
+      await db.runAsync('ALTER TABLE clothing_items ADD COLUMN isDraft INTEGER NOT NULL DEFAULT 0');
+    }
+  } catch (e) {
+    console.warn('[ClothingDB] ensureIsDraftColumn failed:', e);
+  }
+}
+
+export async function getDraftClothing(): Promise<ClothingItem[]> {
+  try {
+    const db = await getDatabase();
+    await ensureIsDraftColumn(db);
+    const result = await db.getAllAsync<ClothingItem>(
+      'SELECT * FROM clothing_items WHERE isDraft = 1 ORDER BY createdAt DESC'
+    );
+    return result.map(item => parseClothingRow(item));
+  } catch (error) {
+    console.warn('[ClothingDB] getDraftClothing failed, returning empty array:', error);
+    return [];
+  }
+}
+
+export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: number }): Promise<number> {
+  try {
+    const db = await getDatabase();
+    // 如果有 id，说明是更新现有草稿
+    if (item.id) {
+      await db.runAsync(
+        `UPDATE clothing_items SET
+          imageUri = ?, thumbnailUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
+          seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wardrobeId = ?
+         WHERE id = ? AND isDraft = 1`,
+        [
+          item.imageUri,
+          item.thumbnailUri,
+          item.type,
+          item.parentType ?? '',
+          item.color,
+          item.brand,
+          item.size,
+          item.remarks || '',
+          JSON.stringify(item.seasons),
+          JSON.stringify(item.occasions),
+          JSON.stringify(item.styles || []),
+          item.purchaseDate,
+          item.price,
+          item.wardrobeId ?? 1,
+          item.id,
+        ]
+      );
+      return item.id;
+    } else {
+      // 新增草稿
+      const result = await db.runAsync(
+        `INSERT INTO clothing_items (imageUri, thumbnailUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId, isDraft)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        [
+          item.imageUri,
+          item.thumbnailUri,
+          item.type,
+          item.parentType ?? '',
+          item.color,
+          item.brand,
+          item.size,
+          item.remarks || '',
+          JSON.stringify(item.seasons),
+          JSON.stringify(item.occasions),
+          JSON.stringify(item.styles || []),
+          item.purchaseDate,
+          item.price,
+          0,
+          null,
+          localDateString(),
+          item.wardrobeId ?? 1,
+        ]
+      );
+      return result.lastInsertRowId;
+    }
+  } catch (error) {
+    console.warn('[ClothingDB] saveClothingDraft failed:', error);
+    throw error;
+  }
+}
+
+export async function publishDraft(id: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.runAsync(
+      'UPDATE clothing_items SET isDraft = 0, deletedAt = NULL WHERE id = ? AND isDraft = 1',
+      [id]
+    );
+  } catch (error) {
+    console.warn('[ClothingDB] publishDraft failed:', error);
+  }
+}
+
+export async function deleteDraft(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM clothing_items WHERE id = ? AND isDraft = 1', [id]);
+}
+
+export async function publishAllDrafts(ids: number[]): Promise<void> {
+  const db = await getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  await db.runAsync(
+    `UPDATE clothing_items SET isDraft = 0 WHERE id IN (${placeholders}) AND isDraft = 1`,
+    ids
+  );
+}
+
+export async function deleteAllDrafts(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM clothing_items WHERE isDraft = 1');
 }

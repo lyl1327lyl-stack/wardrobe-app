@@ -20,7 +20,7 @@ import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
 
-type DetailSource = 'wardrobe' | 'trash' | 'sold';
+type DetailSource = 'wardrobe' | 'trash' | 'sold' | 'draft';
 type RouteParams = { ClothingDetail: { id: number; source?: DetailSource } };
 
 function getColorHex(colorName: string): string {
@@ -452,7 +452,7 @@ const makeStyles = (theme: Theme) =>
 export function ClothingDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ClothingDetail'>>();
-  const { getClothingByIdIncludingAll, wearClothing, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, trashClothing, soldClothing } = useWardrobeStore();
+  const { getClothingByIdIncludingAll, wearClothing, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, trashClothing, soldClothing, publishDraft } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -477,6 +477,7 @@ export function ClothingDetailScreen() {
 
   const isTrash = source === 'trash';
   const isSold = source === 'sold';
+  const isDraft = source === 'draft';
 
   if (!item) {
     return (
@@ -585,6 +586,29 @@ export function ClothingDetailScreen() {
       setItem(prev => prev ? { ...prev, discardReason: reason } : null);
     }
     setShowEditReason(false);
+  };
+
+  const handlePublish = async () => {
+    Alert.alert(
+      '确认发布',
+      '确定要将这件衣服发布到衣柜吗？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '发布',
+          onPress: async () => {
+            try {
+              await publishDraft(item.id);
+              Alert.alert('已发布到衣柜');
+              navigation.goBack();
+            } catch (e) {
+              console.error('发布失败:', e);
+              Alert.alert('发布失败，请重试');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const costPerWear = calcCostPerWear(item.price || 0, item.wearCount);
@@ -749,7 +773,19 @@ export function ClothingDetailScreen() {
 
       {/* 底栏 */}
       <View style={styles.bottomBar}>
-        {isTrash || isSold ? (
+        {isDraft ? (
+          <>
+            <TouchableOpacity style={styles.primaryAction} onPress={handlePublish} activeOpacity={0.8}>
+              <Ionicons name="cloud-upload-outline" size={20} color={theme.colors.white} />
+              <Text style={styles.primaryActionText}>发布到衣柜</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.iconAction} onPress={() => {
+              navigation.navigate('EditClothing', { id: item.id });
+            }} activeOpacity={0.7}>
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </>
+        ) : isTrash || isSold ? (
           <>
             <TouchableOpacity style={styles.restoreAction} onPress={handleRestore} activeOpacity={0.8}>
               <Ionicons name="refresh" size={20} color={theme.colors.white} />

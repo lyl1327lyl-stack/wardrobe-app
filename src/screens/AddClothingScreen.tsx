@@ -11,6 +11,7 @@ import {
   Alert,
   Platform,
   BackHandler,
+  Modal,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -24,7 +25,7 @@ import { useTheme } from '../hooks/useTheme';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { Theme } from '../utils/theme';
 
-type RouteParams = { EditClothing?: { id: number } };
+type RouteParams = { EditClothing?: { id: number; isDraft?: boolean; prefilledImageUri?: string } };
 
 // 父分类图标映射 - 更匹配的图标
 const PARENT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -102,9 +103,11 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     headerTitle: {
+      flex: 1,
       fontSize: 17,
       fontWeight: '600',
       color: theme.colors.text,
+      textAlign: 'left',
     },
     headerRight: {
       flexDirection: 'row',
@@ -157,6 +160,100 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'flex-end',
       alignItems: 'flex-end',
       padding: 12,
+    },
+    // 衣橱选择居中对话框
+    dialogOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    dialogBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    dialogCard: {
+      backgroundColor: theme.colors.card,
+      borderRadius: 16,
+      padding: 20,
+      width: '75%',
+      maxWidth: 300,
+    },
+    dialogTitle: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: theme.colors.text,
+      textAlign: 'center',
+      marginBottom: 6,
+    },
+    dialogSubtitle: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      textAlign: 'center',
+      marginBottom: 16,
+    },
+    dialogOptions: {
+      gap: 8,
+      marginBottom: 16,
+    },
+    dialogOption: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      backgroundColor: theme.colors.background,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    dialogOptionText: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    dialogOptionSelected: {
+      backgroundColor: `${theme.colors.primary}15`,
+      borderWidth: 1.5,
+      borderColor: theme.colors.primary,
+    },
+    dialogOptionTextSelected: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+    },
+    dialogConfirmText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
+    dialogConfirmTextDisabled: {
+      color: theme.colors.textTertiary,
+    },
+    dialogButtonRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginTop: 4,
+    },
+    dialogConfirmBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+    },
+    dialogConfirmBtnDisabled: {
+      backgroundColor: theme.colors.borderLight,
+    },
+    dialogCancelBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      backgroundColor: theme.colors.borderLight,
+      alignItems: 'center',
+    },
+    dialogCancelText: {
+      fontSize: 15,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
     },
     editBadge: {
       flexDirection: 'row',
@@ -508,7 +605,7 @@ const makeStyles = (theme: Theme) =>
 export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
-  const { addClothing, updateClothing, getClothingById, loadData, currentWardrobeId } = useWardrobeStore();
+  const { addClothing, updateClothing, getClothingByIdIncludingDrafts, loadData, currentWardrobeId, saveDraft, publishDraft, wardrobes } = useWardrobeStore();
   const wardrobeIsLoading = useWardrobeStore(state => state.isLoading);
   const { theme } = useTheme();
   const getParents = useCustomOptionsStore(state => state.getParents);
@@ -538,8 +635,9 @@ export function AddClothingScreen() {
   );
 
   const isEditing = !!(route.params?.id);
-  console.log('[EDIT] route.params:', route.params, 'isDataReady:', isDataReady);
-  const existingItem = isDataReady && isEditing ? getClothingById(route.params.id) : null;
+  const isEditingDraft = route.params?.isDraft === true;
+  console.log('[EDIT] route.params:', route.params, 'isDataReady:', isDataReady, 'isEditingDraft:', isEditingDraft);
+  const existingItem = isDataReady && isEditing ? getClothingByIdIncludingDrafts(route.params.id) : null;
   console.log('[EDIT] existingItem:', existingItem?.type, 'parentType:', existingItem?.parentType);
 
   const getInitialParent = (item: any): string => {
@@ -563,7 +661,7 @@ export function AddClothingScreen() {
     return '';
   };
 
-  const [imageUri, setImageUri] = useState(existingItem?.imageUri || '');
+  const [imageUri, setImageUri] = useState(isEditingDraft ? (route.params?.prefilledImageUri || '') : (existingItem?.imageUri || ''));
   const [selectedParent, setSelectedParent] = useState<string>(getInitialParent(existingItem));
   const [selectedChild, setSelectedChild] = useState<string>(getInitialChild(existingItem));
   const [color, setColor] = useState(existingItem?.color || '');
@@ -580,6 +678,8 @@ export function AddClothingScreen() {
   const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
+  const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
 
   // 当 existingItem 加载完成时，同步更新所有状态（包括分类）
   useEffect(() => {
@@ -758,6 +858,17 @@ export function AddClothingScreen() {
       if (seasons.length === 0) { Alert.alert('请至少选择一个季节'); return; }
     }
 
+    // 如果是编辑草稿并点击"创建"，先显示衣橱选择对话框
+    if (isEditingDraft && !asDraft) {
+      setIsSubmitting(true);
+      setShowWardrobeDialog(true);
+      return;
+    }
+
+    await performSave(asDraft, currentWardrobeId ?? 1);
+  };
+
+  const performSave = async (asDraft: boolean, wardrobeId: number) => {
     setIsSubmitting(true);
     try {
       let processedUri = imageUri;
@@ -777,7 +888,7 @@ export function AddClothingScreen() {
         color: asDraft && !color ? '' : color,
         brand,
         size,
-        seasons: asDraft && seasons.length === 0 ? (['春'] as string[]) : seasons,
+        seasons: seasons,
         occasions,
         purchaseDate: purchaseDate ? formatDate(purchaseDate) : '',
         price: parseFloat(price) || 0,
@@ -791,17 +902,26 @@ export function AddClothingScreen() {
         soldAt: existingItem?.soldAt || null,
         soldPrice: existingItem?.soldPrice || null,
         soldPlatform: existingItem?.soldPlatform || null,
-        wardrobeId: existingItem?.wardrobeId ?? currentWardrobeId ?? 1,
+        wardrobeId,
       };
-      console.log('[SAVE] selectedParent:', selectedParent, 'selectedChild:', selectedChild, '-> type:', clothingData.type, 'parentType:', clothingData.parentType);
+      console.log('[SAVE] selectedParent:', selectedParent, 'selectedChild:', selectedChild, '-> type:', clothingData.type, 'parentType:', clothingData.parentType, 'wardrobeId:', wardrobeId);
 
-      if (isEditing && existingItem) {
+      if (isEditingDraft && !asDraft) {
+        // 编辑草稿并点击"创建"：先更新草稿，再发布
         await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);
+        await publishDraft(existingItem!.id);
+        // 返回主界面（Main是Tab导航器）
+        navigation.navigate('Main');
+      } else if (isEditing && existingItem) {
+        await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);
+        navigation.goBack();
+      } else if (asDraft) {
+        await saveDraft({ ...clothingData, id: existingItem?.id } as any);
+        navigation.goBack();
       } else {
         await addClothing(clothingData as any);
+        navigation.goBack();
       }
-
-      navigation.goBack();
     } catch (error) {
       console.error('Failed to save clothing:', error);
       Alert.alert('保存失败，请重试');
@@ -819,15 +939,20 @@ export function AddClothingScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEditing ? '编辑衣服' : '添加衣服'}</Text>
+        <Text style={styles.headerTitle}>{isEditing ? (isEditingDraft ? '编辑草稿' : '编辑衣服') : '添加衣服'}</Text>
         <View style={styles.headerRight}>
+          {isEditingDraft && (
+            <TouchableOpacity style={styles.headerDraftBtn} onPress={() => doSave(true)} activeOpacity={0.7} disabled={isSubmitting}>
+              <Text style={styles.headerDraftBtnText}>存草稿</Text>
+            </TouchableOpacity>
+          )}
           {!isEditing && (
             <TouchableOpacity style={styles.headerDraftBtn} onPress={() => doSave(true)} activeOpacity={0.7} disabled={isSubmitting}>
               <Text style={styles.headerDraftBtnText}>存草稿</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity style={styles.headerSaveBtn} onPress={() => doSave(false)} activeOpacity={0.8} disabled={isSubmitting}>
-            <Text style={styles.headerSaveBtnText}>{isSubmitting ? '保存中...' : '保存'}</Text>
+            <Text style={styles.headerSaveBtnText}>{isSubmitting ? '保存中...' : (isEditingDraft ? '创建' : '保存')}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -1089,6 +1214,57 @@ export function AddClothingScreen() {
         onClose={() => setShowImagePicker(false)}
         onImageSelected={setImageUri}
       />
+
+      {/* 衣橱选择居中对话框 */}
+      <Modal visible={showWardrobeDialog} transparent animationType="fade" statusBarTranslucent>
+        <View style={styles.dialogOverlay}>
+          <TouchableOpacity style={styles.dialogBackdrop} activeOpacity={1} onPress={() => { setShowWardrobeDialog(false); setIsSubmitting(false); setPendingWardrobeId(null); }} />
+          <View style={styles.dialogCard}>
+            <Text style={styles.dialogTitle}>选择衣橱</Text>
+            <Text style={styles.dialogSubtitle}>将衣服添加到哪个衣橱？</Text>
+            <View style={styles.dialogOptions}>
+              {wardrobes.map((wardrobe: any) => {
+                const isSelected = pendingWardrobeId === wardrobe.id;
+                return (
+                  <TouchableOpacity
+                    key={wardrobe.id}
+                    style={[styles.dialogOption, isSelected && styles.dialogOptionSelected]}
+                    onPress={() => setPendingWardrobeId(wardrobe.id)}
+                  >
+                    <Text style={[styles.dialogOptionText, isSelected && styles.dialogOptionTextSelected]}>
+                      {wardrobe.name}
+                    </Text>
+                    {isSelected && (
+                      <Ionicons name="checkmark-circle" size={22} color={theme.colors.primary} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={styles.dialogButtonRow}>
+              <TouchableOpacity
+                style={[styles.dialogConfirmBtn, !pendingWardrobeId && styles.dialogConfirmBtnDisabled]}
+                onPress={() => {
+                  if (pendingWardrobeId) {
+                    setShowWardrobeDialog(false);
+                    performSave(false, pendingWardrobeId);
+                    setPendingWardrobeId(null);
+                  }
+                }}
+                disabled={!pendingWardrobeId}
+              >
+                <Text style={[styles.dialogConfirmText, !pendingWardrobeId && styles.dialogConfirmTextDisabled]}>确认创建</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dialogCancelBtn}
+                onPress={() => { setShowWardrobeDialog(false); setIsSubmitting(false); setPendingWardrobeId(null); }}
+              >
+                <Text style={styles.dialogCancelText}>取消</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

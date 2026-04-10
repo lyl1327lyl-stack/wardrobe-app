@@ -29,20 +29,27 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 16,
       paddingTop: 56,
       paddingBottom: 16,
+      backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
     },
     headerTitle: {
-      fontSize: 28,
+      fontSize: 18,
       fontWeight: '700',
       color: theme.colors.text,
-      letterSpacing: -0.5,
     },
-    headerSubtitle: {
+    headerCount: {
       fontSize: 14,
       color: theme.colors.textTertiary,
-      marginTop: 4,
     },
     list: {
       paddingHorizontal: 16,
+      paddingTop: 16,
       paddingBottom: 100,
       flexGrow: 1,
     },
@@ -316,6 +323,13 @@ export function OutfitsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* 统一顶栏 */}
+      <View style={styles.header}>
+        <View style={styles.headerTitleRow}>
+          <Text style={styles.headerTitle}>我的搭配</Text>
+          <Text style={styles.headerCount}>{outfits.length} 个搭配</Text>
+        </View>
+      </View>
       <FlatList
         data={outfits}
         keyExtractor={item => item.id.toString()}
@@ -323,12 +337,6 @@ export function OutfitsScreen() {
         numColumns={2}
         contentContainerStyle={styles.list}
         columnWrapperStyle={styles.row}
-        ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>我的搭配</Text>
-            <Text style={styles.headerSubtitle}>{outfits.length} 个搭配</Text>
-          </View>
-        }
         ListEmptyComponent={
           <View style={styles.empty}>
             <View style={styles.emptyIconWrap}>

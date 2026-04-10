@@ -47,57 +47,42 @@ const makeStyles = (theme: Theme) =>
       flex: 1,
       backgroundColor: theme.colors.background,
     },
+    // 统一顶栏
     header: {
-      paddingHorizontal: 20,
+      paddingHorizontal: 16,
       paddingTop: 56,
-      paddingBottom: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
+      paddingBottom: 12,
       backgroundColor: theme.colors.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
-    titleButton: {
+    headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
+      justifyContent: 'space-between',
     },
     headerTitle: {
-      fontSize: 28,
+      fontSize: 18,
       fontWeight: '700',
       color: theme.colors.text,
-      letterSpacing: -0.5,
     },
-    headerCount: {
-      fontSize: 14,
-      color: theme.colors.textTertiary,
-      fontWeight: '500',
-    },
-    headerRight: {
+    headerRightIcons: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 8,
-    },
-    headerActionBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
-      backgroundColor: theme.colors.background,
       gap: 4,
-      position: 'relative',
     },
-    headerActionText: {
-      fontSize: 13,
-      color: theme.colors.textSecondary,
-      fontWeight: '500',
+    headerIconBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
     },
-    headerBadge: {
+    draftBadge: {
       position: 'absolute',
-      top: -4,
-      right: -4,
+      top: 4,
+      right: 4,
       minWidth: 16,
       height: 16,
       borderRadius: 8,
@@ -106,18 +91,31 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
       paddingHorizontal: 4,
     },
-    headerBadgeText: {
+    draftBadgeText: {
       fontSize: 10,
       fontWeight: '700',
       color: theme.colors.white,
     },
-    settingsBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: theme.colors.background,
+    wardrobeSelector: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 8,
+    },
+    wardrobeCount: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.primary,
+    },
+    wardrobeCountLabel: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+    },
+    // 季节筛选条
+    filterSection: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      gap: 8,
     },
     scrollView: {
       flex: 1,
@@ -200,6 +198,56 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '600',
     },
     selectBadge: {
+      position: 'absolute',
+      top: 6,
+      right: 6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    // 网格视图样式 - 简洁版
+    gridContainer: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: 16,
+      gap: 10,
+    },
+    gridItemWrap: {
+      width: '31%',
+      aspectRatio: 1,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.card,
+      ...theme.shadows.sm,
+    },
+    gridItemSelected: {
+      borderWidth: 3,
+      borderColor: theme.colors.primary,
+    },
+    gridItemImage: {
+      width: '100%',
+      height: '100%',
+      backgroundColor: theme.colors.borderLight,
+    },
+    // 网格视图价格标签 - 只在右下角显示价格
+    gridPriceBadge: {
+      position: 'absolute',
+      bottom: 6,
+      right: 6,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    gridPriceText: {
+      fontSize: 10,
+      color: theme.colors.white,
+      fontWeight: '600',
+    },
+    gridSelectBadge: {
       position: 'absolute',
       top: 6,
       right: 6,
@@ -338,12 +386,6 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.white,
     },
     // Season filter styles
-    seasonFilterBar: {
-      flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      gap: 8,
-    },
     seasonPill: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -454,7 +496,9 @@ export function WardrobeScreen() {
     clothing,
     trashClothing,
     soldClothing,
+    draftClothing,
     loadData,
+    loadDrafts,
     moveMultipleToTrash,
     sellMultipleClothing,
     moveMultipleClothingToWardrobe,
@@ -473,6 +517,7 @@ export function WardrobeScreen() {
 
   const [selectedSeasons, setSelectedSeasons] = useState<('全部' | Season)[]>(['全部']);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   // 批量选择状态
   const [isSelecting, setIsSelecting] = useState(false);
@@ -485,12 +530,14 @@ export function WardrobeScreen() {
     loadData();
     load();
     loadWardrobes();
+    loadDrafts();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
       loadWardrobes();
+      loadDrafts();
     }, [])
   );
 
@@ -627,42 +674,63 @@ export function WardrobeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 顶部标题栏 */}
+      {/* 统一顶栏 */}
       <View style={styles.header}>
         {isSelecting ? (
-          <>
-            <TouchableOpacity style={styles.titleButton} onPress={cancelSelection} activeOpacity={0.7}>
-              <Ionicons name="close" size={24} color={theme.colors.text} />
-              <Text style={styles.headerTitle}>取消</Text>
+          <View style={styles.headerRow}>
+            <TouchableOpacity style={styles.wardrobeSelector} onPress={cancelSelection} activeOpacity={0.7}>
+              <Ionicons name="close" size={22} color={theme.colors.text} />
+              <Text style={[styles.headerTitle, { fontSize: 17 }]}>取消选择</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={selectAll} activeOpacity={0.7}>
-              <Text style={[styles.headerCount, { color: theme.colors.primary }]}>
+              <Text style={[styles.wardrobeCount, { fontSize: 15, color: theme.colors.primary }]}>
                 {selectedIds.length === filteredClothing.length ? '取消全选' : '全选'}
               </Text>
             </TouchableOpacity>
-          </>
+          </View>
         ) : (
-          <>
+          <View style={styles.headerRow}>
+            {/* 左侧：衣橱选择器 */}
             <TouchableOpacity
-              style={styles.titleButton}
+              style={styles.wardrobeSelector}
               onPress={() => setShowWardrobePicker(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.headerTitle}>
-                {currentWardrobe ? `${currentWardrobe.icon} ${currentWardrobe.name}` : '我的衣橱'}
-              </Text>
-              <Text style={styles.headerCount}>{filteredClothing.length} 件</Text>
-              <Ionicons name="chevron-down" size={22} color={theme.colors.text} />
+              <Text style={styles.headerTitle}>{currentWardrobe?.name || '我的衣橱'}</Text>
+              <Ionicons name="chevron-down" size={18} color={theme.colors.textTertiary} />
             </TouchableOpacity>
-            <View style={styles.headerRight}>
-              {/* 占位，保持右侧空间 */}
+            {/* 右侧：视图切换 + 草稿箱 */}
+            <View style={styles.headerRightIcons}>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={viewMode === 'list' ? 'grid-outline' : 'list-outline'}
+                  size={22}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => navigation.navigate('Drafts')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="document-text-outline" size={22} color={theme.colors.warning} />
+                {draftClothing.length > 0 && (
+                  <View style={styles.draftBadge}>
+                    <Text style={styles.draftBadgeText}>{draftClothing.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
             </View>
-          </>
+          </View>
         )}
       </View>
 
       {/* 季节筛选按钮 */}
-      <View style={styles.seasonFilterBar}>
+      <View style={styles.filterSection}>
         {SEASON_OPTIONS.map((season) => {
           const isSelected = selectedSeasons.includes(season);
           const iconConfig = SEASON_ICONS[season];
@@ -712,7 +780,48 @@ export function WardrobeScreen() {
             {selectedSeasons.includes('全部') || selectedSeasons.length === 0 ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
           </Text>
         </View>
+      ) : viewMode === 'grid' ? (
+        /* 网格视图 */
+        <ScrollView
+          style={styles.scrollView}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
+        >
+          <View style={styles.gridContainer}>
+            {filteredClothing.map(item => {
+              const itemId = getItemId(item);
+              const isSelected = selectedIds.includes(itemId);
+              const imageUri = item.thumbnailUri || item.imageUri;
+              return (
+                <TouchableOpacity
+                  key={`grid-${itemId}`}
+                  style={[styles.gridItemWrap, isSelecting && isSelected && styles.gridItemSelected]}
+                  onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
+                  onLongPress={() => handleLongPress(itemId)}
+                  activeOpacity={0.85}
+                >
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.gridItemImage}
+                    resizeMode="cover"
+                  />
+                  {isSelecting && isSelected && (
+                    <View style={styles.gridSelectBadge}>
+                      <Ionicons name="checkmark" size={14} color={theme.colors.white} />
+                    </View>
+                  )}
+                  {!isSelecting && item.price > 0 && (
+                    <View style={styles.gridPriceBadge}>
+                      <Text style={styles.gridPriceText}>{item.price}元</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </ScrollView>
       ) : (
+        /* 列表视图 */
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
@@ -879,7 +988,6 @@ export function WardrobeScreen() {
                   }}
                   activeOpacity={0.7}
                 >
-                  <Text style={{ fontSize: 16 }}>{wardrobe.icon}</Text>
                   <Text style={[styles.pickerOptionText, isActive && styles.pickerOptionTextActive]}>
                     {wardrobe.name}
                   </Text>
@@ -897,7 +1005,7 @@ export function WardrobeScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
+              <Ionicons name="trash-outline" size={18} color={theme.colors.textTertiary} />
               <Text style={styles.pickerOptionText}>废衣篓</Text>
               {trashClothing.length > 0 && (
                 <View style={styles.pickerBadge}>
@@ -914,10 +1022,10 @@ export function WardrobeScreen() {
               }}
               activeOpacity={0.7}
             >
-              <Ionicons name="cash-outline" size={18} color="#4CAF50" />
+              <Ionicons name="cash-outline" size={18} color={theme.colors.textTertiary} />
               <Text style={styles.pickerOptionText}>已卖出</Text>
               {soldClothing.length > 0 && (
-                <View style={[styles.pickerBadge, { backgroundColor: '#4CAF50' }]}>
+                <View style={[styles.pickerBadge, { backgroundColor: theme.colors.primary }]}>
                   <Text style={styles.pickerBadgeText}>{soldClothing.length}</Text>
                 </View>
               )}
@@ -954,16 +1062,6 @@ export function WardrobeScreen() {
           <View style={styles.batchButtonsRow}>
             <TouchableOpacity
               style={[styles.batchBtn, styles.batchBtnSecondary]}
-              onPress={handleBatchTrash}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.batchBtnIconWrap, styles.batchBtnSecondaryIcon]}>
-                <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
-              </View>
-              <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>废衣篓</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.batchBtn, styles.batchBtnSecondary]}
               onPress={() => setShowMoveSheet(true)}
               activeOpacity={0.8}
             >
@@ -971,6 +1069,16 @@ export function WardrobeScreen() {
                 <Ionicons name="swap-horizontal-outline" size={18} color={theme.colors.primary} />
               </View>
               <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>移动</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchBtn, styles.batchBtnSecondary]}
+              onPress={handleBatchTrash}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.batchBtnIconWrap, styles.batchBtnSecondaryIcon]}>
+                <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>废衣篓</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.batchBtn, styles.batchBtnSuccess]}

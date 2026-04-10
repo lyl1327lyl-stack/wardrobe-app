@@ -46,6 +46,8 @@ export interface ClothingItem {
   soldPlatform?: string | null;
   // 衣橱ID
   wardrobeId: number;
+  // 草稿箱
+  isDraft?: boolean;
 }
 
 export interface OutfitItemPosition {

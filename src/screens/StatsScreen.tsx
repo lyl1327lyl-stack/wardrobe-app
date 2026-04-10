@@ -24,13 +24,15 @@ const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
     header: {
-      paddingHorizontal: 20, paddingTop: 56, paddingBottom: 16,
+      paddingHorizontal: 16, paddingTop: 56, paddingBottom: 16,
       backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
     },
     headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     headerAccent: { width: 4, height: 24, borderRadius: 2, backgroundColor: theme.colors.primary, marginRight: 10 },
     titleRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-    title: { fontSize: 26, fontWeight: '700', color: theme.colors.text, letterSpacing: -0.5 },
+    title: { fontSize: 18, fontWeight: '700', color: theme.colors.text },
     headerIcon: {
       width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.background,
       justifyContent: 'center', alignItems: 'center',
@@ -397,13 +399,12 @@ export function StatsScreen() {
         <View style={styles.headerTop}>
           <View style={styles.titleRow}>
             <View style={styles.headerAccent} />
-            <Text style={styles.title}>穿衣统计</Text>
+            <Text style={styles.title}>衣橱统计</Text>
           </View>
           <View style={styles.headerIcon}>
             <Ionicons name="analytics-outline" size={20} color={theme.colors.primary} />
           </View>
         </View>
-        <Text style={styles.subtitle}>共 {stats.total} 件衣服，总价值 {formatCurrency(stats.totalValue)}</Text>
       </View>
 
       {/* 模块1: 筛选器 + 顶部4卡片 */}

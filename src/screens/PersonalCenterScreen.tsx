@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
 import { ThemeId, themes } from '../utils/theme';
+import { Theme } from '../utils/theme';
 import { OPTIONS_STORAGE_KEY } from '../utils/customOptions';
 import { useWardrobeStore } from '../store/wardrobeStore';
 
@@ -63,9 +64,107 @@ const MENU_ITEMS: MenuSection[] = [
   },
 ];
 
+const makeStyles = (theme: Theme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      paddingHorizontal: 16,
+      paddingTop: 56,
+      paddingBottom: 16,
+      backgroundColor: theme.colors.card,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    headerTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+      textAlign: 'center',
+    },
+    content: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingTop: 12,
+    },
+    section: {
+      marginHorizontal: 16,
+      borderRadius: 16,
+      padding: 16,
+      backgroundColor: theme.colors.card,
+    },
+    sectionTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
+      marginBottom: 14,
+    },
+    themeGrid: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    themeOption: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 8,
+      borderRadius: 12,
+      position: 'relative',
+    },
+    themeIconWrap: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+    },
+    themeLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    checkBadge: {
+      position: 'absolute',
+      top: 8,
+      right: 8,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 14,
+      gap: 12,
+    },
+    menuIconWrap: {
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    menuLabel: {
+      flex: 1,
+      fontSize: 15,
+    },
+    menuValue: {
+      fontSize: 14,
+    },
+    bottom: {
+      height: 40,
+    },
+  });
+
 export function PersonalCenterScreen() {
   const navigation = useNavigation();
   const { theme, themeId, setTheme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const handleThemeChange = async (newThemeId: ThemeId) => {
     if (newThemeId === themeId) return;
@@ -135,15 +234,19 @@ export function PersonalCenterScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <View style={styles.container}>
+      {/* 统一顶栏 */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>个人中心</Text>
+      </View>
       <ScrollView
         style={styles.content}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {/* Theme Selection */}
-        <View style={[styles.section, { backgroundColor: theme.colors.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>主题切换</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>主题切换</Text>
           <View style={styles.themeGrid}>
             {THEME_OPTIONS.map((option) => {
               const isSelected = themeId === option.id;
@@ -189,9 +292,9 @@ export function PersonalCenterScreen() {
         {MENU_ITEMS.map((section, sectionIndex) => (
           <View
             key={section.title}
-            style={[styles.section, { backgroundColor: theme.colors.card, marginTop: sectionIndex === 0 ? 12 : 12 }]}
+            style={[styles.section, { marginTop: 12 }]}
           >
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            <Text style={styles.sectionTitle}>
               {section.title}
             </Text>
             {section.items.map((item, itemIndex) => (
@@ -244,82 +347,3 @@ export function PersonalCenterScreen() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 60,
-  },
-  section: {
-    marginHorizontal: 16,
-    borderRadius: 16,
-    padding: 16,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginBottom: 14,
-  },
-  themeGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  themeOption: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    position: 'relative',
-  },
-  themeIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  themeLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  checkBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 14,
-    gap: 12,
-  },
-  menuIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  menuLabel: {
-    flex: 1,
-    fontSize: 15,
-  },
-  menuValue: {
-    fontSize: 14,
-  },
-  bottom: {
-    height: 40,
-  },
-});

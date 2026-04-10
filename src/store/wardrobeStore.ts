@@ -15,6 +15,7 @@ interface WardrobeState {
   clothing: ClothingItem[];
   trashClothing: ClothingItem[];
   soldClothing: ClothingItem[];
+  draftClothing: ClothingItem[];
   outfits: Outfit[];
   isLoading: boolean;
   filterType: ClothingType | '全部';
@@ -48,6 +49,7 @@ interface WardrobeState {
   getClothingById: (id: number) => ClothingItem | undefined;
   getClothingByIdIncludingTrash: (id: number) => ClothingItem | undefined;
   getClothingByIdIncludingAll: (id: number) => ClothingItem | undefined;
+  getClothingByIdIncludingDrafts: (id: number) => ClothingItem | undefined;
   getColorStats: () => Record<string, number>;
   // 推荐相关
   getRecentWornIds: (days: number) => number[];
@@ -64,10 +66,18 @@ interface WardrobeState {
   restoreMultipleFromSold: (ids: number[]) => Promise<void>;
   permanentDeleteMultiple: (ids: number[]) => Promise<void>;
 
+  // Actions - 草稿箱
+  loadDrafts: () => Promise<void>;
+  saveDraft: (item: Omit<ClothingItem, 'id'> & { id?: number }) => Promise<number>;
+  publishDraft: (id: number) => Promise<void>;
+  publishMultipleDrafts: (ids: number[]) => Promise<void>;
+  deleteDraft: (id: number) => Promise<void>;
+  deleteAllDrafts: () => Promise<void>;
+
   // Actions - 衣橱
   loadWardrobes: () => Promise<void>;
-  addWardrobe: (name: string, icon: string) => Promise<number>;
-  updateWardrobe: (id: number, name: string, icon: string) => Promise<void>;
+  addWardrobe: (name: string) => Promise<number>;
+  updateWardrobe: (id: number, name: string) => Promise<void>;
   deleteWardrobe: (id: number, action: 'move' | 'trash' | 'delete') => Promise<void>;
   setCurrentWardrobe: (id: number) => void;
   getCurrentWardrobe: () => Wardrobe | undefined;
@@ -81,6 +91,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   clothing: [],
   trashClothing: [],
   soldClothing: [],
+  draftClothing: [],
   outfits: [],
   isLoading: false,
   filterType: '全部',
@@ -96,13 +107,14 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   loadData: async () => {
     set({ isLoading: true });
     try {
-      const [clothing, trashClothing, soldClothing, outfits] = await Promise.all([
+      const [clothing, trashClothing, soldClothing, draftClothing, outfits] = await Promise.all([
         clothingDb.getAllClothing(),
         clothingDb.getTrashClothing(),
         clothingDb.getSoldClothing(),
+        clothingDb.getDraftClothing(),
         outfitDb.getAllOutfits(),
       ]);
-      set({ clothing, trashClothing, soldClothing, outfits, isLoading: false });
+      set({ clothing, trashClothing, soldClothing, draftClothing, outfits, isLoading: false });
     } catch (error) {
       console.error('Failed to load data:', error);
       set({ isLoading: false });
@@ -283,6 +295,14 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     );
   },
 
+  getClothingByIdIncludingDrafts: (id) => {
+    const state = get();
+    return (
+      state.clothing.find(c => c.id === id) ||
+      state.draftClothing.find(c => c.id === id)
+    );
+  },
+
   getColorStats: () => {
     const { clothing } = get();
     const stats: Record<string, number> = {};
@@ -434,6 +454,51 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     }));
   },
 
+  // ============ 草稿箱 Actions ============
+
+  loadDrafts: async () => {
+    try {
+      const draftClothing = await clothingDb.getDraftClothing();
+      set({ draftClothing });
+    } catch (error) {
+      console.error('[WardrobeStore] Failed to load drafts:', error);
+    }
+  },
+
+  saveDraft: async (item) => {
+    const id = await clothingDb.saveClothingDraft(item);
+    // 重新加载草稿箱
+    const draftClothing = await clothingDb.getDraftClothing();
+    set({ draftClothing });
+    return id;
+  },
+
+  publishDraft: async (id) => {
+    await clothingDb.publishDraft(id);
+    const draftClothing = await clothingDb.getDraftClothing();
+    const clothing = await clothingDb.getAllClothing();
+    set({ draftClothing, clothing });
+  },
+
+  publishMultipleDrafts: async (ids) => {
+    await clothingDb.publishAllDrafts(ids);
+    const draftClothing = await clothingDb.getDraftClothing();
+    const clothing = await clothingDb.getAllClothing();
+    set({ draftClothing, clothing });
+  },
+
+  deleteDraft: async (id) => {
+    await clothingDb.deleteDraft(id);
+    set(state => ({
+      draftClothing: state.draftClothing.filter(c => c.id !== id),
+    }));
+  },
+
+  deleteAllDrafts: async () => {
+    await clothingDb.deleteAllDrafts();
+    set({ draftClothing: [] });
+  },
+
   // ============ 衣橱 Actions ============
 
   loadWardrobes: async () => {
@@ -454,12 +519,12 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     }
   },
 
-  addWardrobe: async (name, icon) => {
-    const id = await wardrobeDb.addWardrobe(name, icon);
+  addWardrobe: async (name) => {
+    const id = await wardrobeDb.addWardrobe(name);
     const newWardrobe: Wardrobe = {
       id,
       name,
-      icon,
+      icon: '',
       isDefault: false,
       createdAt: new Date().toISOString().split('T')[0],
     };
@@ -467,11 +532,11 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     return id;
   },
 
-  updateWardrobe: async (id, name, icon) => {
-    await wardrobeDb.updateWardrobe(id, name, icon);
+  updateWardrobe: async (id, name) => {
+    await wardrobeDb.updateWardrobe(id, name);
     set(state => ({
       wardrobes: state.wardrobes.map(w =>
-        w.id === id ? { ...w, name, icon } : w
+        w.id === id ? { ...w, name } : w
       ),
     }));
   },

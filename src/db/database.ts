@@ -101,6 +101,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   await addColumnIfNotExists('clothing_items', 'parentType', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
   await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
+  await addColumnIfNotExists('clothing_items', 'isDraft', 'INTEGER NOT NULL DEFAULT 0');
 
   // 确保 wardrobes 表存在
   await ensureWardrobesTable(dbInstance!);
@@ -146,7 +147,7 @@ async function ensureDefaultWardrobe(db: SQLite.SQLiteDatabase): Promise<void> {
   if (!result || result.count === 0) {
     await db.runAsync(
       'INSERT INTO wardrobes (name, icon, isDefault, createdAt) VALUES (?, ?, ?, ?)',
-      ['我的衣橱', '👗', 1, localDateString()]
+      ['我的衣橱', 'grid-outline', 1, localDateString()]
     );
   }
 }

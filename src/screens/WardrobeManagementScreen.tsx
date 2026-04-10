@@ -61,12 +61,12 @@ export function WardrobeManagementScreen() {
     setDeleteSheetVisible(true);
   };
 
-  const handleSave = async (name: string, icon: string) => {
+  const handleSave = async (name: string) => {
     try {
       if (selectedWardrobe) {
-        await updateWardrobe(selectedWardrobe.id, name, icon);
+        await updateWardrobe(selectedWardrobe.id, name);
       } else {
-        await addWardrobe(name, icon);
+        await addWardrobe(name);
       }
     } catch (error) {
       Alert.alert('保存失败', '请重试');
@@ -86,7 +86,6 @@ export function WardrobeManagementScreen() {
   const renderItem = ({ item }: { item: Wardrobe }) => (
     <View style={styles.itemCard}>
       <View style={styles.itemInfo}>
-        <Text style={styles.itemIcon}>{item.icon}</Text>
         <View style={styles.itemText}>
           <Text style={styles.itemName}>{item.name}</Text>
           {item.isDefault && (
@@ -215,10 +214,6 @@ const useMemoStyles = (theme: any) => {
           flexDirection: 'row',
           alignItems: 'center',
           flex: 1,
-        },
-        itemIcon: {
-          fontSize: 32,
-          marginRight: 12,
         },
         itemText: {
           flexDirection: 'row',
