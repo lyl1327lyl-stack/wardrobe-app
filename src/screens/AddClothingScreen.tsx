@@ -13,7 +13,6 @@ import {
   BackHandler,
   Modal,
   KeyboardAvoidingView,
-  Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -999,18 +998,6 @@ export function AddClothingScreen() {
           )}
         </TouchableOpacity>
 
-        {/* 自动抠图开关 */}
-        <View style={styles.bgRemovalRow}>
-          <Ionicons name="cut-outline" size={18} color={theme.colors.textSecondary} />
-          <Text style={styles.bgRemovalText}>自动抠图</Text>
-          <Switch
-            value={removeBackground}
-            onValueChange={setRemoveBackground}
-            trackColor={{ false: theme.colors.border, true: theme.colors.primary + '80' }}
-            thumbColor={removeBackground ? theme.colors.primary : theme.colors.borderLight}
-          />
-        </View>
-
         <View style={styles.section}>
           {/* Card 1: 基本信息 */}
           <View style={styles.formCard}>
@@ -1244,6 +1231,8 @@ export function AddClothingScreen() {
         visible={showImagePicker}
         onClose={() => setShowImagePicker(false)}
         onImageSelected={setImageUri}
+        removeBackground={removeBackground}
+        onRemoveBackgroundChange={setRemoveBackground}
       />
 
       {/* 衣橱选择居中对话框 */}

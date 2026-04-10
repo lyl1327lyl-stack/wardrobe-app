@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Image } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, Switch } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { pickImage, takePhoto } from '../utils/imageUtils';
 import { useTheme } from '../hooks/useTheme';
@@ -9,6 +9,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onImageSelected: (uri: string) => void;
+  removeBackground?: boolean;
+  onRemoveBackgroundChange?: (value: boolean) => void;
 }
 
 type Step = 'select' | 'preview';
@@ -152,9 +154,20 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '600',
       color: theme.colors.white,
     },
+    bgRemovalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      gap: 8,
+    },
+    bgRemovalText: {
+      fontSize: 13,
+      color: 'rgba(255,255,255,0.7)',
+    },
   });
 
-export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
+export function ImagePickerModal({ visible, onClose, onImageSelected, removeBackground = true, onRemoveBackgroundChange }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [step, setStep] = useState<Step>('select');
@@ -252,6 +265,16 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
               <Ionicons name="cloud-upload" size={18} color={theme.colors.white} />
               <Text style={styles.previewConfirmBtnText}>确认上传</Text>
             </TouchableOpacity>
+          </View>
+          <View style={styles.bgRemovalRow}>
+            <Ionicons name="cut-outline" size={16} color="rgba(255,255,255,0.7)" />
+            <Text style={styles.bgRemovalText}>自动抠图</Text>
+            <Switch
+              value={removeBackground}
+              onValueChange={onRemoveBackgroundChange}
+              trackColor={{ false: 'rgba(255,255,255,0.3)', true: theme.colors.primary + '80' }}
+              thumbColor={removeBackground ? theme.colors.primary : 'rgba(255,255,255,0.5)'}
+            />
           </View>
         </View>
       )}
