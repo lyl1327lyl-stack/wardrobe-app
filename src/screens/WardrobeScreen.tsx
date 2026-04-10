@@ -322,6 +322,47 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.primary,
       fontWeight: '600',
     },
+    pickerBadge: {
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: theme.colors.warning,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+    },
+    pickerBadgeText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.colors.white,
+    },
+    // Season filter styles
+    seasonFilterBar: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      gap: 8,
+    },
+    seasonPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      backgroundColor: theme.colors.card,
+      gap: 6,
+    },
+    seasonPillActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    seasonPillText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+    },
+    seasonPillTextActive: {
+      color: theme.colors.white,
+    },
     batchActionBar: {
       position: 'absolute',
       bottom: 0,
@@ -416,8 +457,8 @@ export function WardrobeScreen() {
   const load = useCustomOptionsStore(state => state.load);
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
-  const [showSeasonPicker, setShowSeasonPicker] = useState(false);
+  const [selectedSeasons, setSelectedSeasons] = useState<('全部' | Season)[]>(['全部']);
+  const [showWardrobePicker, setShowWardrobePicker] = useState(false);
 
   // 批量选择状态
   const [isSelecting, setIsSelecting] = useState(false);
@@ -441,21 +482,25 @@ export function WardrobeScreen() {
   };
 
   const handleViewAll = (parent: string) => {
-    navigation.navigate('CategoryDetail', { type: parent, season: selectedSeason });
+    const season = selectedSeasons.includes('全部') ? '全部' : selectedSeasons[0];
+    navigation.navigate('CategoryDetail', { type: parent, season });
   };
 
   const getItemId = (item: ClothingItem) => Number(item.id);
 
   const getTitle = () => {
-    if (selectedSeason === '全部') return '我的衣橱';
-    return `${selectedSeason}季衣橱`;
+    if (selectedSeasons.includes('全部') || selectedSeasons.length === 0) return '我的衣橱';
+    if (selectedSeasons.length === 1) return `${selectedSeasons[0]}季衣橱`;
+    return `${selectedSeasons.length}个季节`;
   };
 
   // 使用 useMemo 确保稳定的数组引用
   const filteredClothing = useMemo(() => {
-    if (selectedSeason === '全部') return clothing;
-    return clothing.filter(item => item.seasons.includes(selectedSeason as Season));
-  }, [selectedSeason, clothing]);
+    if (selectedSeasons.includes('全部') || selectedSeasons.length === 0) return clothing;
+    return clothing.filter(item =>
+      item.seasons.some(season => selectedSeasons.includes(season))
+    );
+  }, [selectedSeasons, clothing]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -568,7 +613,7 @@ export function WardrobeScreen() {
           <>
             <TouchableOpacity
               style={styles.titleButton}
-              onPress={() => setShowSeasonPicker(true)}
+              onPress={() => setShowWardrobePicker(true)}
               activeOpacity={0.7}
             >
               <Text style={styles.headerTitle}>{getTitle()}</Text>
@@ -576,33 +621,48 @@ export function WardrobeScreen() {
               <Ionicons name="chevron-down" size={22} color={theme.colors.text} />
             </TouchableOpacity>
             <View style={styles.headerRight}>
-              <TouchableOpacity
-                style={styles.headerActionBtn}
-                onPress={() => navigation.navigate('Trash')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.headerActionText}>废衣篓</Text>
-                {trashClothing.length > 0 && (
-                  <View style={styles.headerBadge}>
-                    <Text style={styles.headerBadgeText}>{trashClothing.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerActionBtn}
-                onPress={() => navigation.navigate('SoldItems')}
-                activeOpacity={0.7}
-              >
-                <Text style={styles.headerActionText}>已卖出</Text>
-                {soldClothing.length > 0 && (
-                  <View style={[styles.headerBadge, { backgroundColor: '#4CAF50' }]}>
-                    <Text style={styles.headerBadgeText}>{soldClothing.length}</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+              {/* 占位，保持右侧空间 */}
             </View>
           </>
         )}
+      </View>
+
+      {/* 季节筛选按钮 */}
+      <View style={styles.seasonFilterBar}>
+        {SEASON_OPTIONS.map((season) => {
+          const isSelected = selectedSeasons.includes(season);
+          const iconConfig = SEASON_ICONS[season];
+          const handlePress = () => {
+            if (season === '全部') {
+              setSelectedSeasons(['全部']);
+            } else {
+              const newSeasons = selectedSeasons.filter(s => s !== '全部');
+              if (isSelected) {
+                const filtered = newSeasons.filter(s => s !== season);
+                setSelectedSeasons(filtered.length === 0 ? ['全部'] : filtered);
+              } else {
+                setSelectedSeasons([...newSeasons, season]);
+              }
+            }
+          };
+          return (
+            <TouchableOpacity
+              key={season}
+              style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
+              onPress={handlePress}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={iconConfig.name}
+                size={14}
+                color={isSelected ? theme.colors.white : theme.colors.textTertiary}
+              />
+              <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
+                {season === '全部' ? '全部' : season}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* 内容区域 */}
@@ -612,10 +672,10 @@ export function WardrobeScreen() {
             <Ionicons name="shirt-outline" size={56} color={theme.colors.border} />
           </View>
           <Text style={styles.emptyTitle}>
-            {selectedSeason === '全部' ? '还没有添加衣服' : `暂无${selectedSeason}季衣物`}
+            {selectedSeasons.includes('全部') || selectedSeasons.length === 0 ? '还没有添加衣服' : `暂无${selectedSeasons[0]}季衣物`}
           </Text>
           <Text style={styles.emptySubtext}>
-            {selectedSeason === '全部' ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
+            {selectedSeasons.includes('全部') || selectedSeasons.length === 0 ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
           </Text>
         </View>
       ) : (
@@ -762,47 +822,61 @@ export function WardrobeScreen() {
         <Ionicons name="add" size={28} color={theme.colors.white} />
       </TouchableOpacity>
 
-      {/* 季节选择 */}
-      {showSeasonPicker && (
+      {/* 衣橱下拉 */}
+      {showWardrobePicker && (
         <View style={styles.pickerContainer}>
           <TouchableOpacity
             style={styles.pickerBackdrop}
             activeOpacity={1}
-            onPress={() => setShowSeasonPicker(false)}
+            onPress={() => setShowWardrobePicker(false)}
           />
           <View style={styles.pickerDropdown}>
             <View style={styles.pickerDropdownArrow} />
-            {seasonOptions.map((season, index) => {
-              const isSelected = selectedSeason === season;
-              const iconConfig = SEASON_ICONS[season];
-              return (
-                <View key={season}>
-                  {index > 0 && <View style={styles.pickerDivider} />}
-                  <TouchableOpacity
-                    style={[styles.pickerOption, isSelected && styles.pickerOptionActive]}
-                    onPress={() => {
-                      setSelectedSeason(season);
-                      setShowSeasonPicker(false);
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.pickerIconWrap, isSelected && { backgroundColor: `${iconConfig.color}20` }]}>
-                      <Ionicons
-                        name={iconConfig.name}
-                        size={18}
-                        color={isSelected ? iconConfig.color : theme.colors.textTertiary}
-                      />
-                    </View>
-                    <Text style={[styles.pickerOptionText, isSelected && styles.pickerOptionTextActive]}>
-                      {season === '全部' ? '全部季节' : `${season}季`}
-                    </Text>
-                    {isSelected && (
-                      <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
-                    )}
-                  </TouchableOpacity>
+            {/* 衣橱选项 */}
+            <TouchableOpacity
+              style={[styles.pickerOption, styles.pickerOptionActive]}
+              onPress={() => setShowWardrobePicker(false)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="shirt-outline" size={18} color={theme.colors.primary} />
+              <Text style={[styles.pickerOptionText, styles.pickerOptionTextActive]}>我的衣橱</Text>
+              <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+            <View style={styles.pickerDivider} />
+            {/* 废衣篓 */}
+            <TouchableOpacity
+              style={styles.pickerOption}
+              onPress={() => {
+                setShowWardrobePicker(false);
+                navigation.navigate('Trash');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
+              <Text style={styles.pickerOptionText}>废衣篓</Text>
+              {trashClothing.length > 0 && (
+                <View style={styles.pickerBadge}>
+                  <Text style={styles.pickerBadgeText}>{trashClothing.length}</Text>
                 </View>
-              );
-            })}
+              )}
+            </TouchableOpacity>
+            {/* 已卖出 */}
+            <TouchableOpacity
+              style={styles.pickerOption}
+              onPress={() => {
+                setShowWardrobePicker(false);
+                navigation.navigate('SoldItems');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="cash-outline" size={18} color="#4CAF50" />
+              <Text style={styles.pickerOptionText}>已卖出</Text>
+              {soldClothing.length > 0 && (
+                <View style={[styles.pickerBadge, { backgroundColor: '#4CAF50' }]}>
+                  <Text style={styles.pickerBadgeText}>{soldClothing.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       )}

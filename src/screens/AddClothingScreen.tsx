@@ -1,4 +1,5 @@
 import React, { useState, useLayoutEffect, useCallback, useRef, useEffect, useMemo } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -49,24 +50,30 @@ function getColorHex(colorName: string): string {
   return COLOR_MAP[colorName] || '#9CA3AF';
 }
 
-function formatDate(date: Date): string {
+function formatDate(date: Date | null): string {
+  if (!date || isNaN(date.getTime())) return '';
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
 function hasUnsavedChanges(initial: any, current: any): boolean {
-  return (
-    initial.imageUri !== current.imageUri ||
-    initial.type !== current.type ||
-    initial.color !== current.color ||
-    initial.brand !== current.brand ||
-    initial.size !== current.size ||
-    JSON.stringify(initial.seasons) !== JSON.stringify(current.seasons) ||
-    JSON.stringify(initial.occasions) !== JSON.stringify(current.occasions) ||
-    JSON.stringify(initial.clothingStyles) !== JSON.stringify(current.clothingStyles) ||
-    initial.purchaseDate !== current.purchaseDate ||
-    initial.price !== current.price ||
-    initial.remarks !== current.remarks
-  );
+  const changes = {
+    imageUri: initial.imageUri !== current.imageUri,
+    type: initial.type !== current.type,
+    color: initial.color !== current.color,
+    brand: initial.brand !== current.brand,
+    size: initial.size !== current.size,
+    seasons: JSON.stringify(initial.seasons) !== JSON.stringify(current.seasons),
+    occasions: JSON.stringify(initial.occasions) !== JSON.stringify(current.occasions),
+    clothingStyles: JSON.stringify(initial.clothingStyles) !== JSON.stringify(current.clothingStyles),
+    purchaseDate: initial.purchaseDate !== current.purchaseDate,
+    price: initial.price !== current.price,
+    remarks: initial.remarks !== current.remarks,
+  };
+  const hasAnyChange = Object.values(changes).some(v => v);
+  if (hasAnyChange) {
+    console.log('[hasUnsavedChanges] DETAIL:', JSON.stringify(changes));
+  }
+  return hasAnyChange;
 }
 
 // Create styles dynamically based on theme
@@ -504,10 +511,8 @@ export function AddClothingScreen() {
   const { addClothing, updateClothing, getClothingById, loadData } = useWardrobeStore();
   const wardrobeIsLoading = useWardrobeStore(state => state.isLoading);
   const { theme } = useTheme();
-  const categories = useCustomOptionsStore(state => state.categories);
   const getParents = useCustomOptionsStore(state => state.getParents);
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
-  const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
   const customSeasons = useCustomOptionsStore(state => state.seasons);
   const customOccasions = useCustomOptionsStore(state => state.occasions);
   const customStyles = useCustomOptionsStore(state => state.styles);
@@ -524,6 +529,13 @@ export function AddClothingScreen() {
     load();
     loadData();
   }, []);
+
+  // 从 CustomOptions 返回时重置 skipUnsavedCheck
+  useFocusEffect(
+    useCallback(() => {
+      skipUnsavedCheck.current = false;
+    }, [])
+  );
 
   const isEditing = !!(route.params?.id);
   console.log('[EDIT] route.params:', route.params, 'isDataReady:', isDataReady);
@@ -564,12 +576,12 @@ export function AddClothingScreen() {
     existingItem?.purchaseDate ? new Date(existingItem.purchaseDate) : null
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [price, setPrice] = useState(existingItem?.price ? String(existingItem.price) : '');
+  const [price, setPrice] = useState(existingItem?.price != null ? String(existingItem.price) : '');
   const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
   const [showImagePicker, setShowImagePicker] = useState(false);
 
-  // 当 existingItem 加载完成时，同步更新所有状态
+  // 当 existingItem 加载完成时，同步更新所有状态（包括分类）
   useEffect(() => {
     if (existingItem) {
       setImageUri(existingItem.imageUri || '');
@@ -580,17 +592,13 @@ export function AddClothingScreen() {
       setOccasions(existingItem.occasions || []);
       setClothingStyles(existingItem.styles || []);
       setPurchaseDate(existingItem.purchaseDate ? new Date(existingItem.purchaseDate) : null);
-      setPrice(existingItem.price ? String(existingItem.price) : '');
+      setPrice(existingItem.price != null ? String(existingItem.price) : '');
       setWearCount(existingItem.wearCount ?? 0);
       setRemarks(existingItem.remarks || '');
-    }
-  }, [existingItem]);
-
-  // 同步分类状态
-  useEffect(() => {
-    if (existingItem) {
+      // 同步分类状态
       const newParent = getInitialParent(existingItem);
       const newChild = getInitialChild(existingItem);
+      console.log('[EDIT useEffect] existingItem.type:', existingItem.type, 'existingItem.parentType:', existingItem.parentType);
       console.log('[EDIT useEffect] setParent:', newParent, 'setChild:', newChild);
       setSelectedParent(newParent);
       setSelectedChild(newChild);
@@ -604,33 +612,6 @@ export function AddClothingScreen() {
     }
   }, [isEditing]);
 
-  // 当 categories 加载完成且编辑模式有 id 时，初始化父分类
-  useEffect(() => {
-    if (!customIsLoading && route.params?.id && categories) {
-      // 从 store 获取最新数据
-      const item = getClothingById(route.params.id);
-      if (item) {
-        const type = item.type;
-        // 直接从 categories 状态查找父分类
-        let foundParent: string | undefined;
-        for (const [parent, children] of Object.entries(categories)) {
-          if (children.includes(type)) {
-            foundParent = parent;
-            break;
-          }
-        }
-        // 如果找不到，检查 type 是否本身就是父分类
-        if (!foundParent && type) {
-          const allParents = Object.keys(categories);
-          if (allParents.includes(type)) {
-            foundParent = type;
-          }
-        }
-        setSelectedParent(foundParent || '');
-        setSelectedChild(foundParent && foundParent !== type ? type : '');
-      }
-    }
-  }, [customIsLoading, route.params?.id, categories, getClothingById]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 初始状态快照，用于检测未保存更改
@@ -666,6 +647,7 @@ export function AddClothingScreen() {
         remarks: existingItem.remarks || '',
       };
       setIsInitialStateReady(true);
+      console.log('[initialState effect] setIsInitialStateReady true, initialState.type:', existingItem.type);
     }
   }, [isDataReady, existingItem]);
 
@@ -678,6 +660,7 @@ export function AddClothingScreen() {
   };
 
   const hasChanges = isInitialStateReady && hasUnsavedChanges(initialState.current, currentState);
+  console.log('[hasChanges] isInitialStateReady:', isInitialStateReady, 'current.type:', currentState.type, 'initial.type:', initialState.current.type, 'hasChanges:', hasChanges);
 
   // 隐藏父级 TabBar
   useLayoutEffect(() => {
@@ -694,6 +677,7 @@ export function AddClothingScreen() {
 
   // 返回按钮 - 检测未保存更改
   const handleBack = useCallback(() => {
+    console.log('[handleBack] called, skipUnsavedCheck:', skipUnsavedCheck.current, 'hasChanges:', hasChanges);
     // 如果是导航到选项管理页面后返回，跳过未保存检查
     if (skipUnsavedCheck.current) {
       skipUnsavedCheck.current = false;
