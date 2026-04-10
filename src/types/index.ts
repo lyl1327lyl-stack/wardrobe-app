@@ -1,3 +1,12 @@
+// 衣橱接口
+export interface Wardrobe {
+  id: number;
+  name: string;
+  icon: string;
+  isDefault: boolean;
+  createdAt: string;
+}
+
 // 类型别名 - 使用字符串，用户可自定义
 export type ClothingType = string;
 export type Season = string;
@@ -35,6 +44,8 @@ export interface ClothingItem {
   soldAt?: string | null;
   soldPrice?: number | null;
   soldPlatform?: string | null;
+  // 衣橱ID
+  wardrobeId: number;
 }
 
 export interface OutfitItemPosition {

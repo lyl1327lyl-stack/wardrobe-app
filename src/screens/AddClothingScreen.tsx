@@ -508,7 +508,7 @@ const makeStyles = (theme: Theme) =>
 export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
-  const { addClothing, updateClothing, getClothingById, loadData } = useWardrobeStore();
+  const { addClothing, updateClothing, getClothingById, loadData, currentWardrobeId } = useWardrobeStore();
   const wardrobeIsLoading = useWardrobeStore(state => state.isLoading);
   const { theme } = useTheme();
   const getParents = useCustomOptionsStore(state => state.getParents);
@@ -791,6 +791,7 @@ export function AddClothingScreen() {
         soldAt: existingItem?.soldAt || null,
         soldPrice: existingItem?.soldPrice || null,
         soldPlatform: existingItem?.soldPlatform || null,
+        wardrobeId: existingItem?.wardrobeId ?? currentWardrobeId ?? 1,
       };
       console.log('[SAVE] selectedParent:', selectedParent, 'selectedChild:', selectedChild, '-> type:', clothingData.type, 'parentType:', clothingData.parentType);
 

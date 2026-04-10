@@ -44,8 +44,8 @@ export async function getClothingById(id: number): Promise<ClothingItem | null> 
 export async function addClothing(item: Omit<ClothingItem, 'id'>): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    `INSERT INTO clothing_items (imageUri, thumbnailUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO clothing_items (imageUri, thumbnailUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       item.imageUri,
       item.thumbnailUri,
@@ -63,6 +63,7 @@ export async function addClothing(item: Omit<ClothingItem, 'id'>): Promise<numbe
       item.wearCount,
       item.lastWornAt,
       item.createdAt,
+      item.wardrobeId ?? 1,
     ]
   );
   return result.lastInsertRowId;
@@ -74,7 +75,7 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
     `UPDATE clothing_items SET
       imageUri = ?, thumbnailUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
       seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wearCount = ?, lastWornAt = ?,
-      soldAt = ?, soldPrice = ?, soldPlatform = ?
+      soldAt = ?, soldPrice = ?, soldPlatform = ?, wardrobeId = ?
      WHERE id = ?`,
     [
       item.imageUri,
@@ -95,6 +96,7 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
       item.soldAt || null,
       item.soldPrice || null,
       item.soldPlatform || null,
+      item.wardrobeId ?? 1,
       item.id,
     ]
   );
@@ -187,4 +189,18 @@ export async function migrateClothingType(oldType: string, newType: string): Pro
     [newType, oldType]
   );
   return result.changes;
+}
+
+export async function moveClothingToWardrobe(id: number, wardrobeId: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('UPDATE clothing_items SET wardrobeId = ? WHERE id = ?', [wardrobeId, id]);
+}
+
+export async function moveMultipleClothingToWardrobe(ids: number[], wardrobeId: number): Promise<void> {
+  const db = await getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  await db.runAsync(
+    `UPDATE clothing_items SET wardrobeId = ? WHERE id IN (${placeholders})`,
+    [wardrobeId, ...ids]
+  );
 }

@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { ClothingItem, Outfit, ClothingType, Season, Occasion, Scene } from '../types';
+import { ClothingItem, Outfit, ClothingType, Season, Occasion, Scene, Wardrobe } from '../types';
 import * as clothingDb from '../db/clothing';
 import * as outfitDb from '../db/outfit';
+import * as wardrobeDb from '../db/wardrobeDb';
 
 // 本地日期字符串，避免时区偏移
 function localDateString(): string {
@@ -10,6 +11,7 @@ function localDateString(): string {
 }
 
 interface WardrobeState {
+  // 衣物相关
   clothing: ClothingItem[];
   trashClothing: ClothingItem[];
   soldClothing: ClothingItem[];
@@ -18,7 +20,12 @@ interface WardrobeState {
   filterType: ClothingType | '全部';
   filterSeason: Season | '全部';
 
-  // Actions
+  // 衣橱相关
+  wardrobes: Wardrobe[];
+  currentWardrobeId: number;
+  isWardrobeLoading: boolean;
+
+  // Actions - 衣物
   loadData: () => Promise<void>;
   addClothing: (item: Omit<ClothingItem, 'id'>) => Promise<number>;
   updateClothing: (item: ClothingItem) => Promise<void>;
@@ -56,9 +63,21 @@ interface WardrobeState {
   sellMultipleClothing: (ids: number[], soldPrice: number, soldPlatform: string) => Promise<void>;
   restoreMultipleFromSold: (ids: number[]) => Promise<void>;
   permanentDeleteMultiple: (ids: number[]) => Promise<void>;
+
+  // Actions - 衣橱
+  loadWardrobes: () => Promise<void>;
+  addWardrobe: (name: string, icon: string) => Promise<number>;
+  updateWardrobe: (id: number, name: string, icon: string) => Promise<void>;
+  deleteWardrobe: (id: number, action: 'move' | 'trash' | 'delete') => Promise<void>;
+  setCurrentWardrobe: (id: number) => void;
+  getCurrentWardrobe: () => Wardrobe | undefined;
+  getDefaultWardrobeId: () => number;
+  moveClothingToWardrobe: (clothingId: number, targetWardrobeId: number) => Promise<void>;
+  moveMultipleClothingToWardrobe: (clothingIds: number[], targetWardrobeId: number) => Promise<void>;
 }
 
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
+  // 衣物相关初始状态
   clothing: [],
   trashClothing: [],
   soldClothing: [],
@@ -66,6 +85,13 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   isLoading: false,
   filterType: '全部',
   filterSeason: '全部',
+
+  // 衣橱相关初始状态
+  wardrobes: [],
+  currentWardrobeId: 1,
+  isWardrobeLoading: false,
+
+  // ============ 衣物 Actions ============
 
   loadData: async () => {
     set({ isLoading: true });
@@ -142,9 +168,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     await clothingDb.sellClothing(id, soldPrice, soldPlatform);
     const item = get().clothing.find(c => c.id === id);
     if (item) {
-      // 使用本地日期避免时区偏移问题
-      const now = new Date();
-      const soldAtStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const soldAtStr = localDateString();
       const soldItem = {
         ...item,
         soldAt: soldAtStr,
@@ -300,7 +324,6 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   getClothingByScene: (scene: Scene) => {
     const { clothing } = get();
-    // 场景到场合的映射
     const sceneOccasionMap: Record<Scene, Occasion[]> = {
       '工作': ['工作', '正式'],
       '运动': ['运动'],
@@ -335,7 +358,6 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   migrateClothingType: async (oldType: string, newType: string) => {
     const count = await clothingDb.migrateClothingType(oldType, newType);
-    // Update in-memory state for all lists that might contain this type
     set(state => ({
       clothing: state.clothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
       soldClothing: state.soldClothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
@@ -409,6 +431,106 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     set(state => ({
       trashClothing: state.trashClothing.filter(c => !ids.includes(c.id)),
       soldClothing: state.soldClothing.filter(c => !ids.includes(c.id)),
+    }));
+  },
+
+  // ============ 衣橱 Actions ============
+
+  loadWardrobes: async () => {
+    set({ isWardrobeLoading: true });
+    try {
+      const wardrobes = await wardrobeDb.getAllWardrobes();
+      const defaultWardrobe = wardrobes.find(w => w.isDefault);
+      const targetId = defaultWardrobe?.id ?? 1;
+      set(state => ({
+        wardrobes,
+        // 只在还没有选中衣橱时设置默认值
+        currentWardrobeId: state.currentWardrobeId ?? targetId,
+        isWardrobeLoading: false,
+      }));
+    } catch (error) {
+      console.error('[WardrobeStore] Failed to load wardrobes:', error);
+      set({ isWardrobeLoading: false });
+    }
+  },
+
+  addWardrobe: async (name, icon) => {
+    const id = await wardrobeDb.addWardrobe(name, icon);
+    const newWardrobe: Wardrobe = {
+      id,
+      name,
+      icon,
+      isDefault: false,
+      createdAt: new Date().toISOString().split('T')[0],
+    };
+    set(state => ({ wardrobes: [...state.wardrobes, newWardrobe] }));
+    return id;
+  },
+
+  updateWardrobe: async (id, name, icon) => {
+    await wardrobeDb.updateWardrobe(id, name, icon);
+    set(state => ({
+      wardrobes: state.wardrobes.map(w =>
+        w.id === id ? { ...w, name, icon } : w
+      ),
+    }));
+  },
+
+  deleteWardrobe: async (id, action) => {
+    const { wardrobes, currentWardrobeId } = get();
+    const wardrobe = wardrobes.find(w => w.id === id);
+    if (!wardrobe || wardrobe.isDefault) {
+      console.warn('[WardrobeStore] Cannot delete default wardrobe');
+      return;
+    }
+
+    const defaultWardrobe = wardrobes.find(w => w.isDefault);
+    const targetWardrobeId = defaultWardrobe?.id ?? 1;
+
+    switch (action) {
+      case 'move':
+        await wardrobeDb.moveClothingToWardrobe(id, targetWardrobeId);
+        break;
+      case 'trash':
+        await wardrobeDb.moveClothingToTrash(id);
+        break;
+      case 'delete':
+        await wardrobeDb.permanentlyDeleteClothingInWardrobe(id);
+        break;
+    }
+
+    await wardrobeDb.deleteWardrobe(id);
+    set(state => ({
+      wardrobes: state.wardrobes.filter(w => w.id !== id),
+      currentWardrobeId: state.currentWardrobeId === id ? targetWardrobeId : state.currentWardrobeId,
+    }));
+  },
+
+  setCurrentWardrobe: (id) => {
+    set({ currentWardrobeId: id });
+  },
+
+  getCurrentWardrobe: () => {
+    const { wardrobes, currentWardrobeId } = get();
+    return wardrobes.find(w => w.id === currentWardrobeId);
+  },
+
+  getDefaultWardrobeId: () => {
+    const { wardrobes } = get();
+    return wardrobes.find(w => w.isDefault)?.id ?? 1;
+  },
+
+  moveClothingToWardrobe: async (clothingId, targetWardrobeId) => {
+    await wardrobeDb.moveClothingToWardrobe(clothingId, targetWardrobeId);
+  },
+
+  moveMultipleClothingToWardrobe: async (clothingIds, targetWardrobeId) => {
+    await clothingDb.moveMultipleClothingToWardrobe(clothingIds, targetWardrobeId);
+    // 更新内存状态
+    set(state => ({
+      clothing: state.clothing.map(c =>
+        clothingIds.includes(c.id) ? { ...c, wardrobeId: targetWardrobeId } : c
+      ),
     }));
   },
 }));

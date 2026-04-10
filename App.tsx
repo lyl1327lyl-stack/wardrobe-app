@@ -20,6 +20,7 @@ import { SoldItemsScreen } from './src/screens/SoldItemsScreen';
 import { SoldItemEditScreen } from './src/screens/SoldItemEditScreen';
 import { PersonalCenterScreen } from './src/screens/PersonalCenterScreen';
 import { CustomOptionsScreen } from './src/screens/CustomOptionsScreen';
+import { WardrobeManagementScreen } from './src/screens/WardrobeManagementScreen';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useTheme } from './src/hooks/useTheme';
 
@@ -226,6 +227,14 @@ function AppNavigator() {
         <RootStack.Screen
           name="StatsDetail"
           component={StatsDetailScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="WardrobeManagement"
+          component={WardrobeManagementScreen}
           options={{
             headerShown: false,
             presentation: 'card',

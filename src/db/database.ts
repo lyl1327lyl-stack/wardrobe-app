@@ -1,4 +1,9 @@
 import * as SQLite from 'expo-sqlite';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Wardrobe } from '../types';
+
+const DB_VERSION_KEY = 'db_version';
+const CURRENT_DB_VERSION = 2; // 递增以触发迁移
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
@@ -64,6 +69,17 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     )
   `);
 
+  // 创建衣橱表
+  await execSQL(dbInstance, `
+    CREATE TABLE IF NOT EXISTS wardrobes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      icon TEXT NOT NULL DEFAULT '👗',
+      isDefault INTEGER NOT NULL DEFAULT 0,
+      createdAt TEXT NOT NULL
+    )
+  `);
+
   // 迁移：确保所有必要列存在
   const addColumnIfNotExists = async (table: string, column: string, definition: string) => {
     if (!(await columnExists(dbInstance!, table, column))) {
@@ -84,6 +100,13 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   await addColumnIfNotExists('clothing_items', 'styles', 'TEXT DEFAULT "[]"');
   await addColumnIfNotExists('clothing_items', 'parentType', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
+  await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
+
+  // 确保 wardrobes 表存在
+  await ensureWardrobesTable(dbInstance!);
+
+  // 确保默认衣橱存在
+  await ensureDefaultWardrobe(dbInstance!);
 
   return dbInstance;
 }
@@ -93,4 +116,43 @@ export async function closeDatabase() {
     await dbInstance.closeAsync();
     dbInstance = null;
   }
+}
+
+// 确保 wardrobes 表存在
+async function ensureWardrobesTable(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const result = await db.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='wardrobes'"
+    );
+    if (!result) {
+      await db.runAsync(`
+        CREATE TABLE IF NOT EXISTS wardrobes (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          icon TEXT NOT NULL DEFAULT '👗',
+          isDefault INTEGER NOT NULL DEFAULT 0,
+          createdAt TEXT NOT NULL
+        )
+      `);
+    }
+  } catch (e) {
+    console.error('ensureWardrobesTable error:', e);
+  }
+}
+
+// 确保默认衣橱存在
+async function ensureDefaultWardrobe(db: SQLite.SQLiteDatabase): Promise<void> {
+  const result = await db.getFirstAsync<{ count: number }>('SELECT COUNT(*) as count FROM wardrobes');
+  if (!result || result.count === 0) {
+    await db.runAsync(
+      'INSERT INTO wardrobes (name, icon, isDefault, createdAt) VALUES (?, ?, ?, ?)',
+      ['我的衣橱', '👗', 1, localDateString()]
+    );
+  }
+}
+
+// 本地日期字符串
+function localDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }

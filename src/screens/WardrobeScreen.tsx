@@ -18,6 +18,7 @@ import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
+import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
 
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
@@ -449,7 +450,20 @@ const makeStyles = (theme: Theme) =>
 
 export function WardrobeScreen() {
   const navigation = useNavigation<any>();
-  const { clothing, trashClothing, soldClothing, loadData, moveMultipleToTrash, sellMultipleClothing } = useWardrobeStore();
+  const {
+    clothing,
+    trashClothing,
+    soldClothing,
+    loadData,
+    moveMultipleToTrash,
+    sellMultipleClothing,
+    moveMultipleClothingToWardrobe,
+    wardrobes,
+    currentWardrobeId,
+    loadWardrobes,
+    setCurrentWardrobe,
+    getCurrentWardrobe,
+  } = useWardrobeStore();
   const { theme } = useTheme();
   const categories = useCustomOptionsStore(state => state.categories);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
@@ -465,17 +479,23 @@ export function WardrobeScreen() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showBatchDiscardSheet, setShowBatchDiscardSheet] = useState(false);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
 
   useEffect(() => {
     loadData();
     load();
+    loadWardrobes();
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       loadData();
+      loadWardrobes();
     }, [])
   );
+
+  // 当前选中的衣橱
+  const currentWardrobe = getCurrentWardrobe();
 
   const handlePress = (item: ClothingItem) => {
     navigation.navigate('ClothingDetail', { id: item.id });
@@ -496,11 +516,16 @@ export function WardrobeScreen() {
 
   // 使用 useMemo 确保稳定的数组引用
   const filteredClothing = useMemo(() => {
-    if (selectedSeasons.includes('全部') || selectedSeasons.length === 0) return clothing;
-    return clothing.filter(item =>
-      item.seasons.some(season => selectedSeasons.includes(season))
-    );
-  }, [selectedSeasons, clothing]);
+    // 先按衣橱筛选
+    let result = clothing.filter(item => item.wardrobeId === currentWardrobeId);
+    // 再按季节筛选
+    if (!selectedSeasons.includes('全部') && selectedSeasons.length > 0) {
+      result = result.filter(item =>
+        item.seasons.some(season => selectedSeasons.includes(season))
+      );
+    }
+    return result;
+  }, [selectedSeasons, clothing, currentWardrobeId]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -593,6 +618,13 @@ export function WardrobeScreen() {
     cancelSelection();
   };
 
+  const handleMoveToWardrobe = async (targetWardrobeId: number) => {
+    await moveMultipleClothingToWardrobe(selectedIds.map(id => Number(id)), targetWardrobeId);
+    // 刷新数据
+    await loadData();
+    cancelSelection();
+  };
+
   return (
     <View style={styles.container}>
       {/* 顶部标题栏 */}
@@ -616,7 +648,9 @@ export function WardrobeScreen() {
               onPress={() => setShowWardrobePicker(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.headerTitle}>{getTitle()}</Text>
+              <Text style={styles.headerTitle}>
+                {currentWardrobe ? `${currentWardrobe.icon} ${currentWardrobe.name}` : '我的衣橱'}
+              </Text>
               <Text style={styles.headerCount}>{filteredClothing.length} 件</Text>
               <Ionicons name="chevron-down" size={22} color={theme.colors.text} />
             </TouchableOpacity>
@@ -833,15 +867,26 @@ export function WardrobeScreen() {
           <View style={styles.pickerDropdown}>
             <View style={styles.pickerDropdownArrow} />
             {/* 衣橱选项 */}
-            <TouchableOpacity
-              style={[styles.pickerOption, styles.pickerOptionActive]}
-              onPress={() => setShowWardrobePicker(false)}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="shirt-outline" size={18} color={theme.colors.primary} />
-              <Text style={[styles.pickerOptionText, styles.pickerOptionTextActive]}>我的衣橱</Text>
-              <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
-            </TouchableOpacity>
+            {wardrobes.map((wardrobe) => {
+              const isActive = wardrobe.id === currentWardrobeId;
+              return (
+                <TouchableOpacity
+                  key={wardrobe.id}
+                  style={[styles.pickerOption, isActive && styles.pickerOptionActive]}
+                  onPress={() => {
+                    setCurrentWardrobe(wardrobe.id);
+                    setShowWardrobePicker(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 16 }}>{wardrobe.icon}</Text>
+                  <Text style={[styles.pickerOptionText, isActive && styles.pickerOptionTextActive]}>
+                    {wardrobe.name}
+                  </Text>
+                  {isActive && <Ionicons name="checkmark" size={18} color={theme.colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
             <View style={styles.pickerDivider} />
             {/* 废衣篓 */}
             <TouchableOpacity
@@ -877,6 +922,19 @@ export function WardrobeScreen() {
                 </View>
               )}
             </TouchableOpacity>
+            <View style={styles.pickerDivider} />
+            {/* 管理衣橱 */}
+            <TouchableOpacity
+              style={styles.pickerOption}
+              onPress={() => {
+                setShowWardrobePicker(false);
+                navigation.navigate('WardrobeManagement');
+              }}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
+              <Text style={styles.pickerOptionText}>管理衣橱</Text>
+            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -903,6 +961,16 @@ export function WardrobeScreen() {
                 <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
               </View>
               <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>废衣篓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchBtn, styles.batchBtnSecondary]}
+              onPress={() => setShowMoveSheet(true)}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.batchBtnIconWrap, styles.batchBtnSecondaryIcon]}>
+                <Ionicons name="swap-horizontal-outline" size={18} color={theme.colors.primary} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>移动</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.batchBtn, styles.batchBtnSuccess]}
@@ -943,6 +1011,14 @@ export function WardrobeScreen() {
         onClose={() => setShowBatchDiscardSheet(false)}
         itemCount={selectedIds.length}
         onConfirm={handleBatchDiscardConfirm}
+      />
+
+      {/* 移动到衣橱 */}
+      <MoveToWardrobeSheet
+        visible={showMoveSheet}
+        currentWardrobeId={currentWardrobeId}
+        onClose={() => setShowMoveSheet(false)}
+        onSelect={handleMoveToWardrobe}
       />
     </View>
   );
