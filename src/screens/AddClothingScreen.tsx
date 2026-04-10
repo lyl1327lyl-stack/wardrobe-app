@@ -13,6 +13,7 @@ import {
   BackHandler,
   Modal,
   KeyboardAvoidingView,
+  Switch,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -160,6 +161,17 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'flex-end',
       alignItems: 'flex-end',
       padding: 12,
+    },
+    bgRemovalRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      gap: 8,
+    },
+    bgRemovalText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
     },
     // 衣橱选择居中对话框
     dialogOverlay: {
@@ -677,6 +689,7 @@ export function AddClothingScreen() {
   const [price, setPrice] = useState(existingItem?.price != null ? String(existingItem.price) : '');
   const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
+  const [removeBackground, setRemoveBackground] = useState(true); // 默认开启抠图
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
   const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
@@ -876,7 +889,7 @@ export function AddClothingScreen() {
       let thumbnailUri = existingItem?.thumbnailUri || imageUri;
 
       if (!asDraft && imageUri && (!existingItem || imageUri !== existingItem.imageUri)) {
-        const result = await processImage(imageUri);
+        const result = await processImage(imageUri, removeBackground);
         processedUri = result.imageUri;
         thumbnailUri = result.thumbnailUri;
       }
@@ -985,6 +998,18 @@ export function AddClothingScreen() {
             </View>
           )}
         </TouchableOpacity>
+
+        {/* 自动抠图开关 */}
+        <View style={styles.bgRemovalRow}>
+          <Ionicons name="cut-outline" size={18} color={theme.colors.textSecondary} />
+          <Text style={styles.bgRemovalText}>自动抠图</Text>
+          <Switch
+            value={removeBackground}
+            onValueChange={setRemoveBackground}
+            trackColor={{ false: theme.colors.border, true: theme.colors.primary + '80' }}
+            thumbColor={removeBackground ? theme.colors.primary : theme.colors.borderLight}
+          />
+        </View>
 
         <View style={styles.section}>
           {/* Card 1: 基本信息 */}

@@ -812,7 +812,7 @@ export function ClothingDetailScreen() {
         {/* 图片区域 */}
         <View style={styles.imageSection}>
           <View style={styles.imageWrapper}>
-            <Image source={{ uri: item.imageUri }} style={styles.image} />
+            <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.image} />
             {item.color && <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />}
           </View>
         </View>

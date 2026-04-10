@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -15,6 +17,7 @@ import { ThemeId, themes } from '../utils/theme';
 import { Theme } from '../utils/theme';
 import { OPTIONS_STORAGE_KEY } from '../utils/customOptions';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { getRemoveBgApiKey, setRemoveBgApiKey, isBackgroundRemovalConfigured } from '../utils/backgroundRemoval';
 
 const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'wood', label: '暖阳原木', icon: 'leaf-outline' },
@@ -45,6 +48,12 @@ const MENU_ITEMS: MenuSection[] = [
       { key: 'seasons', label: '季节管理', icon: 'flower-outline', action: 'seasons' },
       { key: 'occasions', label: '场合管理', icon: 'calendar-outline', action: 'occasions' },
       { key: 'styles', label: '风格管理', icon: 'brush-outline', action: 'styles' },
+    ],
+  },
+  {
+    title: '抠图设置',
+    items: [
+      { key: 'removeBgApi', label: 'Remove.bg API Key', icon: 'key-outline', action: 'removeBgApi' },
     ],
   },
   {
@@ -159,12 +168,152 @@ const makeStyles = (theme: Theme) =>
     bottom: {
       height: 40,
     },
+    // API Key Modal
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 24,
+    },
+    modal: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.xl,
+      padding: 24,
+      width: '100%',
+      maxWidth: 340,
+    },
+    modalTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.colors.text,
+      marginBottom: 8,
+      textAlign: 'center',
+    },
+    modalSubtitle: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+      marginBottom: 16,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    modalInput: {
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 15,
+      color: theme.colors.text,
+      backgroundColor: theme.colors.background,
+      marginBottom: 16,
+    },
+    modalActions: {
+      flexDirection: 'row',
+      gap: 12,
+    },
+    modalCancel: {
+      flex: 1,
+      paddingVertical: 13,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      alignItems: 'center',
+    },
+    modalCancelText: {
+      fontSize: 15,
+      color: theme.colors.textSecondary,
+      fontWeight: '500',
+    },
+    modalConfirm: {
+      flex: 2,
+      paddingVertical: 13,
+      borderRadius: theme.borderRadius.md,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+    },
+    modalConfirmText: {
+      fontSize: 15,
+      color: theme.colors.white,
+      fontWeight: '600',
+    },
+    modalDanger: {
+      backgroundColor: theme.colors.danger,
+    },
+    statusBadge: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
+    statusText: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
   });
 
 export function PersonalCenterScreen() {
   const navigation = useNavigation();
   const { theme, themeId, setTheme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  // API Key Modal state
+  const [showApiModal, setShowApiModal] = useState(false);
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [apiKeyStatus, setApiKeyStatus] = useState<'checking' | 'configured' | 'not_configured'>('checking');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    checkApiKeyStatus();
+  }, []);
+
+  const checkApiKeyStatus = async () => {
+    const configured = await isBackgroundRemovalConfigured();
+    setApiKeyStatus(configured ? 'configured' : 'not_configured');
+  };
+
+  const handleShowApiModal = () => {
+    setApiKeyInput('');
+    setShowApiModal(true);
+  };
+
+  const handleSaveApiKey = async () => {
+    if (isSaving) return;
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) {
+      Alert.alert('请输入 API Key');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await setRemoveBgApiKey(trimmed);
+      setShowApiModal(false);
+      setApiKeyStatus('configured');
+      Alert.alert('保存成功', 'API Key 已保存。添加衣服时可以使用抠图功能了。');
+    } catch (e) {
+      Alert.alert('保存失败', '无法保存 API Key');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleClearApiKey = async () => {
+    Alert.alert(
+      '清除 API Key',
+      '确定要清除已保存的 API Key 吗？清除后将无法使用抠图功能。',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '清除',
+          style: 'destructive',
+          onPress: async () => {
+            await setRemoveBgApiKey('');
+            setShowApiModal(false);
+            setApiKeyStatus('not_configured');
+          },
+        },
+      ]
+    );
+  };
 
   const handleThemeChange = async (newThemeId: ThemeId) => {
     if (newThemeId === themeId) return;
@@ -180,6 +329,9 @@ export function PersonalCenterScreen() {
       case 'occasions':
       case 'styles':
         (navigation as any).navigate('CustomOptions', { category: action });
+        break;
+      case 'removeBgApi':
+        handleShowApiModal();
         break;
       case 'export':
         Alert.alert('备份导出', '功能开发中');
@@ -330,6 +482,17 @@ export function PersonalCenterScreen() {
                   <Text style={[styles.menuValue, { color: theme.colors.textTertiary }]}>
                     {item.value}
                   </Text>
+                ) : item.key === 'removeBgApi' ? (
+                  <View style={styles.statusBadge}>
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: apiKeyStatus === 'configured' ? '#22C55E' : '#EF4444' },
+                      ]}
+                    >
+                      {apiKeyStatus === 'checking' ? '检测中...' : apiKeyStatus === 'configured' ? '已配置' : '未配置'}
+                    </Text>
+                  </View>
                 ) : item.action ? (
                   <Ionicons
                     name="chevron-forward"
@@ -344,6 +507,56 @@ export function PersonalCenterScreen() {
 
         <View style={styles.bottom} />
       </ScrollView>
+
+      {/* API Key Modal */}
+      <Modal visible={showApiModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modal}>
+            <Text style={styles.modalTitle}>Remove.bg API Key</Text>
+            <Text style={styles.modalSubtitle}>
+              请输入您的 Remove.bg API Key{'\n'}
+              用于自动去除衣服背景{'\n'}
+              前往 remove.bg 注册获取免费 API Key
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              value={apiKeyInput}
+              onChangeText={setApiKeyInput}
+              placeholder="输入 API Key"
+              placeholderTextColor={theme.colors.textTertiary}
+              autoFocus
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancel}
+                onPress={() => setShowApiModal(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>取消</Text>
+              </TouchableOpacity>
+              {apiKeyStatus === 'configured' && (
+                <TouchableOpacity
+                  style={[styles.modalConfirm, styles.modalDanger]}
+                  onPress={handleClearApiKey}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.modalConfirmText}>清除</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                style={[styles.modalConfirm, isSaving && { opacity: 0.6 }]}
+                onPress={handleSaveApiKey}
+                activeOpacity={0.8}
+                disabled={isSaving}
+              >
+                <Text style={styles.modalConfirmText}>{isSaving ? '保存中...' : '保存'}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

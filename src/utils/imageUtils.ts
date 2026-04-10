@@ -8,6 +8,7 @@ import {
   writeAsStringAsync,
 } from 'expo-file-system/legacy';
 import { manipulateAsync } from 'expo-image-manipulator';
+import { removeBackground } from './backgroundRemoval';
 
 const IMAGE_DIR = `${documentDirectory}images/`;
 const THUMBNAIL_SIZE = 300;
@@ -44,12 +45,12 @@ export async function takePhoto(): Promise<string | null> {
   return result.assets[0].uri;
 }
 
-export async function processImage(uri: string): Promise<{ imageUri: string; thumbnailUri: string }> {
+export async function processImage(uri: string, removeBg: boolean = false): Promise<{ imageUri: string; thumbnailUri: string }> {
   await ensureImageDir();
 
   const timestamp = Date.now();
   const imagePath = `${IMAGE_DIR}img_${timestamp}.jpg`;
-  const thumbnailPath = `${IMAGE_DIR}thumb_${timestamp}.jpg`;
+  const thumbnailPath = `${IMAGE_DIR}thumb_${timestamp}.png`; // PNG for transparent background
 
   // Process main image - resize to reasonable size
   const manipulated = await manipulateAsync(
@@ -58,21 +59,47 @@ export async function processImage(uri: string): Promise<{ imageUri: string; thu
     { compress: 0.9 }
   );
 
-  // Process thumbnail
-  const thumbnail = await manipulateAsync(
-    uri,
-    [{ resize: { width: THUMBNAIL_SIZE } }],
-    { compress: 0.8 }
-  );
-
   // Copy the processed images to our own directory
   const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
   await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
 
-  const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
-  await writeAsStringAsync(thumbnailPath, base64Thumb, { encoding: 'base64' });
+  // Try background removal if enabled
+  let thumbnailUri = thumbnailPath;
+  if (removeBg) {
+    const bgRemovedUri = await removeBackground(uri);
+    if (bgRemovedUri) {
+      // Save the background removed image as thumbnail
+      // bgRemovedUri is a data URI, extract base64 and save
+      const base64Match = bgRemovedUri.match(/base64,(.+)$/);
+      if (base64Match) {
+        await writeAsStringAsync(thumbnailPath, base64Match[1], { encoding: 'base64' });
+        console.log('[processImage] Saved background removed thumbnail');
+      }
+    } else {
+      // Fallback to regular thumbnail
+      const thumbnail = await manipulateAsync(
+        uri,
+        [{ resize: { width: THUMBNAIL_SIZE } }],
+        { compress: 0.8 }
+      );
+      const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
+      // Use jpg for fallback
+      await writeAsStringAsync(thumbnailPath.replace('.png', '.jpg'), base64Thumb, { encoding: 'base64' });
+      thumbnailUri = thumbnailPath.replace('.png', '.jpg');
+    }
+  } else {
+    // Regular thumbnail without background removal
+    const thumbnail = await manipulateAsync(
+      uri,
+      [{ resize: { width: THUMBNAIL_SIZE } }],
+      { compress: 0.8 }
+    );
+    const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
+    await writeAsStringAsync(thumbnailPath.replace('.png', '.jpg'), base64Thumb, { encoding: 'base64' });
+    thumbnailUri = thumbnailPath.replace('.png', '.jpg');
+  }
 
-  return { imageUri: imagePath, thumbnailUri: thumbnailPath };
+  return { imageUri: imagePath, thumbnailUri };
 }
 
 export async function deleteImage(imageUri: string, thumbnailUri: string) {
