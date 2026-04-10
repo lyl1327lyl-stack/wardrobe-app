@@ -301,8 +301,8 @@ export async function publishDraft(id: number): Promise<void> {
   try {
     const db = await getDatabase();
     await db.runAsync(
-      'UPDATE clothing_items SET isDraft = 0, deletedAt = NULL WHERE id = ? AND isDraft = 1',
-      [id]
+      'UPDATE clothing_items SET isDraft = 0, deletedAt = NULL, createdAt = ? WHERE id = ? AND isDraft = 1',
+      [localDateString(), id]
     );
   } catch (error) {
     console.warn('[ClothingDB] publishDraft failed:', error);
@@ -318,8 +318,8 @@ export async function publishAllDrafts(ids: number[]): Promise<void> {
   const db = await getDatabase();
   const placeholders = ids.map(() => '?').join(',');
   await db.runAsync(
-    `UPDATE clothing_items SET isDraft = 0 WHERE id IN (${placeholders}) AND isDraft = 1`,
-    ids
+    `UPDATE clothing_items SET isDraft = 0, createdAt = ? WHERE id IN (${placeholders}) AND isDraft = 1`,
+    [localDateString(), ...ids]
   );
 }
 

@@ -12,6 +12,7 @@ import {
   Platform,
   BackHandler,
   Modal,
+  KeyboardAvoidingView,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -83,7 +84,6 @@ const makeStyles = (theme: Theme) =>
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
-      position: 'relative',
     },
     header: {
       flexDirection: 'row',
@@ -753,6 +753,7 @@ export function AddClothingScreen() {
 
   // 跟踪是否正在导航到选项管理页面（跳过未保存检查）
   const skipUnsavedCheck = useRef(false);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const currentState = {
     imageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, occasions,
@@ -895,7 +896,7 @@ export function AddClothingScreen() {
         wearCount,
         lastWornAt: existingItem?.lastWornAt || null,
         createdAt: existingItem?.createdAt || new Date().toISOString(),
-        remarks: asDraft ? `[草稿]${remarks}` : remarks,
+        remarks: remarks,
         styles: clothingStyles,
         deletedAt: asDraft ? 'draft' : existingItem?.deletedAt,
         discardReason: existingItem?.discardReason || null,
@@ -910,7 +911,8 @@ export function AddClothingScreen() {
         // 编辑草稿并点击"创建"：先更新草稿，再发布
         await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);
         await publishDraft(existingItem!.id);
-        // 返回主界面（Main是Tab导航器）
+        // 返回衣橱主页（重置栈避免导航混乱）
+        navigation.popToTop();
         navigation.navigate('Main');
       } else if (isEditing && existingItem) {
         await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);
@@ -933,7 +935,11 @@ export function AddClothingScreen() {
   const displayDate = purchaseDate ? formatDate(purchaseDate) : '';
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior="padding"
+      keyboardVerticalOffset={0}
+    >
       {/* 自定义 Header */}
       <View style={[styles.header, { paddingTop: insets.top }]}>
         <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
@@ -957,7 +963,7 @@ export function AddClothingScreen() {
         </View>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} scrollIndicatorInsets={{ right: 1 }}>
+      <ScrollView ref={scrollViewRef} style={styles.scrollView} showsVerticalScrollIndicator={false} scrollIndicatorInsets={{ right: 1 }} keyboardShouldPersistTaps="handled">
         {/* Image Area */}
         <TouchableOpacity style={styles.imageArea} onPress={() => setShowImagePicker(true)} activeOpacity={0.9}>
           {imageUri ? (
@@ -1265,6 +1271,6 @@ export function AddClothingScreen() {
           </View>
         </View>
       </Modal>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

@@ -854,13 +854,13 @@ export function WardrobeScreen() {
                     <Ionicons name="chevron-forward" size={14} color={theme.colors.textTertiary} />
                   </TouchableOpacity>
                 </View>
-                {/* 横向图片列表 */}
+                {/* 横向图片列表 - 显示所有衣服，最新在前 */}
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
                   contentContainerStyle={styles.categoryScroll}
                 >
-                  {items.slice(0, 4).map(item => {
+                  {[...items].sort((a, b) => Number(b.createdAt?.replace(/-/g, '')) - Number(a.createdAt?.replace(/-/g, ''))).map(item => {
                     const itemId = getItemId(item);
                     const costPerWear = item.price > 0 && item.wearCount > 0
                       ? Math.round(item.price / item.wearCount)
@@ -916,7 +916,7 @@ export function WardrobeScreen() {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.categoryScroll}
               >
-                {uncategorizedItems.slice(0, 4).map(item => {
+                {[...uncategorizedItems].sort((a, b) => Number(b.createdAt?.replace(/-/g, '')) - Number(a.createdAt?.replace(/-/g, ''))).map(item => {
                   const itemId = getItemId(item);
                   const costPerWear = item.price > 0 && item.wearCount > 0
                     ? Math.round(item.price / item.wearCount)
