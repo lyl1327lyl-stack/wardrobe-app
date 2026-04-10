@@ -19,6 +19,8 @@ import { OutfitPickerModal } from '../components/OutfitPickerModal';
 import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
+import { WearCalendarSheet } from '../components/WearCalendarSheet';
+import * as wearRecordsDb from '../db/wearRecords';
 
 type DetailSource = 'wardrobe' | 'trash' | 'sold' | 'draft';
 type RouteParams = { ClothingDetail: { id: number; source?: DetailSource } };
@@ -53,19 +55,6 @@ function getDaysAgo(dateStr: string | null): string {
     return `${Math.floor(diff / 30)}月前`;
   } catch {
     return dateStr;
-  }
-}
-
-function isToday(dateStr: string | null): boolean {
-  if (!dateStr) return false;
-  try {
-    const d = new Date(dateStr);
-    const now = new Date();
-    return d.getFullYear() === now.getFullYear() &&
-           d.getMonth() === now.getMonth() &&
-           d.getDate() === now.getDate();
-  } catch {
-    return false;
   }
 }
 
@@ -452,7 +441,7 @@ const makeStyles = (theme: Theme) =>
 export function ClothingDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ClothingDetail'>>();
-  const { getClothingByIdIncludingAll, wearClothing, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, trashClothing, soldClothing, publishDraft } = useWardrobeStore();
+  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, trashClothing, soldClothing, publishDraft } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -461,6 +450,13 @@ export function ClothingDetailScreen() {
   const [showDiscardSheet, setShowDiscardSheet] = useState(false);
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
+  const [showWearCalendar, setShowWearCalendar] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [wearDates, setWearDates] = useState<string[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  });
 
   // 使用 useFocusEffect 在屏幕获得焦点时刷新数据
   useFocusEffect(
@@ -479,6 +475,181 @@ export function ClothingDetailScreen() {
   const isSold = source === 'sold';
   const isDraft = source === 'draft';
 
+  // 加载穿着日期
+  const loadWearDates = useCallback(async () => {
+    if (item && !isTrash && !isSold && !isDraft) {
+      try {
+        const dates = await wearRecordsDb.getWearDatesByMonth(
+          item.id,
+          currentMonth.year,
+          currentMonth.month
+        );
+        setWearDates(dates);
+      } catch (error) {
+        console.error('Failed to load wear dates:', error);
+      }
+    }
+  }, [item, currentMonth, isTrash, isSold, isDraft]);
+
+  useEffect(() => {
+    loadWearDates();
+  }, [loadWearDates]);
+
+  // 月份切换
+  const prevMonth = () => {
+    setCurrentMonth(prev => {
+      if (prev.month === 1) {
+        return { year: prev.year - 1, month: 12 };
+      }
+      return { year: prev.year, month: prev.month - 1 };
+    });
+  };
+
+  const nextMonth = () => {
+    setCurrentMonth(prev => {
+      if (prev.month === 12) {
+        return { year: prev.year + 1, month: 1 };
+      }
+      return { year: prev.year, month: prev.month + 1 };
+    });
+  };
+
+  // 点击日期（已有记录）
+  const handleDatePress = (date: string) => {
+    setSelectedDate(date);
+    setShowWearCalendar(true);
+  };
+
+  // 添加过往穿着日期
+  const handleAddWearDate = (date: string) => {
+    if (!item) return;
+    Alert.alert(
+      '确认记录',
+      `确认记录 ${date} 的穿着吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确认',
+          onPress: () => {
+            (async () => {
+              try {
+                await wearRecordsDb.addWearRecord(item.id, date);
+                await loadWearDates();
+                const newCount = await wearRecordsDb.getWearCountFromRecords(item.id);
+                const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
+                setItem(prev => prev ? { ...prev, wearCount: newCount, lastWornAt: lastDate } : null);
+              } catch (e) {
+                console.error('记录穿着失败:', e);
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
+  // 删除穿着记录后刷新
+  const handleDeleteRecord = async () => {
+    await loadWearDates();
+    // 更新衣物的 wearCount
+    if (item) {
+      const count = await wearRecordsDb.getWearCountFromRecords(item.id);
+      const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
+      setItem(prev => prev ? { ...prev, wearCount: count, lastWornAt: lastDate } : null);
+    }
+  };
+
+  // 获取日历样式
+  const getCalendarStyles = useMemo(() => StyleSheet.create({
+    calendarCard: {
+      marginHorizontal: 20,
+      marginTop: 16,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: 16,
+      ...theme.shadows.sm,
+    },
+    calendarHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 16,
+    },
+    calendarTitle: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    monthNav: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+    },
+    monthNavBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    monthText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.text,
+      minWidth: 80,
+      textAlign: 'center',
+    },
+    weekDaysRow: {
+      flexDirection: 'row',
+      marginBottom: 8,
+    },
+    weekDay: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 6,
+    },
+    weekDayText: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      fontWeight: '500',
+    },
+    daysGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+    },
+    dayCell: {
+      width: '14.28%',
+      aspectRatio: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dayText: {
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    dayTextOther: {
+      color: theme.colors.textTertiary,
+    },
+    dayFilled: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    dayFilledText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
+    dayTextToday: {
+      fontWeight: '700',
+      color: theme.colors.primary,
+    },
+  }), [theme]);
+
   if (!item) {
     return (
       <View style={[styles.container, styles.empty]}>
@@ -488,8 +659,11 @@ export function ClothingDetailScreen() {
   }
 
   const handleWear = async () => {
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
     // 检查今天是否已记录
-    if (isToday(item.lastWornAt)) {
+    if (wearDates.includes(dateStr)) {
       Alert.alert('提示', '今天已记录过穿着，无需重复记录');
       return;
     }
@@ -504,10 +678,10 @@ export function ClothingDetailScreen() {
           onPress: () => {
             (async () => {
               try {
-                await wearClothing(item.id);
-                const now = new Date();
-                const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                setItem(prev => prev ? { ...prev, wearCount: prev.wearCount + 1, lastWornAt: dateStr } : null);
+                await wearRecordsDb.addWearRecord(item.id, dateStr);
+                await loadWearDates();
+                const newCount = await wearRecordsDb.getWearCountFromRecords(item.id);
+                setItem(prev => prev ? { ...prev, wearCount: newCount, lastWornAt: dateStr } : null);
                 Alert.alert('已记录穿着');
               } catch (e) {
                 console.error('记录穿着失败:', e);
@@ -768,6 +942,77 @@ export function ClothingDetailScreen() {
           <Text style={styles.remarksText}>{item.remarks || '暂无备注'}</Text>
         </View>
 
+        {/* 穿着日历卡片 */}
+        {!isTrash && !isSold && !isDraft && (
+          <View style={getCalendarStyles.calendarCard}>
+            <View style={getCalendarStyles.calendarHeader}>
+              <Text style={getCalendarStyles.calendarTitle}>穿着日历</Text>
+              <View style={getCalendarStyles.monthNav}>
+                <TouchableOpacity style={getCalendarStyles.monthNavBtn} onPress={prevMonth}>
+                  <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
+                </TouchableOpacity>
+                <Text style={getCalendarStyles.monthText}>
+                  {currentMonth.year}年{currentMonth.month}月
+                </Text>
+                <TouchableOpacity style={getCalendarStyles.monthNavBtn} onPress={nextMonth}>
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.text} />
+                </TouchableOpacity>
+              </View>
+            </View>
+            <View style={getCalendarStyles.weekDaysRow}>
+              {['日', '一', '二', '三', '四', '五', '六'].map(day => (
+                <View key={day} style={getCalendarStyles.weekDay}>
+                  <Text style={getCalendarStyles.weekDayText}>{day}</Text>
+                </View>
+              ))}
+            </View>
+            <View style={getCalendarStyles.daysGrid}>
+              {(() => {
+                const firstDay = new Date(currentMonth.year, currentMonth.month - 1, 1).getDay();
+                const daysInMonth = new Date(currentMonth.year, currentMonth.month, 0).getDate();
+                const today = new Date();
+                const cells = [];
+                for (let i = 0; i < firstDay; i++) {
+                  cells.push(<View key={`empty-${i}`} style={getCalendarStyles.dayCell} />);
+                }
+                for (let d = 1; d <= daysInMonth; d++) {
+                  const dateStr = `${currentMonth.year}-${String(currentMonth.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                  const isToday = today.getFullYear() === currentMonth.year &&
+                    today.getMonth() + 1 === currentMonth.month &&
+                    today.getDate() === d;
+                  const hasRecord = wearDates.includes(dateStr);
+                  // 判断是否未来日期
+                  const isFuture = new Date(dateStr) > new Date(today.toISOString().split('T')[0]);
+                  cells.push(
+                    <TouchableOpacity
+                      key={d}
+                      style={getCalendarStyles.dayCell}
+                      onPress={() => hasRecord ? handleDatePress(dateStr) : (!isFuture && handleAddWearDate(dateStr))}
+                      disabled={isFuture}
+                      activeOpacity={0.7}
+                    >
+                      {hasRecord ? (
+                        <View style={getCalendarStyles.dayFilled}>
+                          <Text style={getCalendarStyles.dayFilledText}>{d}</Text>
+                        </View>
+                      ) : (
+                        <Text style={[
+                          getCalendarStyles.dayText,
+                          isToday && getCalendarStyles.dayTextToday,
+                          isFuture && getCalendarStyles.dayTextOther,
+                        ]}>
+                          {d}
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  );
+                }
+                return cells;
+              })()}
+            </View>
+          </View>
+        )}
+
         <View style={styles.bottomPadding} />
       </ScrollView>
 
@@ -866,6 +1111,14 @@ export function ClothingDetailScreen() {
         onClose={() => setShowEditReason(false)}
         clothingItem={item}
         onSave={handleEditReason}
+      />
+
+      <WearCalendarSheet
+        visible={showWearCalendar}
+        onClose={() => setShowWearCalendar(false)}
+        date={selectedDate}
+        onDeleteRecord={handleDeleteRecord}
+        onAddRecord={loadWearDates}
       />
     </View>
   );

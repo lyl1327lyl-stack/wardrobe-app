@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import { ClothingItem, Outfit, ClothingType, Season, Occasion, Scene, Wardrobe } from '../types';
+import { ClothingItem, Outfit, ClothingType, Season, Occasion, Scene, Wardrobe, WearRecord } from '../types';
 import * as clothingDb from '../db/clothing';
 import * as outfitDb from '../db/outfit';
 import * as wardrobeDb from '../db/wardrobeDb';
+import * as wearRecordsDb from '../db/wearRecords';
 
 // 本地日期字符串，避免时区偏移
 function localDateString(): string {
@@ -20,6 +21,9 @@ interface WardrobeState {
   isLoading: boolean;
   filterType: ClothingType | '全部';
   filterSeason: Season | '全部';
+
+  // 穿着记录相关
+  wearRecords: WearRecord[];
 
   // 衣橱相关
   wardrobes: Wardrobe[];
@@ -84,6 +88,15 @@ interface WardrobeState {
   getDefaultWardrobeId: () => number;
   moveClothingToWardrobe: (clothingId: number, targetWardrobeId: number) => Promise<void>;
   moveMultipleClothingToWardrobe: (clothingIds: number[], targetWardrobeId: number) => Promise<void>;
+
+  // 穿着记录 Actions
+  loadWearRecords: () => Promise<void>;
+  addWearRecord: (clothingId: number, date: string) => Promise<number>;
+  addWearRecords: (clothingIds: number[], date: string) => Promise<void>;
+  deleteWearRecord: (id: number) => Promise<void>;
+  getWearDatesByClothing: (clothingId: number) => string[];
+  getWearRecordsByDate: (date: string) => WearRecord[];
+  getWearCount: (clothingId: number) => number;
 }
 
 export const useWardrobeStore = create<WardrobeState>((set, get) => ({
@@ -96,6 +109,9 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   isLoading: false,
   filterType: '全部',
   filterSeason: '全部',
+
+  // 穿着记录相关初始状态
+  wearRecords: [],
 
   // 衣橱相关初始状态
   wardrobes: [],
@@ -597,5 +613,57 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
         clothingIds.includes(c.id) ? { ...c, wardrobeId: targetWardrobeId } : c
       ),
     }));
+  },
+
+  // ============ 穿着记录 Actions ============
+
+  loadWearRecords: async () => {
+    // 穿着记录不需要预加载，按需查询
+  },
+
+  addWearRecord: async (clothingId, date) => {
+    const id = await wearRecordsDb.addWearRecord(clothingId, date);
+    // 更新衣物的 wearCount 和 lastWornAt
+    const { clothing } = get();
+    const item = clothing.find(c => c.id === clothingId);
+    if (item) {
+      const newCount = (item.wearCount || 0) + 1;
+      set(state => ({
+        clothing: state.clothing.map(c =>
+          c.id === clothingId
+            ? { ...c, wearCount: newCount, lastWornAt: date }
+            : c
+        ),
+      }));
+    }
+    return id;
+  },
+
+  addWearRecords: async (clothingIds, date) => {
+    await wearRecordsDb.addWearRecords(clothingIds, date);
+    // 批量更新衣物的 wearCount 和 lastWornAt
+    set(state => ({
+      clothing: state.clothing.map(c =>
+        clothingIds.includes(c.id)
+          ? { ...c, wearCount: (c.wearCount || 0) + 1, lastWornAt: date }
+          : c
+      ),
+    }));
+  },
+
+  deleteWearRecord: async (id) => {
+    await wearRecordsDb.deleteWearRecord(id);
+  },
+
+  getWearDatesByClothing: (_clothingId) => {
+    return [];
+  },
+
+  getWearRecordsByDate: (_date) => {
+    return [];
+  },
+
+  getWearCount: (_clothingId) => {
+    return 0;
   },
 }));

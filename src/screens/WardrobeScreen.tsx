@@ -19,6 +19,7 @@ import { Theme } from '../utils/theme';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
 import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
+import * as wearRecordsDb from '../db/wearRecords';
 
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
@@ -221,6 +222,8 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 12,
       overflow: 'hidden',
       backgroundColor: theme.colors.card,
+      borderWidth: 1,
+      borderColor: 'transparent',
       ...theme.shadows.sm,
     },
     gridItemSelected: {
@@ -525,6 +528,8 @@ export function WardrobeScreen() {
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showBatchDiscardSheet, setShowBatchDiscardSheet] = useState(false);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
+  // 用于刷新图片，解决选择模式导致的图片空白问题
+  const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -635,6 +640,7 @@ export function WardrobeScreen() {
   const cancelSelection = useCallback(() => {
     setIsSelecting(false);
     setSelectedIds([]);
+    setImageRefreshKey(k => k + 1);
   }, []);
 
   const handleLongPress = useCallback((id: number) => {
@@ -670,6 +676,33 @@ export function WardrobeScreen() {
     // 刷新数据
     await loadData();
     cancelSelection();
+  };
+
+  const handleBatchWear = () => {
+    if (selectedIds.length === 0) return;
+    Alert.alert(
+      '记录穿着',
+      `确定要记录这 ${selectedIds.length} 件衣物的穿着吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确认',
+          onPress: async () => {
+            try {
+              const now = new Date();
+              const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+              await wearRecordsDb.addWearRecords(selectedIds.map(id => Number(id)), dateStr);
+              Alert.alert('已记录穿着');
+              cancelSelection();
+              await loadData();
+            } catch (e) {
+              console.error('记录穿着失败:', e);
+              Alert.alert('记录穿着失败');
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -801,6 +834,7 @@ export function WardrobeScreen() {
                   activeOpacity={0.85}
                 >
                   <Image
+                    key={`img-${itemId}-${imageRefreshKey}`}
                     source={{ uri: imageUri }}
                     style={styles.gridItemImage}
                     resizeMode="cover"
@@ -1079,6 +1113,16 @@ export function WardrobeScreen() {
                 <Ionicons name="trash-outline" size={18} color={theme.colors.warning} />
               </View>
               <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>废衣篓</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.batchBtn, styles.batchBtnSecondary]}
+              onPress={handleBatchWear}
+              activeOpacity={0.8}
+            >
+              <View style={[styles.batchBtnIconWrap, styles.batchBtnSecondaryIcon]}>
+                <Ionicons name="checkmark-done-outline" size={18} color={theme.colors.primary} />
+              </View>
+              <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>穿着</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.batchBtn, styles.batchBtnSuccess]}

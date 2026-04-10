@@ -86,3 +86,11 @@ export const STYLES: string[] = ['休闲', '简约', '运动', '通勤', '优雅
 export const COLORS: string[] = ['黑色', '白色', '灰色', '红色', '蓝色', '绿色', '黄色', '紫色', '粉色', '棕色', '米色', '橙色', '青色', '咖啡色', '酒红色', '藏青色', '卡其色', '军绿色', '其他'];
 
 export const SOLD_PLATFORMS = ['闲鱼', '转转', '得物', '微信', '小红书', '其他'];
+
+// 穿着记录
+export interface WearRecord {
+  id: number;
+  clothingId: number;
+  wornDate: string;  // YYYY-MM-DD
+  createdAt: string;
+}

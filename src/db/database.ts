@@ -80,6 +80,21 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     )
   `);
 
+  // 创建穿着记录表
+  await execSQL(dbInstance, `
+    CREATE TABLE IF NOT EXISTS wear_records (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      clothingId INTEGER NOT NULL,
+      wornDate TEXT NOT NULL,
+      createdAt TEXT NOT NULL,
+      FOREIGN KEY (clothingId) REFERENCES clothing_items(id) ON DELETE CASCADE
+    )
+  `);
+
+  // 创建穿着记录表索引
+  await execSQL(dbInstance, `CREATE INDEX IF NOT EXISTS idx_wear_records_clothing ON wear_records(clothingId)`);
+  await execSQL(dbInstance, `CREATE INDEX IF NOT EXISTS idx_wear_records_date ON wear_records(wornDate)`);
+
   // 迁移：确保所有必要列存在
   const addColumnIfNotExists = async (table: string, column: string, definition: string) => {
     if (!(await columnExists(dbInstance!, table, column))) {
