@@ -5,11 +5,11 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
-  PanResponder,
   Animated,
   ActivityIndicator,
   Image,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -190,9 +190,13 @@ export function CropView({
 
   const originalSizeRef = useRef({ width: 1, height: 1 });
   const displaySizeRef = useRef({ width: CROP_SIZE, height: CROP_SIZE });
+  const renderedSizeRef = useRef({ width: CROP_SIZE, height: CROP_SIZE }); // 实际渲染尺寸（onLayout 测量）
   const startOffsetRef = useRef({ x: 0, y: 0 });
   const offsetRef = useRef({ x: 0, y: 0 });
   const offsetAnim = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const scaleRef = useRef(1);
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const startScaleRef = useRef(1);
 
   // 裁剪框在 body 内的垂直起点（居中）
   const cropTop = bodyHeight > 0 ? (bodyHeight - CROP_SIZE) / 2 : 0;
@@ -229,6 +233,7 @@ export function CropView({
         const initY = -(displayH - CROP_SIZE) / 2;
         offsetRef.current = { x: initX, y: initY };
         offsetAnim.setValue({ x: initX, y: initY });
+        console.log('[ImageLoad] orig:', width, height, '| display:', displayW.toFixed(1), displayH.toFixed(1), '| initOffset:', initX.toFixed(1), initY.toFixed(1), '| aspectRatio:', aspectRatio.toFixed(2), '| overX:', (displayW - CROP_SIZE).toFixed(1), '| overY:', (displayH - CROP_SIZE).toFixed(1));
         setImageReady(true);
       },
       (error) => {
@@ -237,33 +242,84 @@ export function CropView({
     );
   }, [imageUri, offsetAnim]);
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        startOffsetRef.current = { ...offsetRef.current };
-      },
-      onPanResponderMove: (_, gs) => {
-        const { width: dw, height: dh } = displaySizeRef.current;
-        const minX = -(dw - CROP_SIZE);
-        const minY = -(dh - CROP_SIZE);
-        const newX = Math.max(minX, Math.min(0, startOffsetRef.current.x + gs.dx));
-        const newY = Math.max(minY, Math.min(0, startOffsetRef.current.y + gs.dy));
-        offsetRef.current = { x: newX, y: newY };
-        offsetAnim.setValue({ x: newX, y: newY });
-      },
-      onPanResponderRelease: (_, gs) => {
-        const { width: dw, height: dh } = displaySizeRef.current;
-        const minX = -(dw - CROP_SIZE);
-        const minY = -(dh - CROP_SIZE);
-        const newX = Math.max(minX, Math.min(0, startOffsetRef.current.x + gs.dx));
-        const newY = Math.max(minY, Math.min(0, startOffsetRef.current.y + gs.dy));
-        offsetRef.current = { x: newX, y: newY };
-        offsetAnim.setValue({ x: newX, y: newY });
-      },
+  // 双指缩放 + 单指拖动（Gesture.Simultaneous 两者同步识别）
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      startScaleRef.current = scaleRef.current;
+      console.log('[Pinch] START scale:', scaleRef.current);
     })
-  ).current;
+    .onUpdate((e) => {
+      const newScale = Math.max(1, Math.min(4, startScaleRef.current * e.scale));
+      scaleRef.current = newScale;
+      scaleAnim.setValue(newScale);
+    })
+    .onEnd(() => {
+      const { width: dw, height: dh } = displaySizeRef.current;
+      const s = scaleRef.current;
+      const overX = dw * s - CROP_SIZE;
+      const overY = dh * s - CROP_SIZE;
+      const minX = dw > CROP_SIZE ? -(overX) : 0;
+      const maxX = dw > CROP_SIZE ? 0 : overX;
+      const minY = dh > CROP_SIZE ? -(overY) : 0;
+      const maxY = dh > CROP_SIZE ? 0 : overY;
+      console.log('[Pinch] END scale:', s.toFixed(2), 'offset:', JSON.stringify(offsetRef.current), '| overX:', overX.toFixed(1), 'overY:', overY.toFixed(1), '| bounds X:', minX.toFixed(1), '~', maxX.toFixed(1), 'Y:', minY.toFixed(1), '~', maxY.toFixed(1));
+      // 缩放过小时自动弹回 1
+      if (scaleRef.current < 1.05) {
+        scaleRef.current = 1;
+        scaleAnim.setValue(1);
+        // 重置 offset 到居中位置
+        const { width: dw, height: dh } = displaySizeRef.current;
+        const initX = -(dw - CROP_SIZE) / 2;
+        const initY = -(dh - CROP_SIZE) / 2;
+        offsetRef.current = { x: initX, y: initY };
+        offsetAnim.setValue({ x: initX, y: initY });
+        console.log('[Pinch] snap to 1x, offset reset:', initX, initY);
+      }
+    });
+
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      // 每次手势开始时，同步 startOffset 到当前 offset（修复 pinch 后 startOffset 不一致的问题）
+      startOffsetRef.current = { ...offsetRef.current };
+    })
+    .onChange((e) => {
+      const { width: dw, height: dh } = displaySizeRef.current;
+      const s = scaleRef.current;
+
+      const deltaX = e.translationX;
+      const deltaY = e.translationY;
+
+      // 关键：scale 是以图片中心为基准，所以左上角会产生偏移
+      // centerOffset = 缩放后尺寸与原尺寸之差的一半
+      const centerOffsetX = (dw * s - dw) / 2;
+      const centerOffsetY = (dh * s - dh) / 2;
+
+      const scaledW = dw * s;
+      const scaledH = dh * s;
+
+      // 限界：考虑中心缩放后左上角的真实位置
+      // minX: 图片右边缘刚好对齐裁剪框右边缘时，左上角的 x
+      // maxX: 图片左边缘刚好对齐裁剪框左边缘时，左上角的 x
+      const minX = CROP_SIZE - scaledW + centerOffsetX;
+      const maxX = centerOffsetX;
+
+      const minY = CROP_SIZE - scaledH + centerOffsetY;
+      const maxY = centerOffsetY;
+
+      const rawX = startOffsetRef.current.x + deltaX;
+      const rawY = startOffsetRef.current.y + deltaY;
+
+      const newX = Math.max(minX, Math.min(maxX, rawX));
+      const newY = Math.max(minY, Math.min(maxY, rawY));
+
+      offsetRef.current = { x: newX, y: newY };
+      offsetAnim.setValue({ x: newX, y: newY });
+    })
+    .onEnd(() => {
+      // onChange 已经处理了 clamp，onEnd 不需要额外操作
+    });
+
+  const composedGesture = Gesture.Simultaneous(pinchGesture, panGesture);
 
   const handleConfirm = async () => {
     if (!imageReady) return;
@@ -273,18 +329,45 @@ export function CropView({
       const { width: dw, height: dh } = displaySizeRef.current;
 
       // 分数坐标：与 DPR、Image.getSize 逻辑像素无关
-      const fracX = Math.max(0, -offsetX / dw);
-      const fracY = Math.max(0, -offsetY / dh);
-      const fracW = Math.min(CROP_SIZE / dw, 1 - fracX);
-      const fracH = Math.min(CROP_SIZE / dh, 1 - fracY);
+      // scaleRef 是当前缩放，offset 是缩放后的像素位移
+      const s = scaleRef.current;
+      // 当前缩放后的显示尺寸（不是初始的 dw/dh）
+      const zoomedW = dw * s;
+      const zoomedH = dh * s;
+
+      // offset 是缩放后空间中的像素位移
+      // fracX = 图上位置（分数）= 显示偏移 / 显示尺寸
+      const rawFracX = -offsetX / zoomedW;
+      const rawFracY = -offsetY / zoomedH;
+
+      // 裁剪框在显示空间是 CROP_SIZE × CROP_SIZE 的正方形
+      // rawFracW/H = 裁剪框占显示区域的比例（随 scale 变化）
+      // 取 min 保证正方形，再 clamp 防止越界
+      const rawFracW = CROP_SIZE / zoomedW;
+      const rawFracH = CROP_SIZE / zoomedH;
+      const fracCrop = Math.min(rawFracW, rawFracH);
+      const fracX = Math.max(0, Math.min(rawFracX, 1 - fracCrop));
+      // 竖图 rotate90 CW 后：原图 y=0 在旋转图右侧，y=H-1 在左侧
+      // 所以往下滑（rawFracY 增加）→ 显示原图顶部
+      // 需要翻转：竖图用 1 - fracCrop - rawFracY，让下滑显示底部
+      const isPortrait = dh > dw;
+      // 竖图 rotate90 后：往下滑(rawFracY↑) → fracY↑ → 显示图片更靠下 → 正常
+      // 旧公式 1-fracCrop-rawFracY 是反的，改为 rawFracY
+      const fracY = isPortrait
+        ? Math.max(0, Math.min(rawFracY, 1 - fracCrop))
+        : Math.max(0, Math.min(rawFracY, 1 - fracCrop));
+      const fracW = fracCrop;
+      const fracH = fracCrop;
+
+      console.log('[Confirm] offset:', offsetX.toFixed(1), offsetY.toFixed(1));
+      console.log('[Confirm] display:', dw.toFixed(1), dh.toFixed(1), '| zoomed:', zoomedW.toFixed(1), zoomedH.toFixed(1), '| scale:', s.toFixed(2), '| isPortrait:', isPortrait);
+      console.log('[Confirm] rawFracX:', rawFracX.toFixed(3), 'rawFracY:', rawFracY.toFixed(3), 'rawFracW:', rawFracW.toFixed(3), 'rawFracH:', rawFracH.toFixed(3));
+      console.log('[Confirm] fracCrop:', fracCrop.toFixed(3), '=> final crop (image frac):', fracX.toFixed(3), fracY.toFixed(3), 'x', fracW.toFixed(3), fracH.toFixed(3));
+      console.log('[Confirm] step1 expected crop:', Math.round(fracW * 1500), 'x', Math.round(fracH * 1500));
 
       await ensureImageDir();
       const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
       const MAX_DIM = 1500;
-
-      // 竖图：fracX 恒为 0（displayW = CROP_SIZE），只有 fracY 偏移
-      // 横图：fracY 恒为 0（displayH = CROP_SIZE），只有 fracX 偏移
-      const isPortrait = dh > dw;
 
       // Step 1: resize（+ 竖图旋转 90° CW，使 Y 轴变成 X 轴）
       // manipulateAsync 的 originX 正常，originY 有 bug（永远是 0）
@@ -301,27 +384,34 @@ export function CropView({
       // Step 2: crop（+ 竖图旋转回来 -90°）
       // 竖图旋转后：原来的 row Y → column (step1.width - 1 - Y)
       //   originX = (1 - fracY - fracH) * step1.width
-      //   cropW   = fracH * step1.width
+      //   cropW   = fracH * step1.width（正方形边长）
       // 横图直接：originX = fracX * step1.width
-      let originX: number, cropW: number;
+      // 关键：竖图 crop 也要用 cropW × cropW（正方形），rotate 回来才是 1:1
+      let originX: number, originY: number, cropW: number;
       if (isPortrait) {
         originX = Math.round((1 - fracY - fracH) * step1.width);
         cropW   = Math.round(fracH * step1.width);
+        originY = 0; // manipulateAsync originY 有 bug，旋转后 Y 轴已变成 X 轴，不需要再设置
       } else {
         originX = Math.round(fracX * step1.width);
         cropW   = Math.round(fracW * step1.width);
+        originY = 0;
       }
       // 边界保护
       originX = Math.max(0, Math.min(originX, step1.width - 1));
       cropW   = Math.min(cropW, step1.width - originX);
 
+      console.log('[Confirm] step1 size:', step1.width, 'x', step1.height);
+      console.log('[Confirm] crop rect => originX:', originX, 'cropW:', cropW, '| portrait:', isPortrait);
+
       const step2Actions = isPortrait
-        ? [{ crop: { originX, originY: 0, width: cropW, height: step1.height } }, { rotate: 270 }]
-        : [{ crop: { originX, originY: 0, width: cropW, height: step1.height } }];
+        ? [{ crop: { originX, originY: 0, width: cropW, height: cropW } }, { rotate: 270 }]
+        : [{ crop: { originX, originY: 0, width: cropW, height: cropW } }];
       const step2 = await manipulateAsync(step1.uri, step2Actions, {
         format: SaveFormat.JPEG,
         compress: 0.92,
       });
+      console.log('[Confirm] step2 size:', step2.width, 'x', step2.height);
 
       await copyAsync({ from: step2.uri, to: savedPath });
       onConfirm(savedPath);
@@ -361,25 +451,37 @@ export function CropView({
       <View
         style={styles.body}
         onLayout={(e) => setBodyHeight(e.nativeEvent.layout.height)}
-        {...panResponder.panHandlers}
       >
-        {/* 图片：绝对定位于 body 内，在裁剪框垂直居中处开始 */}
-        <Animated.Image
-          source={{ uri: imageUri }}
-          style={{
-            position: 'absolute',
-            width: displaySize.width,
-            height: displaySize.height,
-            left: 0,
-            top: cropTop,
-            transform: [
-              { translateX: offsetAnim.x },
-              { translateY: offsetAnim.y },
-            ],
-            opacity: showContent ? 1 : 0,
-          }}
-          resizeMode="cover"
-        />
+        <GestureDetector gesture={composedGesture}>
+          <View style={StyleSheet.absoluteFill}>
+            {/* 图片：绝对定位于 body 内，在裁剪框垂直居中处开始 */}
+            <Animated.Image
+              source={{ uri: imageUri }}
+              style={{
+                position: 'absolute',
+                width: displaySize.width,
+                height: displaySize.height,
+                left: 0,
+                top: cropTop,
+                transform: [
+                  { translateX: offsetAnim.x },
+                  { translateY: offsetAnim.y },
+                  { scale: scaleAnim },
+                ],
+                opacity: showContent ? 1 : 0,
+              }}
+              resizeMode="cover"
+              onLayout={(e) => {
+                const { width, height } = e.nativeEvent.layout;
+                const prev = renderedSizeRef.current;
+                if (Math.abs(width - prev.width) > 0.5 || Math.abs(height - prev.height) > 0.5) {
+                  renderedSizeRef.current = { width, height };
+                  console.log('[ImageLayout] rendered:', width.toFixed(1), height.toFixed(1), '| prev:', prev.width.toFixed(1), prev.height.toFixed(1), '| displaySize:', displaySizeRef.current.width.toFixed(1), displaySizeRef.current.height.toFixed(1));
+                }
+              }}
+            />
+          </View>
+        </GestureDetector>
 
         {/* 加载中 */}
         {!showContent && (
