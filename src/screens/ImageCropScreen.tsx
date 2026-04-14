@@ -13,78 +13,11 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { documentDirectory, readAsStringAsync, writeAsStringAsync } from 'expo-file-system/legacy';
+import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { ensureImageDir } from '../utils/imageUtils';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import jpeg from 'jpeg-js';
-
-/** Pure JS JPEG crop using jpeg-js - bypasses native manipulateAsync bugs */
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
-
-function uint8ArrayToBase64(bytes: Uint8Array): string {
-  const CHUNK = 0x8000; // 32 KB chunks to avoid call stack overflow
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK) as unknown as number[]);
-  }
-  return btoa(binary);
-}
-
-async function cropJpegPure(
-  srcPath: string,
-  destPath: string,
-  fracX: number,  // left edge as fraction of image width  (0–1)
-  fracY: number,  // top  edge as fraction of image height (0–1)
-  fracW: number,  // crop width  as fraction of image width  (0–1)
-  fracH: number,  // crop height as fraction of image height (0–1)
-  quality: number = 0.92
-): Promise<{ width: number; height: number }> {
-  // 1. Read file as base64 → Uint8Array
-  const base64 = await readAsStringAsync(srcPath, { encoding: 'base64' });
-  const jpegData = base64ToUint8Array(base64);
-
-  // 2. Decode JPEG to raw RGBA pixels (4 bytes/pixel)
-  const rawImage = jpeg.decode(jpegData, { useTArray: true });
-  const { width: srcW, height: srcH, data: srcPixels } = rawImage;
-
-  // 3. Convert fractional coords → actual pixel coords (immune to DPR differences)
-  const cropX = Math.round(fracX * srcW);
-  const cropY = Math.round(fracY * srcH);
-  const cropW = Math.round(fracW * srcW);
-  const cropH = Math.round(fracH * srcH);
-  console.log('[cropJpegPure] decoded:', srcW, srcH, '| crop px:', cropX, cropY, cropW, cropH);
-
-  // 4. Clamp crop rect to image bounds
-  const sx = Math.max(0, Math.min(cropX, srcW - 1));
-  const sy = Math.max(0, Math.min(cropY, srcH - 1));
-  const sw = Math.min(cropW, srcW - sx);
-  const sh = Math.min(cropH, srcH - sy);
-
-  // 5. Extract cropped rows in bulk
-  const rgbaPixels = new Uint8Array(sw * sh * 4);
-  for (let dy = 0; dy < sh; dy++) {
-    const srcRowStart = ((sy + dy) * srcW + sx) * 4;
-    rgbaPixels.set(srcPixels.subarray(srcRowStart, srcRowStart + sw * 4), dy * sw * 4);
-  }
-
-  // 6. Encode RGBA pixels to JPEG — jpeg.encode expects RGBA (4 bytes/pixel)
-  const encoded = jpeg.encode({ width: sw, height: sh, data: rgbaPixels }, Math.round(quality * 100));
-
-  // 7. Convert to base64 and write
-  const jpegBase64 = uint8ArrayToBase64(encoded.data);
-  await writeAsStringAsync(destPath, jpegBase64, { encoding: 'base64' });
-
-  return { width: sw, height: sh };
-}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CROP_SIZE = SCREEN_WIDTH; // 1:1 正方形，宽度=屏幕宽度
@@ -339,47 +272,61 @@ export function CropView({
       const { x: offsetX, y: offsetY } = offsetRef.current;
       const { width: dw, height: dh } = displaySizeRef.current;
 
-      // Use fractional coordinates so they're immune to DPR differences between
-      // Image.getSize (logical px) and jpeg.decode (physical px).
+      // 分数坐标：与 DPR、Image.getSize 逻辑像素无关
       const fracX = Math.max(0, -offsetX / dw);
       const fracY = Math.max(0, -offsetY / dh);
       const fracW = Math.min(CROP_SIZE / dw, 1 - fracX);
       const fracH = Math.min(CROP_SIZE / dh, 1 - fracY);
 
-      console.log('[CropView] offset:', offsetX, offsetY, '| display:', dw, dh);
-      console.log('[CropView] fractions:', fracX.toFixed(3), fracY.toFixed(3), fracW.toFixed(3), fracH.toFixed(3));
-
-      // 确保目录存在
       await ensureImageDir();
-
-      // Step 1: 用 manipulateAsync 原生缩小图片（resize 无 bug，只有 crop 有 bug）
-      // 目标最大边 1500px → 解码数据量降低 4~6 倍，速度大幅提升
-      const { width: origW, height: origH } = originalSizeRef.current;
+      const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
       const MAX_DIM = 1500;
-      const longerSide = Math.max(origW, origH);
-      const resizeAction = longerSide > MAX_DIM
-        ? [{ resize: origW >= origH ? { width: MAX_DIM } : { height: MAX_DIM } }]
-        : [];  // 图片已足够小，跳过 resize
-      const resized = await manipulateAsync(imageUri, resizeAction, {
+
+      // 竖图：fracX 恒为 0（displayW = CROP_SIZE），只有 fracY 偏移
+      // 横图：fracY 恒为 0（displayH = CROP_SIZE），只有 fracX 偏移
+      const isPortrait = dh > dw;
+
+      // Step 1: resize（+ 竖图旋转 90° CW，使 Y 轴变成 X 轴）
+      // manipulateAsync 的 originX 正常，originY 有 bug（永远是 0）
+      // 旋转后用 originX 裁剪，绕过 originY bug
+      const step1Actions = isPortrait
+        ? [{ resize: { height: MAX_DIM } }, { rotate: 90 }]
+        : [{ resize: { width: MAX_DIM } }];
+      const step1 = await manipulateAsync(imageUri, step1Actions, {
         format: SaveFormat.JPEG,
-        compress: 0.95,
+        compress: 0.92,
+      });
+      // step1.width / step1.height 是实际像素（绕过 Image.getSize DPR 问题）
+
+      // Step 2: crop（+ 竖图旋转回来 -90°）
+      // 竖图旋转后：原来的 row Y → column (step1.width - 1 - Y)
+      //   originX = (1 - fracY - fracH) * step1.width
+      //   cropW   = fracH * step1.width
+      // 横图直接：originX = fracX * step1.width
+      let originX: number, cropW: number;
+      if (isPortrait) {
+        originX = Math.round((1 - fracY - fracH) * step1.width);
+        cropW   = Math.round(fracH * step1.width);
+      } else {
+        originX = Math.round(fracX * step1.width);
+        cropW   = Math.round(fracW * step1.width);
+      }
+      // 边界保护
+      originX = Math.max(0, Math.min(originX, step1.width - 1));
+      cropW   = Math.min(cropW, step1.width - originX);
+
+      const step2Actions = isPortrait
+        ? [{ crop: { originX, originY: 0, width: cropW, height: step1.height } }, { rotate: 270 }]
+        : [{ crop: { originX, originY: 0, width: cropW, height: step1.height } }];
+      const step2 = await manipulateAsync(step1.uri, step2Actions, {
+        format: SaveFormat.JPEG,
+        compress: 0.92,
       });
 
-      // Step 2: 纯 JS 对缩小后的图裁剪（坐标用分数，与分辨率无关）
-      const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
-      const { width: resultW, height: resultH } = await cropJpegPure(
-        resized.uri,
-        savedPath,
-        fracX,
-        fracY,
-        fracW,
-        fracH,
-        0.92
-      );
-      console.log('[CropView] pureJS crop result:', resultW, resultH);
+      await copyAsync({ from: step2.uri, to: savedPath });
       onConfirm(savedPath);
     } catch (error) {
-      console.error('[CropView] Crop FAILED, returning original:', error);
+      console.error('[CropView] Crop failed:', error);
       onConfirm(imageUri);
     } finally {
       setIsProcessing(false);
