@@ -417,14 +417,22 @@ export function TrashScreen() {
   const renderItem = ({ item }: { item: ClothingItem }) => {
     const itemId = Number(item.id);
     const isSelected = selectedIds.includes(itemId);
+    const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
     return (
       <TouchableOpacity
-        style={[styles.itemCard, isSelecting && isSelected && styles.itemCardSelected]}
+        style={[
+          styles.itemCard,
+          isSelecting && isSelected && styles.itemCardSelected,
+          isTransparent && { backgroundColor: theme.colors.background }
+        ]}
         onPress={() => isSelecting ? toggleSelect(itemId) : navigation.navigate('ClothingDetail', { id: item.id, source: 'trash' })}
         onLongPress={() => handleLongPress(itemId)}
         activeOpacity={0.85}
       >
-        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />
+        <Image
+          source={{ uri: item.thumbnailUri || item.imageUri }}
+          style={[styles.itemImage, isTransparent && { resizeMode: 'contain' }]}
+        />
         {isSelecting && isSelected && (
           <View style={styles.selectBadge}>
             <Ionicons name="checkmark" size={14} color={theme.colors.white} />

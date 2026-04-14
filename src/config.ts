@@ -6,4 +6,4 @@
  * 2. 登录后在 Dashboard 获取你的 API Key
  * 3. 将下面的 YOUR_API_KEY 替换为你的真实 API Key
  */
-export const REMOVE_BG_API_KEY = 'YOUR_API_KEY';
+export const REMOVE_BG_API_KEY = 'vsoEY4pUWAohLy9oEFpHYx6S';

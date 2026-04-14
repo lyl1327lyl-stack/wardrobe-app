@@ -360,18 +360,23 @@ export function DraftsScreen() {
               const itemId = getItemId(item);
               const isSelected = selectedIds.includes(itemId);
               const imageUri = item.thumbnailUri || item.imageUri;
+              const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
               return (
                 <TouchableOpacity
                   key={`grid-${itemId}`}
-                  style={[styles.gridItemWrap, isSelecting && isSelected && styles.gridItemSelected]}
+                  style={[
+                    styles.gridItemWrap,
+                    isSelecting && isSelected && styles.gridItemSelected,
+                    isTransparent && { backgroundColor: theme.colors.background }
+                  ]}
                   onPress={() => handlePress(item)}
                   onLongPress={() => handleLongPress(itemId)}
                   activeOpacity={0.85}
                 >
                   <Image
                     source={{ uri: imageUri }}
-                    style={styles.gridItemImage}
-                    resizeMode="cover"
+                    style={[styles.gridItemImage, isTransparent && { resizeMode: 'contain' }]}
+                    resizeMode={isTransparent ? 'contain' : 'cover'}
                   />
                   {isSelecting && isSelected && (
                     <View style={styles.gridSelectBadge}>

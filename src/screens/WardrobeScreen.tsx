@@ -179,6 +179,15 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 3,
       borderColor: theme.colors.primary,
     },
+    // 透明图片背景 - 无边框，融入页面背景
+    itemCardTransparent: {
+      width: 100,
+      height: 100,
+      borderRadius: 10,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.background,
+      position: 'relative',
+    },
     itemImage: {
       width: '100%',
       height: '100%',
@@ -229,6 +238,14 @@ const makeStyles = (theme: Theme) =>
     gridItemSelected: {
       borderWidth: 3,
       borderColor: theme.colors.primary,
+    },
+    // 透明图片背景 - 无边框，融入页面背景
+    gridItemTransparentWrap: {
+      width: '31%',
+      aspectRatio: 1,
+      borderRadius: 12,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.background,
     },
     gridItemImage: {
       width: '100%',
@@ -825,10 +842,14 @@ export function WardrobeScreen() {
               const itemId = getItemId(item);
               const isSelected = selectedIds.includes(itemId);
               const imageUri = item.thumbnailUri || item.imageUri;
+              const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
               return (
                 <TouchableOpacity
                   key={`grid-${itemId}`}
-                  style={[styles.gridItemWrap, isSelecting && isSelected && styles.gridItemSelected]}
+                  style={[
+                    isTransparent ? styles.gridItemTransparentWrap : styles.gridItemWrap,
+                    isSelecting && isSelected && styles.gridItemSelected
+                  ]}
                   onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
                   onLongPress={() => handleLongPress(itemId)}
                   activeOpacity={0.85}
@@ -836,8 +857,8 @@ export function WardrobeScreen() {
                   <Image
                     key={`img-${itemId}-${imageRefreshKey}`}
                     source={{ uri: imageUri }}
-                    style={styles.gridItemImage}
-                    resizeMode="cover"
+                    style={[styles.gridItemImage, isTransparent && { resizeMode: 'contain', backgroundColor: 'transparent' }]}
+                    resizeMode={isTransparent ? 'contain' : 'cover'}
                   />
                   {isSelecting && isSelected && (
                     <View style={styles.gridSelectBadge}>
@@ -901,18 +922,22 @@ export function WardrobeScreen() {
                       : null;
                     const isSelected = selectedIds.includes(itemId);
                     const imageUri = item.thumbnailUri || item.imageUri;
+                    const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
                     return (
                       <TouchableOpacity
                         key={`card-${itemId}`}
-                        style={[styles.itemCard, isSelecting && isSelected && styles.itemCardSelected]}
+                        style={[
+                          isTransparent ? styles.itemCardTransparent : styles.itemCard,
+                          isSelecting && isSelected && styles.itemCardSelected
+                        ]}
                         onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
                         onLongPress={() => handleLongPress(itemId)}
                         activeOpacity={0.85}
                       >
                         <Image
                           source={{ uri: imageUri }}
-                          style={styles.itemImage}
-                          resizeMode="cover"
+                          style={[styles.itemImage, isTransparent && { resizeMode: 'contain', backgroundColor: 'transparent' }]}
+                          resizeMode={isTransparent ? 'contain' : 'cover'}
                         />
                         {isSelecting && isSelected && (
                           <View style={styles.selectBadge}>
@@ -957,10 +982,14 @@ export function WardrobeScreen() {
                     : null;
                   const isSelected = selectedIds.includes(itemId);
                   const imageUri = item.thumbnailUri || item.imageUri;
+                  const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
                   return (
                     <TouchableOpacity
                       key={`card-${itemId}`}
-                      style={[styles.itemCard, isSelecting && isSelected && styles.itemCardSelected]}
+                      style={[
+                        isTransparent ? styles.itemCardTransparent : styles.itemCard,
+                        isSelecting && isSelected && styles.itemCardSelected
+                      ]}
                       onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
                       onLongPress={() => handleLongPress(itemId)}
                       activeOpacity={0.85}

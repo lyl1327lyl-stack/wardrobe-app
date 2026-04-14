@@ -673,6 +673,7 @@ export function AddClothingScreen() {
   };
 
   const [imageUri, setImageUri] = useState(isEditingDraft ? (route.params?.prefilledImageUri || '') : (existingItem?.imageUri || ''));
+  const [removeBackground, setRemoveBackground] = useState(false);
   const [selectedParent, setSelectedParent] = useState<string>(getInitialParent(existingItem));
   const [selectedChild, setSelectedChild] = useState<string>(getInitialChild(existingItem));
   const [color, setColor] = useState(existingItem?.color || '');
@@ -887,7 +888,7 @@ export function AddClothingScreen() {
       let thumbnailUri = existingItem?.thumbnailUri || imageUri;
 
       if (!asDraft && imageUri && (!existingItem || imageUri !== existingItem.imageUri)) {
-        const result = await processImage(imageUri, false);
+        const result = await processImage(imageUri, removeBackground);
         processedUri = result.imageUri;
         thumbnailUri = result.thumbnailUri;
       }
@@ -1229,8 +1230,9 @@ export function AddClothingScreen() {
       <ImagePickerModal
         visible={showImagePicker}
         onClose={() => setShowImagePicker(false)}
-        onImageSelected={(uri) => {
+        onImageSelected={(uri, shouldRemoveBg) => {
           setImageUri(uri);
+          setRemoveBackground(shouldRemoveBg);
         }}
       />
 

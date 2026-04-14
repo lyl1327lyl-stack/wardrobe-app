@@ -811,8 +811,17 @@ export function ClothingDetailScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* 图片区域 */}
         <View style={styles.imageSection}>
-          <View style={styles.imageWrapper}>
-            <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.image} />
+          <View style={[
+            styles.imageWrapper,
+            item.thumbnailUri?.endsWith('.png') && { backgroundColor: theme.colors.background }
+          ]}>
+            <Image
+              source={{ uri: item.thumbnailUri || item.imageUri }}
+              style={[
+                styles.image,
+                item.thumbnailUri?.endsWith('.png') && { resizeMode: 'contain' }
+              ]}
+            />
             {item.color && <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />}
           </View>
         </View>

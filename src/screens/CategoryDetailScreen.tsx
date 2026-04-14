@@ -148,15 +148,20 @@ export function CategoryDetailScreen() {
     const costPerWear = item.price > 0 && item.wearCount > 0
       ? Math.round(item.price / item.wearCount)
       : null;
+    const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
     return (
       <TouchableOpacity
-        style={[styles.card, index % COLUMN_COUNT !== 0 && styles.cardMargin]}
+        style={[
+          styles.card,
+          index % COLUMN_COUNT !== 0 && styles.cardMargin,
+          isTransparent && { backgroundColor: theme.colors.background }
+        ]}
         onPress={() => handlePress(item)}
         activeOpacity={0.8}
       >
         <Image
           source={{ uri: item.thumbnailUri || item.imageUri }}
-          style={styles.cardImage}
+          style={[styles.cardImage, isTransparent && { resizeMode: 'contain' }]}
         />
         {costPerWear !== null && (
           <View style={styles.costBadge}>

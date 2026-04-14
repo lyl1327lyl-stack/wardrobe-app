@@ -7,7 +7,7 @@ import {
   readAsStringAsync,
   writeAsStringAsync,
 } from 'expo-file-system/legacy';
-import { manipulateAsync } from 'expo-image-manipulator';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { removeBackground } from './backgroundRemoval';
 
 const IMAGE_DIR = `${documentDirectory}images/`;
@@ -68,12 +68,14 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
   if (removeBg) {
     const bgRemovedUri = await removeBackground(uri);
     if (bgRemovedUri) {
-      // Save the background removed image as thumbnail
-      // bgRemovedUri is a data URI, extract base64 and save
+      // bgRemovedUri is a data URI with PNG format (has transparency)
+      // Save as PNG - UI should display with white background
       const base64Match = bgRemovedUri.match(/base64,(.+)$/);
       if (base64Match) {
-        await writeAsStringAsync(thumbnailPath, base64Match[1], { encoding: 'base64' });
-        console.log('[processImage] Saved background removed thumbnail');
+        const pngPath = thumbnailPath;
+        await writeAsStringAsync(pngPath, base64Match[1], { encoding: 'base64' });
+        console.log('[processImage] Saved background removed thumbnail as PNG');
+        // Keep thumbnailUri as pngPath (with transparency)
       }
     } else {
       // Fallback to regular thumbnail
@@ -89,14 +91,16 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
     }
   } else {
     // Regular thumbnail without background removal
+    const isPng = uri.toLowerCase().endsWith('.png');
     const thumbnail = await manipulateAsync(
       uri,
       [{ resize: { width: THUMBNAIL_SIZE } }],
-      { compress: 0.8 }
+      isPng ? { format: SaveFormat.PNG } : { compress: 0.8 }
     );
     const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
-    await writeAsStringAsync(thumbnailPath.replace('.png', '.jpg'), base64Thumb, { encoding: 'base64' });
-    thumbnailUri = thumbnailPath.replace('.png', '.jpg');
+    const thumbPath = isPng ? thumbnailPath : thumbnailPath.replace('.png', '.jpg');
+    await writeAsStringAsync(thumbPath, base64Thumb, { encoding: 'base64' });
+    thumbnailUri = thumbPath;
   }
 
   return { imageUri: imagePath, thumbnailUri };

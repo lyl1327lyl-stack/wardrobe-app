@@ -9,6 +9,11 @@ interface Props {
   onPress: () => void;
 }
 
+// Check if thumbnail is PNG (transparent background after background removal)
+function hasTransparentBackground(item: ClothingItem): boolean {
+  return !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
+}
+
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
@@ -22,10 +27,15 @@ const makeStyles = (theme: Theme) =>
     imageWrapper: {
       position: 'relative',
     },
+    // Transparent image background - use theme background
+    transparentBg: {
+      width: '100%',
+      aspectRatio: 1,
+      backgroundColor: theme.colors.background,
+    },
     image: {
       width: '100%',
       aspectRatio: 1,
-      backgroundColor: theme.colors.borderLight,
     },
     badge: {
       position: 'absolute',
@@ -69,10 +79,19 @@ export function ClothingCard({ item, onPress }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
+  const isTransparent = hasTransparentBackground(item);
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: item.thumbnailUri }} style={styles.image} />
+        {isTransparent ? (
+          // Use theme background color so transparent areas blend in
+          <View style={styles.transparentBg}>
+            <Image source={{ uri: item.thumbnailUri }} style={styles.image} resizeMode="contain" />
+          </View>
+        ) : (
+          <Image source={{ uri: item.thumbnailUri }} style={styles.image} />
+        )}
         {item.wearCount > 0 && (
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{item.wearCount}</Text>
