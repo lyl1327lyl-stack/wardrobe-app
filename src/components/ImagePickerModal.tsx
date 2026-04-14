@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { processImage } from '../utils/imageUtils';
+import { registerCropCallback } from '../screens/ImageCropScreen';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 interface Props {
@@ -191,11 +193,14 @@ const makeStyles = (theme: Theme) =>
 export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const navigation = useNavigation<any>();
 
   const [step, setStep] = useState<Step>('source');
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
   const [processedUri, setProcessedUri] = useState<string | null>(null);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  // 导航到裁剪页面时临时隐藏编辑页
+  const [isCropNavigating, setIsCropNavigating] = useState(false);
 
   useEffect(() => {
     if (!visible) {
@@ -203,6 +208,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
       setSelectedUri(null);
       setProcessedUri(null);
       setIsRemovingBg(false);
+      setIsCropNavigating(false);
     }
   }, [visible]);
 
@@ -323,7 +329,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
   const isProcessed = !!processedUri;
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleBack}>
+    <Modal visible={visible && !isCropNavigating} transparent animationType="fade" onRequestClose={handleBack}>
       <View style={styles.editOverlay}>
         {/* 顶部导航栏 */}
         <View style={styles.editHeader}>
@@ -350,11 +356,24 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
           <View style={styles.bottomActionBar}>
             {/* 裁剪按钮 */}
             <TouchableOpacity
-              style={[styles.actionBtn, styles.actionBtnDisabled]}
+              style={[styles.actionBtn, isRemovingBg && styles.actionBtnDisabled]}
               activeOpacity={0.7}
+              disabled={isRemovingBg}
+              onPress={() => {
+                const uriToCrop = processedUri || selectedUri;
+                if (!uriToCrop) return;
+                // 注册回调：裁剪完成后将结果写入 processedUri 并恢复本 Modal
+                registerCropCallback((croppedUri: string) => {
+                  setProcessedUri(croppedUri);
+                  setIsCropNavigating(false);
+                });
+                // 隐藏本 Modal，push 到裁剪页面
+                setIsCropNavigating(true);
+                navigation.navigate('ImageCrop', { imageUri: uriToCrop });
+              }}
             >
-              <Ionicons name="crop" size={20} color={theme.colors.textSecondary} />
-              <Text style={[styles.actionBtnText, { color: theme.colors.textSecondary }]}>裁剪</Text>
+              <Ionicons name="crop" size={20} color={theme.colors.text} />
+              <Text style={styles.actionBtnText}>裁剪</Text>
             </TouchableOpacity>
 
             {/* AI抠图按钮 */}

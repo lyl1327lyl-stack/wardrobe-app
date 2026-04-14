@@ -4,7 +4,7 @@ import { NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WardrobeScreen } from './src/screens/WardrobeScreen';
@@ -22,6 +22,7 @@ import { PersonalCenterScreen } from './src/screens/PersonalCenterScreen';
 import { CustomOptionsScreen } from './src/screens/CustomOptionsScreen';
 import { WardrobeManagementScreen } from './src/screens/WardrobeManagementScreen';
 import { DraftsScreen } from './src/screens/DraftsScreen';
+import { ImageCropScreen } from './src/screens/ImageCropScreen';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useTheme } from './src/hooks/useTheme';
 
@@ -244,6 +245,14 @@ function AppNavigator() {
         <RootStack.Screen
           name="Drafts"
           component={DraftsScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="ImageCrop"
+          component={ImageCropScreen}
           options={{
             headerShown: false,
             presentation: 'card',
