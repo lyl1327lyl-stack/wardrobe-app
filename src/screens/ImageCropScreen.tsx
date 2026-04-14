@@ -328,89 +328,58 @@ export function CropView({
       const { x: offsetX, y: offsetY } = offsetRef.current;
       const { width: dw, height: dh } = displaySizeRef.current;
 
-      // 分数坐标：与 DPR、Image.getSize 逻辑像素无关
-      // scaleRef 是当前缩放，offset 是缩放后的像素位移
       const s = scaleRef.current;
-      // 当前缩放后的显示尺寸（不是初始的 dw/dh）
+
+      // scale 以图片中心为基准，左上角会产生 centerOffset
+      const centerOffsetX = (dw * s - dw) / 2;
+      const centerOffsetY = (dh * s - dh) / 2;
+      const realOffsetX = offsetX - centerOffsetX;
+      const realOffsetY = offsetY - centerOffsetY;
+
       const zoomedW = dw * s;
       const zoomedH = dh * s;
 
-      // offset 是缩放后空间中的像素位移
-      // fracX = 图上位置（分数）= 显示偏移 / 显示尺寸
-      const rawFracX = -offsetX / zoomedW;
-      const rawFracY = -offsetY / zoomedH;
+      // fracX/Y 直接基于显示尺寸计算
+      const rawFracX = -realOffsetX / zoomedW;
+      const rawFracY = -realOffsetY / zoomedH;
 
       // 裁剪框在显示空间是 CROP_SIZE × CROP_SIZE 的正方形
-      // rawFracW/H = 裁剪框占显示区域的比例（随 scale 变化）
-      // 取 min 保证正方形，再 clamp 防止越界
       const rawFracW = CROP_SIZE / zoomedW;
       const rawFracH = CROP_SIZE / zoomedH;
       const fracCrop = Math.min(rawFracW, rawFracH);
       const fracX = Math.max(0, Math.min(rawFracX, 1 - fracCrop));
-      // 竖图 rotate90 CW 后：原图 y=0 在旋转图右侧，y=H-1 在左侧
-      // 所以往下滑（rawFracY 增加）→ 显示原图顶部
-      // 需要翻转：竖图用 1 - fracCrop - rawFracY，让下滑显示底部
-      const isPortrait = dh > dw;
-      // 竖图 rotate90 后：往下滑(rawFracY↑) → fracY↑ → 显示图片更靠下 → 正常
-      // 旧公式 1-fracCrop-rawFracY 是反的，改为 rawFracY
-      const fracY = isPortrait
-        ? Math.max(0, Math.min(rawFracY, 1 - fracCrop))
-        : Math.max(0, Math.min(rawFracY, 1 - fracCrop));
+      const fracY = Math.max(0, Math.min(rawFracY, 1 - fracCrop));
       const fracW = fracCrop;
       const fracH = fracCrop;
 
-      console.log('[Confirm] offset:', offsetX.toFixed(1), offsetY.toFixed(1));
-      console.log('[Confirm] display:', dw.toFixed(1), dh.toFixed(1), '| zoomed:', zoomedW.toFixed(1), zoomedH.toFixed(1), '| scale:', s.toFixed(2), '| isPortrait:', isPortrait);
-      console.log('[Confirm] rawFracX:', rawFracX.toFixed(3), 'rawFracY:', rawFracY.toFixed(3), 'rawFracW:', rawFracW.toFixed(3), 'rawFracH:', rawFracH.toFixed(3));
-      console.log('[Confirm] fracCrop:', fracCrop.toFixed(3), '=> final crop (image frac):', fracX.toFixed(3), fracY.toFixed(3), 'x', fracW.toFixed(3), fracH.toFixed(3));
-      console.log('[Confirm] step1 expected crop:', Math.round(fracW * 1500), 'x', Math.round(fracH * 1500));
+      console.log('[Confirm] offset:', offsetX.toFixed(1), offsetY.toFixed(1), '| centerOff:', centerOffsetX.toFixed(1), centerOffsetY.toFixed(1), '| realOff:', realOffsetX.toFixed(1), realOffsetY.toFixed(1));
+      console.log('[Confirm] display:', dw.toFixed(1), dh.toFixed(1), '| zoomed:', zoomedW.toFixed(1), zoomedH.toFixed(1), '| scale:', s.toFixed(2));
+      console.log('[Confirm] rawFracX:', rawFracX.toFixed(3), 'rawFracY:', rawFracY.toFixed(3), 'fracCrop:', fracCrop.toFixed(3), '=> final crop:', fracX.toFixed(3), fracY.toFixed(3), 'x', fracW.toFixed(3), fracH.toFixed(3));
 
       await ensureImageDir();
       const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
       const MAX_DIM = 1500;
 
-      // Step 1: resize（+ 竖图旋转 90° CW，使 Y 轴变成 X 轴）
-      // manipulateAsync 的 originX 正常，originY 有 bug（永远是 0）
-      // 旋转后用 originX 裁剪，绕过 originY bug
-      const step1Actions = isPortrait
-        ? [{ resize: { height: MAX_DIM } }, { rotate: 90 }]
-        : [{ resize: { width: MAX_DIM } }];
-      const step1 = await manipulateAsync(imageUri, step1Actions, {
-        format: SaveFormat.JPEG,
-        compress: 0.92,
-      });
-      // step1.width / step1.height 是实际像素（绕过 Image.getSize DPR 问题）
+      // Step 1: 仅等比例 resize（不 rotate！保持坐标系与显示一致）
+      const step1 = await manipulateAsync(
+        imageUri,
+        [{ resize: { width: MAX_DIM } }],
+        { format: SaveFormat.JPEG, compress: 0.92 }
+      );
 
-      // Step 2: crop（+ 竖图旋转回来 -90°）
-      // 竖图旋转后：原来的 row Y → column (step1.width - 1 - Y)
-      //   originX = (1 - fracY - fracH) * step1.width
-      //   cropW   = fracH * step1.width（正方形边长）
-      // 横图直接：originX = fracX * step1.width
-      // 关键：竖图 crop 也要用 cropW × cropW（正方形），rotate 回来才是 1:1
-      let originX: number, originY: number, cropW: number;
-      if (isPortrait) {
-        originX = Math.round((1 - fracY - fracH) * step1.width);
-        cropW   = Math.round(fracH * step1.width);
-        originY = 0; // manipulateAsync originY 有 bug，旋转后 Y 轴已变成 X 轴，不需要再设置
-      } else {
-        originX = Math.round(fracX * step1.width);
-        cropW   = Math.round(fracW * step1.width);
-        originY = 0;
-      }
-      // 边界保护
-      originX = Math.max(0, Math.min(originX, step1.width - 1));
-      cropW   = Math.min(cropW, step1.width - originX);
+      // Step 2: 直接用 frac 裁剪（坐标系完全对应）
+      const originX = Math.round(fracX * step1.width);
+      const originY = Math.round(fracY * step1.height);
+      const cropW   = Math.round(fracW * step1.width);
+      const cropH   = Math.round(fracH * step1.height);
 
-      console.log('[Confirm] step1 size:', step1.width, 'x', step1.height);
-      console.log('[Confirm] crop rect => originX:', originX, 'cropW:', cropW, '| portrait:', isPortrait);
+      console.log('[Confirm] step1 size:', step1.width, 'x', step1.height, '| crop rect => originX:', originX, 'originY:', originY, 'cropW:', cropW, 'cropH:', cropH);
 
-      const step2Actions = isPortrait
-        ? [{ crop: { originX, originY: 0, width: cropW, height: cropW } }, { rotate: 270 }]
-        : [{ crop: { originX, originY: 0, width: cropW, height: cropW } }];
-      const step2 = await manipulateAsync(step1.uri, step2Actions, {
-        format: SaveFormat.JPEG,
-        compress: 0.92,
-      });
+      const step2 = await manipulateAsync(
+        step1.uri,
+        [{ crop: { originX, originY, width: cropW, height: cropH } }],
+        { format: SaveFormat.JPEG, compress: 0.92 }
+      );
       console.log('[Confirm] step2 size:', step2.width, 'x', step2.height);
 
       await copyAsync({ from: step2.uri, to: savedPath });
