@@ -688,7 +688,6 @@ export function AddClothingScreen() {
   const [price, setPrice] = useState(existingItem?.price != null ? String(existingItem.price) : '');
   const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
-  const [removeBackground, setRemoveBackground] = useState(true); // 默认开启抠图
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
   const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
@@ -888,7 +887,7 @@ export function AddClothingScreen() {
       let thumbnailUri = existingItem?.thumbnailUri || imageUri;
 
       if (!asDraft && imageUri && (!existingItem || imageUri !== existingItem.imageUri)) {
-        const result = await processImage(imageUri, removeBackground);
+        const result = await processImage(imageUri, false);
         processedUri = result.imageUri;
         thumbnailUri = result.thumbnailUri;
       }
@@ -1230,9 +1229,9 @@ export function AddClothingScreen() {
       <ImagePickerModal
         visible={showImagePicker}
         onClose={() => setShowImagePicker(false)}
-        onImageSelected={setImageUri}
-        removeBackground={removeBackground}
-        onRemoveBackgroundChange={setRemoveBackground}
+        onImageSelected={(uri) => {
+          setImageUri(uri);
+        }}
       />
 
       {/* 衣橱选择居中对话框 */}

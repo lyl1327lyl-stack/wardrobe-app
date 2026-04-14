@@ -1,17 +1,16 @@
 import { readAsStringAsync } from 'expo-file-system/legacy';
+import { REMOVE_BG_API_KEY } from '../config';
 
-// Get API key from environment variable (configured in .env file)
+// Get API key from config
 function getApiKey(): string | undefined {
-  // In Expo, use Constants.expoConfig or process.env
-  // For Expo EAS Build or local dev with .env, use process.env
-  return process.env.EXPO_PUBLIC_REMOVE_BG_API_KEY;
+  return REMOVE_BG_API_KEY !== 'YOUR_API_KEY' ? REMOVE_BG_API_KEY : undefined;
 }
 
 // Remove background from image using Remove.bg API
 export async function removeBackground(imageUri: string): Promise<string | null> {
   const apiKey = getApiKey();
   if (!apiKey) {
-    console.log('[BackgroundRemoval] No API key configured. Set EXPO_PUBLIC_REMOVE_BG_API_KEY in .env file.');
+    console.log('[BackgroundRemoval] API Key 未配置，请编辑 src/config.ts 设置 Remove.bg API Key');
     return null;
   }
 

@@ -1,283 +1,415 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, Image, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { pickImage, takePhoto } from '../utils/imageUtils';
+import * as ImagePicker from 'expo-image-picker';
+import { processImage } from '../utils/imageUtils';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onImageSelected: (uri: string) => void;
-  removeBackground?: boolean;
-  onRemoveBackgroundChange?: (value: boolean) => void;
+  onImageSelected: (uri: string, removeBg: boolean) => void;
 }
 
-type Step = 'select' | 'preview';
+type Step = 'source' | 'edit';
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     overlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      justifyContent: 'center',
-      alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.6)',
+      justifyContent: 'flex-end',
     },
-    content: {
+
+    // ===== 步骤1: 选择图片来源 =====
+    sourceSheet: {
       backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.xl,
-      padding: 28,
-      width: '82%',
-      maxWidth: 320,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 40,
     },
-    title: {
+    handleBar: {
+      width: 36,
+      height: 4,
+      backgroundColor: theme.colors.border,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginTop: 12,
+      marginBottom: 20,
+    },
+    sourceTitle: {
       fontSize: 18,
       fontWeight: '700',
-      textAlign: 'center',
       color: theme.colors.text,
+      textAlign: 'center',
       marginBottom: 24,
-      letterSpacing: -0.3,
     },
-    buttons: {
+    sourceButtons: {
+      paddingHorizontal: 24,
       gap: 12,
     },
-    button: {
+    sourceBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 8,
+      gap: 12,
       backgroundColor: theme.colors.primary,
-      paddingVertical: 15,
-      borderRadius: theme.borderRadius.lg,
+      paddingVertical: 16,
+      borderRadius: 16,
       ...theme.shadows.md,
     },
-    buttonText: {
-      color: theme.colors.white,
-      fontSize: 15,
-      fontWeight: '600',
-    },
-    buttonOutline: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      backgroundColor: 'transparent',
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.lg,
+    sourceBtnSecondary: {
+      backgroundColor: theme.colors.background,
       borderWidth: 1.5,
-      borderColor: theme.colors.primary,
+      borderColor: theme.colors.border,
     },
-    buttonOutlineText: {
-      color: theme.colors.primary,
-      fontSize: 15,
+    sourceBtnText: {
+      fontSize: 16,
       fontWeight: '600',
+      color: theme.colors.white,
     },
-    cancelButton: {
+    sourceBtnTextSecondary: {
+      color: theme.colors.text,
+    },
+    cancelBtn: {
       marginTop: 16,
-      paddingVertical: 12,
+      marginHorizontal: 24,
+      paddingVertical: 14,
+      alignItems: 'center',
     },
     cancelText: {
-      color: theme.colors.textSecondary,
       fontSize: 15,
-      textAlign: 'center',
+      color: theme.colors.textSecondary,
     },
-    previewOverlay: {
+
+    // ===== 步骤2: 编辑页面 =====
+    editOverlay: {
       flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.95)',
+      backgroundColor: theme.colors.background,
     },
-    previewHeader: {
+    editHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: 8,
-      paddingTop: 50,
-      paddingBottom: 16,
+      paddingTop: 8,
+      height: 56,
+      backgroundColor: theme.colors.background,
     },
-    previewHeaderBtn: {
-      width: 48,
-      height: 48,
+    editHeaderBtn: {
+      width: 44,
+      height: 44,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    previewHeaderTitle: {
+    editHeaderTitle: {
       fontSize: 17,
       fontWeight: '600',
-      color: theme.colors.white,
+      color: theme.colors.text,
     },
-    previewImageContainer: {
+    editContent: {
       flex: 1,
       justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 20,
     },
-    previewImage: {
+    editPreviewBg: {
+      width: '100%',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    editPreviewImage: {
       width: '100%',
       height: '100%',
     },
-    previewFooter: {
+    editFooter: {
+      paddingHorizontal: 20,
+      paddingBottom: 40,
+      paddingTop: 16,
+      backgroundColor: theme.colors.card,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+    },
+    bottomActionBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 20,
-      paddingVertical: 24,
+      justifyContent: 'space-between',
       gap: 12,
     },
-    previewRetakeBtn: {
+    actionBtn: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 6,
       paddingVertical: 14,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: 'rgba(255,255,255,0.1)',
-      borderWidth: 1,
-      borderColor: 'rgba(255,255,255,0.2)',
+      borderRadius: 12,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
     },
-    previewRetakeBtnText: {
+    actionBtnPrimary: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    actionBtnText: {
       fontSize: 14,
       fontWeight: '600',
+      color: theme.colors.text,
+    },
+    actionBtnTextPrimary: {
       color: theme.colors.white,
     },
-    previewConfirmBtn: {
-      flex: 1.4,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.lg,
-      backgroundColor: theme.colors.accent,
-      ...theme.shadows.md,
+    actionBtnDisabled: {
+      opacity: 0.45,
     },
-    previewConfirmBtnText: {
-      fontSize: 14,
+    processingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 100,
+    },
+    processingContent: {
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: theme.colors.card,
+      paddingHorizontal: 32,
+      paddingVertical: 24,
+      borderRadius: 16,
+    },
+    processingText: {
+      fontSize: 16,
       fontWeight: '600',
-      color: theme.colors.white,
+      color: theme.colors.text,
     },
-    bgRemovalRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 10,
-      gap: 8,
-    },
-    bgRemovalText: {
+    processingSubtext: {
       fontSize: 13,
-      color: 'rgba(255,255,255,0.7)',
+      color: theme.colors.textSecondary,
     },
   });
 
-export function ImagePickerModal({ visible, onClose, onImageSelected, removeBackground = true, onRemoveBackgroundChange }: Props) {
+export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const [step, setStep] = useState<Step>('select');
+
+  const [step, setStep] = useState<Step>('source');
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
+  const [processedUri, setProcessedUri] = useState<string | null>(null);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
 
   useEffect(() => {
     if (!visible) {
-      setStep('select');
+      setStep('source');
       setSelectedUri(null);
+      setProcessedUri(null);
+      setIsRemovingBg(false);
     }
   }, [visible]);
 
+  // 选择图片 - 不裁剪，直接选完进入编辑页面
   const handlePick = async () => {
-    const uri = await pickImage();
-    if (uri) {
-      setSelectedUri(uri);
-      setStep('preview');
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: false, // 不裁剪，直接进入编辑页面
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedUri(result.assets[0].uri);
+        setProcessedUri(null);
+        setStep('edit');
+      }
+    } catch (e) {
+      console.error('[ImagePicker] Pick failed:', e);
     }
   };
 
+  // 拍照 - 不裁剪，直接拍完进入编辑页面
   const handleTake = async () => {
-    const uri = await takePhoto();
-    if (uri) {
-      setSelectedUri(uri);
-      setStep('preview');
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('需要相机权限', '请在设置中开启相机权限');
+      return;
+    }
+
+    try {
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false, // 不裁剪，直接进入编辑页面
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setSelectedUri(result.assets[0].uri);
+        setProcessedUri(null);
+        setStep('edit');
+      }
+    } catch (e) {
+      console.error('[ImagePicker] Take photo failed:', e);
     }
   };
 
+  // 抠图
+  const handleRemoveBg = async () => {
+    const sourceUri = processedUri || selectedUri;
+    if (!sourceUri) return;
+
+    setIsRemovingBg(true);
+    try {
+      const result = await processImage(sourceUri, true);
+      if (result.thumbnailUri) {
+        setProcessedUri(result.thumbnailUri);
+      }
+    } catch (e) {
+      console.error('[ImagePicker] Remove bg failed:', e);
+      Alert.alert('抠图失败', '请稍后重试');
+    } finally {
+      setIsRemovingBg(false);
+    }
+  };
+
+  // 确认选择
   const handleConfirm = () => {
-    if (selectedUri) {
-      onImageSelected(selectedUri);
+    const uriToUse = processedUri || selectedUri;
+    if (uriToUse) {
+      onImageSelected(uriToUse, !!processedUri);
       onClose();
     }
   };
 
-  const handleRetake = () => {
+  // 返回选择图片来源 - 清空状态，重新选择
+  const handleBack = () => {
+    setStep('source');
     setSelectedUri(null);
-    setStep('select');
-  };
-
-  const handleClose = () => {
-    setStep('select');
-    setSelectedUri(null);
-    onClose();
+    setProcessedUri(null);
   };
 
   if (!visible) return null;
 
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={handleClose}
-    >
-      {step === 'select' ? (
-        <TouchableOpacity style={styles.overlay} onPress={handleClose} activeOpacity={1}>
-          <View style={styles.content}>
-            <Text style={styles.title}>添加衣服照片</Text>
-            <View style={styles.buttons}>
-              <TouchableOpacity style={styles.button} onPress={handlePick} activeOpacity={0.8}>
-                <Ionicons name="images" size={20} color={theme.colors.white} />
-                <Text style={styles.buttonText}>从相册选择</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.buttonOutline} onPress={handleTake} activeOpacity={0.8}>
-                <Ionicons name="camera" size={20} color={theme.colors.primary} />
-                <Text style={styles.buttonOutlineText}>拍照</Text>
+  // ===== 步骤1: 选择图片来源 =====
+  if (step === 'source') {
+    return (
+      <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+        <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}}>
+            <View style={styles.sourceSheet}>
+              <View style={styles.handleBar} />
+              <Text style={styles.sourceTitle}>添加衣服照片</Text>
+              <View style={styles.sourceButtons}>
+                <TouchableOpacity style={styles.sourceBtn} onPress={handlePick} activeOpacity={0.85}>
+                  <Ionicons name="images" size={22} color={theme.colors.white} />
+                  <Text style={styles.sourceBtnText}>从相册选择</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.sourceBtn, styles.sourceBtnSecondary]}
+                  onPress={handleTake}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="camera" size={22} color={theme.colors.text} />
+                  <Text style={[styles.sourceBtnText, styles.sourceBtnTextSecondary]}>拍照</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.cancelBtn} onPress={onClose} activeOpacity={0.7}>
+                <Text style={styles.cancelText}>取消</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.cancelButton} onPress={handleClose} activeOpacity={0.7}>
-              <Text style={styles.cancelText}>取消</Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
-      ) : (
-        <View style={styles.previewOverlay}>
-          <View style={styles.previewHeader}>
-            <TouchableOpacity onPress={handleRetake} style={styles.previewHeaderBtn}>
-              <Ionicons name="arrow-back" size={24} color={theme.colors.white} />
-            </TouchableOpacity>
-            <Text style={styles.previewHeaderTitle}>预览照片</Text>
-            <TouchableOpacity onPress={handleConfirm} style={styles.previewHeaderBtn}>
-              <Ionicons name="checkmark-circle" size={28} color={theme.colors.accent} />
-            </TouchableOpacity>
-          </View>
-          <View style={styles.previewImageContainer}>
-            <Image source={{ uri: selectedUri! }} style={styles.previewImage} resizeMode="contain" />
-          </View>
-          <View style={styles.previewFooter}>
-            <TouchableOpacity style={styles.previewRetakeBtn} onPress={handleRetake} activeOpacity={0.8}>
-              <Ionicons name="refresh-outline" size={18} color={theme.colors.white} />
-              <Text style={styles.previewRetakeBtnText}>重新选择</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.previewConfirmBtn} onPress={handleConfirm} activeOpacity={0.85}>
-              <Ionicons name="cloud-upload" size={18} color={theme.colors.white} />
-              <Text style={styles.previewConfirmBtnText}>确认上传</Text>
-            </TouchableOpacity>
-          </View>
-          <View style={styles.bgRemovalRow}>
-            <Ionicons name="cut-outline" size={16} color="rgba(255,255,255,0.7)" />
-            <Text style={styles.bgRemovalText}>自动抠图</Text>
-            <Switch
-              value={removeBackground}
-              onValueChange={onRemoveBackgroundChange}
-              trackColor={{ false: 'rgba(255,255,255,0.3)', true: theme.colors.primary + '80' }}
-              thumbColor={removeBackground ? theme.colors.primary : 'rgba(255,255,255,0.5)'}
+      </Modal>
+    );
+  }
+
+  // ===== 步骤2: 编辑页面 =====
+  const isProcessed = !!processedUri;
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={handleBack}>
+      <View style={styles.editOverlay}>
+        {/* 顶部导航栏 */}
+        <View style={styles.editHeader}>
+          <TouchableOpacity style={styles.editHeaderBtn} onPress={handleBack} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.editHeaderTitle}>编辑照片</Text>
+          <View style={styles.editHeaderBtn} />
+        </View>
+
+        {/* 图片预览区 */}
+        <View style={styles.editContent}>
+          <View style={styles.editPreviewBg}>
+            <Image
+              source={{ uri: (processedUri || selectedUri)! }}
+              style={styles.editPreviewImage}
+              resizeMode="contain"
             />
           </View>
         </View>
-      )}
+
+        {/* 底部操作栏 */}
+        <View style={styles.editFooter}>
+          <View style={styles.bottomActionBar}>
+            {/* 裁剪按钮 */}
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnDisabled]}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="crop" size={20} color={theme.colors.textSecondary} />
+              <Text style={[styles.actionBtnText, { color: theme.colors.textSecondary }]}>裁剪</Text>
+            </TouchableOpacity>
+
+            {/* AI抠图按钮 */}
+            <TouchableOpacity
+              style={[
+                styles.actionBtn,
+                isProcessed && { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
+                isRemovingBg && styles.actionBtnDisabled,
+              ]}
+              onPress={handleRemoveBg}
+              disabled={isRemovingBg}
+              activeOpacity={0.7}
+            >
+              {isRemovingBg ? (
+                <>
+                  <ActivityIndicator size="small" color={theme.colors.textSecondary} />
+                  <Text style={styles.actionBtnText}>抠图中...</Text>
+                </>
+              ) : (
+                <>
+                  <Ionicons name={isProcessed ? 'refresh' : 'sparkles'} size={20} color={isProcessed ? theme.colors.white : theme.colors.text} />
+                  <Text style={[styles.actionBtnText, isProcessed && { color: theme.colors.white }]}>
+                    {isProcessed ? '重新抠图' : 'AI抠图'}
+                  </Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {/* 确认上传按钮 */}
+            <TouchableOpacity
+              style={[styles.actionBtn, styles.actionBtnPrimary]}
+              onPress={handleConfirm}
+              disabled={isRemovingBg}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="cloud-upload" size={20} color={theme.colors.white} />
+              <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>
+                {isProcessed ? '已抠图' : '确认上传'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 处理中遮罩 */}
+        {isRemovingBg && (
+          <View style={styles.processingOverlay}>
+            <View style={styles.processingContent}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.processingText}>正在抠图...</Text>
+              <Text style={styles.processingSubtext}>请稍候</Text>
+            </View>
+          </View>
+        )}
+
+      </View>
     </Modal>
   );
 }
