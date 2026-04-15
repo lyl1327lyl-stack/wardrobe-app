@@ -185,6 +185,8 @@ export function CropView({
   const [isProcessing, setIsProcessing] = useState(false);
   // body 区域高度（用于计算裁剪框在 body 中的垂直位置）
   const [bodyHeight, setBodyHeight] = useState(0);
+  // 当前显示的图片 URI（旋转后变成新图片）
+  const [currentImageUri, setCurrentImageUri] = useState(imageUri);
   // 图片显示尺寸（短边 = CROP_SIZE）
   const [displaySize, setDisplaySize] = useState({ width: CROP_SIZE, height: CROP_SIZE });
 
@@ -205,9 +207,9 @@ export function CropView({
 
   // 使用 Image.getSize 获取原始图片尺寸（比 onLoad event 更可靠）
   useEffect(() => {
-    if (!imageUri) return;
+    if (!currentImageUri) return;
     Image.getSize(
-      imageUri,
+      currentImageUri,
       (width, height) => {
         originalSizeRef.current = { width, height };
 
@@ -233,6 +235,9 @@ export function CropView({
         const initY = -(displayH - CROP_SIZE) / 2;
         offsetRef.current = { x: initX, y: initY };
         offsetAnim.setValue({ x: initX, y: initY });
+        // 重置缩放
+        scaleRef.current = 1;
+        scaleAnim.setValue(1);
         console.log('[ImageLoad] orig:', width, height, '| display:', displayW.toFixed(1), displayH.toFixed(1), '| initOffset:', initX.toFixed(1), initY.toFixed(1), '| aspectRatio:', aspectRatio.toFixed(2), '| overX:', (displayW - CROP_SIZE).toFixed(1), '| overY:', (displayH - CROP_SIZE).toFixed(1));
         setImageReady(true);
       },
@@ -240,7 +245,7 @@ export function CropView({
         console.error('[CropView] Image.getSize failed:', error);
       }
     );
-  }, [imageUri, offsetAnim]);
+  }, [currentImageUri, offsetAnim]);
 
   // 双指缩放 + 单指拖动（Gesture.Simultaneous 两者同步识别）
   const pinchGesture = Gesture.Pinch()
@@ -354,20 +359,20 @@ export function CropView({
 
       console.log('[Confirm] offset:', offsetX.toFixed(1), offsetY.toFixed(1), '| centerOff:', centerOffsetX.toFixed(1), centerOffsetY.toFixed(1), '| realOff:', realOffsetX.toFixed(1), realOffsetY.toFixed(1));
       console.log('[Confirm] display:', dw.toFixed(1), dh.toFixed(1), '| zoomed:', zoomedW.toFixed(1), zoomedH.toFixed(1), '| scale:', s.toFixed(2));
-      console.log('[Confirm] rawFracX:', rawFracX.toFixed(3), 'rawFracY:', rawFracY.toFixed(3), 'fracCrop:', fracCrop.toFixed(3), '=> final crop:', fracX.toFixed(3), fracY.toFixed(3), 'x', fracW.toFixed(3), fracH.toFixed(3));
+      console.log('[Confirm] frac:', fracX.toFixed(3), fracY.toFixed(3), 'x', fracW.toFixed(3), fracH.toFixed(3));
 
       await ensureImageDir();
       const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
       const MAX_DIM = 1500;
 
-      // Step 1: 仅等比例 resize（不 rotate！保持坐标系与显示一致）
+      // Step 1: 仅等比例 resize
       const step1 = await manipulateAsync(
-        imageUri,
+        currentImageUri,
         [{ resize: { width: MAX_DIM } }],
         { format: SaveFormat.JPEG, compress: 0.92 }
       );
 
-      // Step 2: 直接用 frac 裁剪（坐标系完全对应）
+      // Step 2: 直接用 frac 裁剪
       const originX = Math.round(fracX * step1.width);
       const originY = Math.round(fracY * step1.height);
       const cropW   = Math.round(fracW * step1.width);
@@ -386,7 +391,7 @@ export function CropView({
       onConfirm(savedPath);
     } catch (error) {
       console.error('[CropView] Crop failed:', error);
-      onConfirm(imageUri);
+      onConfirm(currentImageUri);
     } finally {
       setIsProcessing(false);
     }
@@ -401,7 +406,29 @@ export function CropView({
         <TouchableOpacity onPress={onCancel} style={styles.headerBtn} activeOpacity={0.7}>
           <Ionicons name="close" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>裁剪照片</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity
+            onPress={async () => {
+              if (isProcessing || !imageReady) return;
+              setIsProcessing(true);
+              try {
+                const rotated = await manipulateAsync(
+                  currentImageUri,
+                  [{ rotate: 90 }],
+                  { format: SaveFormat.JPEG, compress: 1 }
+                );
+                setCurrentImageUri(rotated.uri);
+              } finally {
+                setIsProcessing(false);
+              }
+            }}
+            style={styles.headerBtn}
+            disabled={isProcessing || !imageReady}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="refresh" size={22} color={isProcessing || !imageReady ? theme.colors.border : theme.colors.text} />
+          </TouchableOpacity>
+        </View>
         <TouchableOpacity
           onPress={handleConfirm}
           style={styles.headerBtn}
@@ -425,7 +452,7 @@ export function CropView({
           <View style={StyleSheet.absoluteFill}>
             {/* 图片：绝对定位于 body 内，在裁剪框垂直居中处开始 */}
             <Animated.Image
-              source={{ uri: imageUri }}
+              source={{ uri: currentImageUri }}
               style={{
                 position: 'absolute',
                 width: displaySize.width,
