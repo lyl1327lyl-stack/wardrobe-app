@@ -213,24 +213,18 @@ export function CropView({
       (width, height) => {
         originalSizeRef.current = { width, height };
 
-        const aspectRatio = width / height;
-        let displayW: number;
-        let displayH: number;
-
-        if (aspectRatio >= 1) {
-          // 横图：高度适配 CROP_SIZE，宽度溢出（水平方向被 body overflow:hidden 裁剪）
-          displayH = CROP_SIZE;
-          displayW = CROP_SIZE * aspectRatio;
-        } else {
-          // 竖图：宽度适配 CROP_SIZE，高度溢出（超出部分可见但变暗）
-          displayW = CROP_SIZE;
-          displayH = CROP_SIZE / aspectRatio;
-        }
+        // 用 cover 真实缩放公式计算显示尺寸（Math.max 保证至少一边铺满）
+        const scale = Math.max(
+          CROP_SIZE / width,
+          CROP_SIZE / height
+        );
+        const displayW = width * scale;
+        const displayH = height * scale;
 
         displaySizeRef.current = { width: displayW, height: displayH };
         setDisplaySize({ width: displayW, height: displayH });
 
-        // 初始居中对齐裁剪框
+        // cover 情况下图片一定超出裁剪框，需要负偏移居中
         const initX = -(displayW - CROP_SIZE) / 2;
         const initY = -(displayH - CROP_SIZE) / 2;
         offsetRef.current = { x: initX, y: initY };
@@ -238,7 +232,7 @@ export function CropView({
         // 重置缩放
         scaleRef.current = 1;
         scaleAnim.setValue(1);
-        console.log('[ImageLoad] orig:', width, height, '| display:', displayW.toFixed(1), displayH.toFixed(1), '| initOffset:', initX.toFixed(1), initY.toFixed(1), '| aspectRatio:', aspectRatio.toFixed(2), '| overX:', (displayW - CROP_SIZE).toFixed(1), '| overY:', (displayH - CROP_SIZE).toFixed(1));
+        console.log('[ImageLoad] orig:', width, height, '| display:', displayW.toFixed(1), displayH.toFixed(1), '| initOffset:', initX.toFixed(1), initY.toFixed(1), '| scale:', scale.toFixed(3));
         setImageReady(true);
       },
       (error) => {
@@ -330,6 +324,11 @@ export function CropView({
     if (!imageReady) return;
     setIsProcessing(true);
     try {
+      // 读取 currentImageUri 的真实尺寸（可能是旋转后的图）
+      const { width: curW, height: curH } = await new Promise<{ width: number; height: number }>((resolve) => {
+        Image.getSize(currentImageUri, (w, h) => resolve({ width: w, height: h }));
+      });
+
       const { x: offsetX, y: offsetY } = offsetRef.current;
       const { width: dw, height: dh } = displaySizeRef.current;
 
@@ -341,32 +340,23 @@ export function CropView({
       const realOffsetX = offsetX - centerOffsetX;
       const realOffsetY = offsetY - centerOffsetY;
 
-      const zoomedW = dw * s;
-      const zoomedH = dh * s;
+      // 显示像素 -> 原图像素（coverScale = 原图/显示 的比例）
+      const { width: imgW, height: imgH } = { width: curW, height: curH };
+      const coverScale = Math.max(CROP_SIZE / imgW, CROP_SIZE / imgH);
+      // cover 模式下原图和显示的比例是 coverScale
+      const pixelX = -realOffsetX / s / coverScale;
+      const pixelY = -realOffsetY / s / coverScale;
+      const pixelSize = CROP_SIZE / s / coverScale;
 
-      // fracX/Y 直接基于显示尺寸计算
-      const rawFracX = -realOffsetX / zoomedW;
-      const rawFracY = -realOffsetY / zoomedH;
-
-      // 裁剪框在显示空间是 CROP_SIZE × CROP_SIZE 的正方形
-      const rawFracW = CROP_SIZE / zoomedW;
-      const rawFracH = CROP_SIZE / zoomedH;
-      const fracCrop = Math.min(rawFracW, rawFracH);
-      const fracX = Math.max(0, Math.min(rawFracX, 1 - fracCrop));
-      const fracY = Math.max(0, Math.min(rawFracY, 1 - fracCrop));
-      const fracW = fracCrop;
-      const fracH = fracCrop;
-
-      console.log('[Confirm] offset:', offsetX.toFixed(1), offsetY.toFixed(1), '| centerOff:', centerOffsetX.toFixed(1), centerOffsetY.toFixed(1), '| realOff:', realOffsetX.toFixed(1), realOffsetY.toFixed(1));
-      console.log('[Confirm] display:', dw.toFixed(1), dh.toFixed(1), '| zoomed:', zoomedW.toFixed(1), zoomedH.toFixed(1), '| scale:', s.toFixed(2));
-      console.log('[Confirm] frac:', fracX.toFixed(3), fracY.toFixed(3), 'x', fracW.toFixed(3), fracH.toFixed(3));
+      console.log('[Confirm] offset:', offsetX.toFixed(1), offsetY.toFixed(1), '| realOffset:', realOffsetX.toFixed(1), realOffsetY.toFixed(1));
+      console.log('[Confirm] dw/dh:', dw.toFixed(1), dh.toFixed(1), '| imgW/imgH:', imgW, imgH, '| coverScale:', coverScale.toFixed(4));
+      console.log('[Confirm] pixelX/Y:', pixelX.toFixed(1), pixelY.toFixed(1), '| pixelSize:', pixelSize.toFixed(1));
 
       await ensureImageDir();
       const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
       const MAX_DIM = 1500;
 
-      // Step 1: 按真实图片长边 resize，保证 step1 比例 == dw/dh
-      const { width: imgW, height: imgH } = originalSizeRef.current;
+      // Step 1: 按原图长边 resize
       const step1 = await manipulateAsync(
         currentImageUri,
         imgW > imgH
@@ -375,15 +365,16 @@ export function CropView({
         { format: SaveFormat.JPEG, compress: 0.92 }
       );
 
-      // Step 2: 强制 1:1，用已有的 rawFracW/rawFracH 取 min 用于两个维度
-      const cropW = Math.round(fracCrop * step1.width);
+      // Step 2: 直接用像素坐标 crop（不需要 frac）
+      // step1 和原图的比例
+      const step1Scale = step1.width / imgW;
+      const originX = Math.max(0, Math.round(pixelX * step1Scale));
+      const originY = Math.max(0, Math.round(pixelY * step1Scale));
+      const cropW = Math.round(pixelSize * step1Scale);
       const cropH = cropW; // 强制 1:1
-      const originX = Math.round(fracX * step1.width);
-      const originY = Math.round(fracY * step1.height);
 
-      console.log('[Confirm] imgW/imgH:', imgW, 'x', imgH, '| imgW>imgH:', imgW > imgH);
-      console.log('[Confirm] display ratio:', (dw / dh).toFixed(4), '| step1 ratio:', (step1.width / step1.height).toFixed(4));
-      console.log('[Confirm] step1 size:', step1.width, 'x', step1.height, '| crop rect => originX:', originX, 'originY:', originY, 'cropW:', cropW, 'cropH:', cropH);
+      console.log('[Confirm] step1Scale:', step1Scale.toFixed(4), '| step1 size:', step1.width, 'x', step1.height);
+      console.log('[Confirm] crop rect => originX:', originX, 'originY:', originY, 'cropW:', cropW, 'cropH:', cropH);
 
       const step2 = await manipulateAsync(
         step1.uri,
@@ -471,7 +462,7 @@ export function CropView({
                 ],
                 opacity: showContent ? 1 : 0,
               }}
-              resizeMode="contain"
+              resizeMode="cover"
               onLayout={(e) => {
                 const { width, height } = e.nativeEvent.layout;
                 const prev = renderedSizeRef.current;
