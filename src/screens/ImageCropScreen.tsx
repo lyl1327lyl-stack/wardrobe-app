@@ -365,19 +365,24 @@ export function CropView({
       const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
       const MAX_DIM = 1500;
 
-      // Step 1: 仅等比例 resize
+      // Step 1: 按真实图片长边 resize，保证 step1 比例 == dw/dh
+      const { width: imgW, height: imgH } = originalSizeRef.current;
       const step1 = await manipulateAsync(
         currentImageUri,
-        [{ resize: { width: MAX_DIM } }],
+        imgW > imgH
+          ? [{ resize: { width: MAX_DIM } }]
+          : [{ resize: { height: MAX_DIM } }],
         { format: SaveFormat.JPEG, compress: 0.92 }
       );
 
-      // Step 2: 直接用 frac 裁剪
+      // Step 2: 强制 1:1，用已有的 rawFracW/rawFracH 取 min 用于两个维度
+      const cropW = Math.round(fracCrop * step1.width);
+      const cropH = cropW; // 强制 1:1
       const originX = Math.round(fracX * step1.width);
       const originY = Math.round(fracY * step1.height);
-      const cropW   = Math.round(fracW * step1.width);
-      const cropH   = Math.round(fracH * step1.height);
 
+      console.log('[Confirm] imgW/imgH:', imgW, 'x', imgH, '| imgW>imgH:', imgW > imgH);
+      console.log('[Confirm] display ratio:', (dw / dh).toFixed(4), '| step1 ratio:', (step1.width / step1.height).toFixed(4));
       console.log('[Confirm] step1 size:', step1.width, 'x', step1.height, '| crop rect => originX:', originX, 'originY:', originY, 'cropW:', cropW, 'cropH:', cropH);
 
       const step2 = await manipulateAsync(
@@ -466,7 +471,7 @@ export function CropView({
                 ],
                 opacity: showContent ? 1 : 0,
               }}
-              resizeMode="cover"
+              resizeMode="contain"
               onLayout={(e) => {
                 const { width, height } = e.nativeEvent.layout;
                 const prev = renderedSizeRef.current;
