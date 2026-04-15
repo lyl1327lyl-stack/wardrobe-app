@@ -144,7 +144,7 @@ const makeStyles = (theme: Theme) =>
     imageArea: {
       width: '100%',
       aspectRatio: 4 / 3,
-      backgroundColor: theme.colors.borderLight,
+      backgroundColor: '#ffffff', // 白色背景，让透明PNG正确显示
       justifyContent: 'center',
       alignItems: 'center',
       overflow: 'hidden',
@@ -280,6 +280,34 @@ const makeStyles = (theme: Theme) =>
       fontSize: 12,
       fontWeight: '600',
       color: theme.colors.primaryDark,
+    },
+    // 图片操作按钮（裁剪/抠图/更换照片）
+    imageActionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'flex-end',
+      gap: 8,
+    },
+    imageActionBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      opacity: 0.95,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+    },
+    imageActionBtnPrimary: {
+      backgroundColor: theme.colors.primary,
+    },
+    imageActionBtnText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.primaryDark,
+    },
+    imageActionBtnTextWhite: {
+      color: '#fff',
     },
     addPhotoBtn: {
       alignItems: 'center',
@@ -692,6 +720,12 @@ export function AddClothingScreen() {
   const [showImagePicker, setShowImagePicker] = useState(false);
   const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
   const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
+  // 从裁剪页面返回时重置编辑状态
+  useFocusEffect(
+    useCallback(() => {
+      // 屏幕获得焦点时重置图片编辑状态
+    }, [])
+  );
 
   // 当 existingItem 加载完成时，同步更新所有状态（包括分类）
   useEffect(() => {
@@ -714,6 +748,9 @@ export function AddClothingScreen() {
       console.log('[EDIT useEffect] setParent:', newParent, 'setChild:', newChild);
       setSelectedParent(newParent);
       setSelectedChild(newChild);
+      // 如果 existingItem 的图片已经是 PNG 格式，设置 removeBackground
+      const existingIsProcessed = existingItem.imageUri?.endsWith('.png');
+      setRemoveBackground(!!existingIsProcessed);
     }
   }, [existingItem]);
 
@@ -888,9 +925,18 @@ export function AddClothingScreen() {
       let thumbnailUri = existingItem?.thumbnailUri || imageUri;
 
       if (!asDraft && imageUri && (!existingItem || imageUri !== existingItem.imageUri)) {
-        const result = await processImage(imageUri, removeBackground);
-        processedUri = result.imageUri;
-        thumbnailUri = result.thumbnailUri;
+        // 如果当前 imageUri 已经是我们的 PNG 格式，说明已经处理过（裁剪/抠图）
+        // 直接使用，不再重复调用 API
+        const isAlreadyProcessed = imageUri.includes('/images/') && imageUri.endsWith('.png');
+        if (isAlreadyProcessed) {
+          processedUri = imageUri;
+          thumbnailUri = existingItem?.thumbnailUri || imageUri;
+        } else {
+          // 新图片，需要处理
+          const result = await processImage(imageUri, removeBackground);
+          processedUri = result.imageUri;
+          thumbnailUri = result.thumbnailUri;
+        }
       }
 
       const clothingData = {
@@ -982,9 +1028,30 @@ export function AddClothingScreen() {
             <>
               <Image source={{ uri: imageUri }} style={styles.image} />
               <View style={styles.imageOverlay}>
-                <View style={styles.editBadge}>
-                  <Ionicons name="camera-outline" size={12} color={theme.colors.primaryDark} />
-                  <Text style={styles.editBadgeText}>更换照片</Text>
+                {/* 编辑按钮 */}
+                <View style={styles.imageActionRow}>
+                  <TouchableOpacity
+                    style={[styles.imageActionBtn, removeBackground && styles.imageActionBtnPrimary]}
+                    onPress={() => setShowImagePicker(true)}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="create-outline" size={12} color={removeBackground ? '#fff' : theme.colors.text} />
+                    <Text style={[styles.imageActionBtnText, removeBackground && styles.imageActionBtnTextWhite]}>
+                      编辑
+                    </Text>
+                  </TouchableOpacity>
+                  {/* 更换照片按钮 */}
+                  <TouchableOpacity
+                    style={styles.imageActionBtn}
+                    onPress={() => {
+                      setRemoveBackground(false);
+                      setShowImagePicker(true);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="camera-outline" size={12} color={theme.colors.text} />
+                    <Text style={styles.imageActionBtnText}>更换</Text>
+                  </TouchableOpacity>
                 </View>
               </View>
             </>
@@ -1233,7 +1300,9 @@ export function AddClothingScreen() {
         onImageSelected={(uri, shouldRemoveBg) => {
           setImageUri(uri);
           setRemoveBackground(shouldRemoveBg);
+          setShowImagePicker(false);
         }}
+        initialImageUri={imageUri || undefined}
       />
 
       {/* 衣橱选择居中对话框 */}

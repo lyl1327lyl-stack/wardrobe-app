@@ -132,7 +132,8 @@ const makeStyles = (theme: Theme, topInset: number) =>
     },
     footerButtons: {
       flexDirection: 'row',
-      gap: 12,
+      gap: 10,
+      alignItems: 'center',
     },
     cancelBtn: {
       flex: 1,
@@ -147,6 +148,27 @@ const makeStyles = (theme: Theme, topInset: number) =>
       fontSize: 15,
       fontWeight: '600',
       color: theme.colors.textSecondary,
+    },
+    // 旋转按钮：长方形药丸形，带旋转箭头图标
+    rotateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 13,
+      paddingHorizontal: 20,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.card,
+    },
+    rotateBtnDisabled: {
+      opacity: 0.5,
+    },
+    rotateBtnText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.colors.text,
     },
     confirmBtn: {
       flex: 1.6,
@@ -402,29 +424,7 @@ export function CropView({
         <TouchableOpacity onPress={onCancel} style={styles.headerBtn} activeOpacity={0.7}>
           <Ionicons name="close" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <TouchableOpacity
-            onPress={async () => {
-              if (isProcessing || !imageReady) return;
-              setIsProcessing(true);
-              try {
-                const rotated = await manipulateAsync(
-                  currentImageUri,
-                  [{ rotate: 90 }],
-                  { format: SaveFormat.JPEG, compress: 1 }
-                );
-                setCurrentImageUri(rotated.uri);
-              } finally {
-                setIsProcessing(false);
-              }
-            }}
-            style={styles.headerBtn}
-            disabled={isProcessing || !imageReady}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="refresh" size={22} color={isProcessing || !imageReady ? theme.colors.border : theme.colors.text} />
-          </TouchableOpacity>
-        </View>
+        <View style={{ flex: 1 }} />
         <TouchableOpacity
           onPress={handleConfirm}
           style={styles.headerBtn}
@@ -551,6 +551,29 @@ export function CropView({
             activeOpacity={0.7}
           >
             <Text style={styles.cancelBtnText}>{cancelLabel}</Text>
+          </TouchableOpacity>
+          {/* 旋转按钮：长方形药丸形 */}
+          <TouchableOpacity
+            style={[styles.rotateBtn, (isProcessing || !imageReady) && styles.rotateBtnDisabled]}
+            onPress={async () => {
+              if (isProcessing || !imageReady) return;
+              setIsProcessing(true);
+              try {
+                const rotated = await manipulateAsync(
+                  currentImageUri,
+                  [{ rotate: 90 }],
+                  { format: SaveFormat.JPEG, compress: 1 }
+                );
+                setCurrentImageUri(rotated.uri);
+              } finally {
+                setIsProcessing(false);
+              }
+            }}
+            disabled={isProcessing || !imageReady}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="refresh" size={18} color={theme.colors.text} />
+            <Text style={styles.rotateBtnText}>旋转</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.confirmBtn, (isProcessing || !imageReady) && styles.confirmBtnDisabled]}

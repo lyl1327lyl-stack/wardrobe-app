@@ -52,45 +52,57 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
   const imagePath = `${IMAGE_DIR}img_${timestamp}.jpg`;
   const thumbnailPath = `${IMAGE_DIR}thumb_${timestamp}.png`; // PNG for transparent background
 
-  // Process main image - resize to reasonable size
-  const manipulated = await manipulateAsync(
-    uri,
-    [{ resize: { width: IMAGE_SIZE } }],
-    { compress: 0.9 }
-  );
-
-  // Copy the processed images to our own directory
-  const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
-  await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
-
-  // Try background removal if enabled
   let thumbnailUri = thumbnailPath;
+
   if (removeBg) {
+    // 背景移除模式：主图和缩略图都用移除背景的结果
     const bgRemovedUri = await removeBackground(uri);
     if (bgRemovedUri) {
-      // bgRemovedUri is a data URI with PNG format (has transparency)
-      // Save as PNG - UI should display with white background
+      // bgRemovedUri 是 data URI (PNG 格式，带透明)
+      // 先按主图尺寸保存，再缩放一份缩略图
       const base64Match = bgRemovedUri.match(/base64,(.+)$/);
       if (base64Match) {
-        const pngPath = thumbnailPath;
-        await writeAsStringAsync(pngPath, base64Match[1], { encoding: 'base64' });
-        console.log('[processImage] Saved background removed thumbnail as PNG');
-        // Keep thumbnailUri as pngPath (with transparency)
+        // 保存完整尺寸 PNG 作为主图（imageUri）
+        await writeAsStringAsync(imagePath.replace('.jpg', '.png'), base64Match[1], { encoding: 'base64' });
+        // 缩放生成缩略图
+        const thumbnail = await manipulateAsync(
+          `data:image/png;base64,${base64Match[1]}`,
+          [{ resize: { width: THUMBNAIL_SIZE } }],
+          { format: SaveFormat.PNG }
+        );
+        const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
+        await writeAsStringAsync(thumbnailPath, base64Thumb, { encoding: 'base64' });
+        thumbnailUri = thumbnailPath;
+        console.log('[processImage] Background removed: saved main as PNG, thumbnail generated');
       }
     } else {
-      // Fallback to regular thumbnail
+      // API 调用失败，回退到普通处理
+      const manipulated = await manipulateAsync(
+        uri,
+        [{ resize: { width: IMAGE_SIZE } }],
+        { compress: 0.9 }
+      );
+      const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
+      await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
       const thumbnail = await manipulateAsync(
         uri,
         [{ resize: { width: THUMBNAIL_SIZE } }],
         { compress: 0.8 }
       );
       const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
-      // Use jpg for fallback
       await writeAsStringAsync(thumbnailPath.replace('.png', '.jpg'), base64Thumb, { encoding: 'base64' });
       thumbnailUri = thumbnailPath.replace('.png', '.jpg');
     }
   } else {
-    // Regular thumbnail without background removal
+    // 普通模式：不移除背景
+    const manipulated = await manipulateAsync(
+      uri,
+      [{ resize: { width: IMAGE_SIZE } }],
+      { compress: 0.9 }
+    );
+    const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
+    await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
+
     const isPng = uri.toLowerCase().endsWith('.png');
     const thumbnail = await manipulateAsync(
       uri,
@@ -103,7 +115,7 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
     thumbnailUri = thumbPath;
   }
 
-  return { imageUri: imagePath, thumbnailUri };
+  return { imageUri: imagePath.replace('.jpg', '.png'), thumbnailUri };
 }
 
 export async function deleteImage(imageUri: string, thumbnailUri: string) {

@@ -11,6 +11,8 @@ interface Props {
   visible: boolean;
   onClose: () => void;
   onImageSelected: (uri: string, removeBg: boolean) => void;
+  // 可选：传入已有图片 URI，直接进入编辑模式（用于编辑已有衣服的照片）
+  initialImageUri?: string;
 }
 
 type Step = 'source' | 'edit';
@@ -116,6 +118,8 @@ const makeStyles = (theme: Theme) =>
     },
     editPreviewBg: {
       width: '100%',
+      flex: 1,
+      backgroundColor: '#f5f5f5', // 白色背景，让透明PNG正确显示
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -190,7 +194,7 @@ const makeStyles = (theme: Theme) =>
     },
   });
 
-export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
+export function ImagePickerModal({ visible, onClose, onImageSelected, initialImageUri }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const navigation = useNavigation<any>();
@@ -199,6 +203,8 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
   const [processedUri, setProcessedUri] = useState<string | null>(null);
   const [isRemovingBg, setIsRemovingBg] = useState(false);
+  // 用户是否明确点击了"AI抠图"（独立于裁剪状态）
+  const [userRequestedRemoveBg, setUserRequestedRemoveBg] = useState(false);
   // 导航到裁剪页面时临时隐藏编辑页
   const [isCropNavigating, setIsCropNavigating] = useState(false);
 
@@ -208,9 +214,16 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
       setSelectedUri(null);
       setProcessedUri(null);
       setIsRemovingBg(false);
+      setUserRequestedRemoveBg(false);
       setIsCropNavigating(false);
+    } else if (initialImageUri) {
+      // 编辑已有图片模式：直接进入编辑页面
+      setStep('edit');
+      setSelectedUri(initialImageUri);
+      setProcessedUri(null);
+      setUserRequestedRemoveBg(false);
     }
-  }, [visible]);
+  }, [visible, initialImageUri]);
 
   // 选择图片 - 不裁剪，直接选完进入编辑页面
   const handlePick = async () => {
@@ -265,6 +278,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
       const result = await processImage(sourceUri, true);
       if (result.thumbnailUri) {
         setProcessedUri(result.thumbnailUri);
+        setUserRequestedRemoveBg(true); // 用户明确要求抠图
       }
     } catch (e) {
       console.error('[ImagePicker] Remove bg failed:', e);
@@ -278,16 +292,24 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
   const handleConfirm = () => {
     const uriToUse = processedUri || selectedUri;
     if (uriToUse) {
-      onImageSelected(uriToUse, !!processedUri);
+      // 用独立的 userRequestedRemoveBg 判断是否抠图，不用 processedUri（裁剪也会设置它）
+      onImageSelected(uriToUse, userRequestedRemoveBg);
       onClose();
     }
   };
 
   // 返回选择图片来源 - 清空状态，重新选择
+  // 如果是编辑已有图片模式（initialImageUri），返回即关闭 Modal
   const handleBack = () => {
-    setStep('source');
-    setSelectedUri(null);
-    setProcessedUri(null);
+    if (initialImageUri) {
+      // 编辑已有图片时，返回关闭 Modal
+      onClose();
+    } else {
+      setStep('source');
+      setSelectedUri(null);
+      setProcessedUri(null);
+      setUserRequestedRemoveBg(false);
+    }
   };
 
   if (!visible) return null;
@@ -376,11 +398,11 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
               <Text style={styles.actionBtnText}>裁剪</Text>
             </TouchableOpacity>
 
-            {/* AI抠图按钮 */}
+            {/* AI抠图按钮 — 只有用户明确点击过"AI抠图"才显示"重新抠图" */}
             <TouchableOpacity
               style={[
                 styles.actionBtn,
-                isProcessed && { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
+                userRequestedRemoveBg && { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
                 isRemovingBg && styles.actionBtnDisabled,
               ]}
               onPress={handleRemoveBg}
@@ -394,9 +416,9 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
                 </>
               ) : (
                 <>
-                  <Ionicons name={isProcessed ? 'refresh' : 'sparkles'} size={20} color={isProcessed ? theme.colors.white : theme.colors.text} />
-                  <Text style={[styles.actionBtnText, isProcessed && { color: theme.colors.white }]}>
-                    {isProcessed ? '重新抠图' : 'AI抠图'}
+                  <Ionicons name={userRequestedRemoveBg ? 'refresh' : 'sparkles'} size={20} color={userRequestedRemoveBg ? theme.colors.white : theme.colors.text} />
+                  <Text style={[styles.actionBtnText, userRequestedRemoveBg && { color: theme.colors.white }]}>
+                    {userRequestedRemoveBg ? '重新抠图' : 'AI抠图'}
                   </Text>
                 </>
               )}
@@ -411,7 +433,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected }: Props) {
             >
               <Ionicons name="cloud-upload" size={20} color={theme.colors.white} />
               <Text style={[styles.actionBtnText, styles.actionBtnTextPrimary]}>
-                {isProcessed ? '已抠图' : '确认上传'}
+                确认上传
               </Text>
             </TouchableOpacity>
           </View>
