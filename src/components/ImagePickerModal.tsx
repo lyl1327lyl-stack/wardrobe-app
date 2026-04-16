@@ -13,6 +13,8 @@ interface Props {
   onImageSelected: (uri: string, removeBg: boolean) => void;
   // 可选：传入已有图片 URI，直接进入编辑模式（用于编辑已有衣服的照片）
   initialImageUri?: string;
+  // 可选：跳过编辑步骤，选择完图片后直接返回（用于"更换照片"场景）
+  skipEdit?: boolean;
 }
 
 type Step = 'source' | 'edit';
@@ -119,7 +121,7 @@ const makeStyles = (theme: Theme) =>
     editPreviewBg: {
       width: '100%',
       flex: 1,
-      backgroundColor: '#f5f5f5', // 白色背景，让透明PNG正确显示
+      backgroundColor: '#ffffff', // 白色背景，让透明PNG正确显示
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -194,7 +196,7 @@ const makeStyles = (theme: Theme) =>
     },
   });
 
-export function ImagePickerModal({ visible, onClose, onImageSelected, initialImageUri }: Props) {
+export function ImagePickerModal({ visible, onClose, onImageSelected, initialImageUri, skipEdit }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const navigation = useNavigation<any>();
@@ -225,26 +227,33 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
     }
   }, [visible, initialImageUri]);
 
-  // 选择图片 - 不裁剪，直接选完进入编辑页面
+  // 选择图片 - 跳过编辑模式则直接返回结果，否则进入编辑页面
   const handlePick = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        allowsEditing: false, // 不裁剪，直接进入编辑页面
+        allowsEditing: false,
         quality: 1,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedUri(result.assets[0].uri);
-        setProcessedUri(null);
-        setStep('edit');
+        const uri = result.assets[0].uri;
+        if (skipEdit) {
+          // 跳过编辑：直接返回
+          onImageSelected(uri, false);
+          onClose();
+        } else {
+          setSelectedUri(uri);
+          setProcessedUri(null);
+          setStep('edit');
+        }
       }
     } catch (e) {
       console.error('[ImagePicker] Pick failed:', e);
     }
   };
 
-  // 拍照 - 不裁剪，直接拍完进入编辑页面
+  // 拍照 - 跳过编辑模式则直接返回结果，否则进入编辑页面
   const handleTake = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
@@ -254,14 +263,20 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
 
     try {
       const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: false, // 不裁剪，直接进入编辑页面
+        allowsEditing: false,
         quality: 1,
       });
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedUri(result.assets[0].uri);
-        setProcessedUri(null);
-        setStep('edit');
+        const uri = result.assets[0].uri;
+        if (skipEdit) {
+          onImageSelected(uri, false);
+          onClose();
+        } else {
+          setSelectedUri(uri);
+          setProcessedUri(null);
+          setStep('edit');
+        }
       }
     } catch (e) {
       console.error('[ImagePicker] Take photo failed:', e);
@@ -276,8 +291,8 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
     setIsRemovingBg(true);
     try {
       const result = await processImage(sourceUri, true);
-      if (result.thumbnailUri) {
-        setProcessedUri(result.thumbnailUri);
+      if (result.imageUri) {
+        setProcessedUri(result.imageUri);
         setUserRequestedRemoveBg(true); // 用户明确要求抠图
       }
     } catch (e) {

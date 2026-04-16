@@ -375,7 +375,7 @@ export function CropView({
       console.log('[Confirm] pixelX/Y:', pixelX.toFixed(1), pixelY.toFixed(1), '| pixelSize:', pixelSize.toFixed(1));
 
       await ensureImageDir();
-      const savedPath = `${documentDirectory}images/crop_${Date.now()}.jpg`;
+      const savedPath = `${documentDirectory}images/crop_${Date.now()}_${Math.floor(Math.random() * 999999)}.jpg`;
       const MAX_DIM = 1500;
 
       // Step 1: 按原图长边 resize

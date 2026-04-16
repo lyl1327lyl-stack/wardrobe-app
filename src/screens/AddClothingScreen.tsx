@@ -644,8 +644,10 @@ const makeStyles = (theme: Theme) =>
 export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
-  const { addClothing, updateClothing, getClothingByIdIncludingDrafts, loadData, currentWardrobeId, saveDraft, publishDraft, wardrobes } = useWardrobeStore();
+  const { addClothing, updateClothing, loadData, currentWardrobeId, saveDraft, publishDraft, wardrobes } = useWardrobeStore();
   const wardrobeIsLoading = useWardrobeStore(state => state.isLoading);
+  const clothing = useWardrobeStore(state => state.clothing);
+  const draftClothing = useWardrobeStore(state => state.draftClothing);
   const { theme } = useTheme();
   const getParents = useCustomOptionsStore(state => state.getParents);
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
@@ -676,7 +678,14 @@ export function AddClothingScreen() {
   const isEditing = !!(route.params?.id);
   const isEditingDraft = route.params?.isDraft === true;
   console.log('[EDIT] route.params:', route.params, 'isDataReady:', isDataReady, 'isEditingDraft:', isEditingDraft);
-  const existingItem = isDataReady && isEditing ? getClothingByIdIncludingDrafts(route.params.id) : null;
+
+  // 直接从 store 订阅 existingItem，不再通过函数获取
+  const existingItem = useMemo(() => {
+    const id = route.params?.id;
+    if (!isEditing || !id) return null;
+    return clothing.find(c => c.id === id) || draftClothing.find(c => c.id === id) || null;
+  }, [isEditing, route.params?.id, clothing, draftClothing]);
+
   console.log('[EDIT] existingItem:', existingItem?.type, 'parentType:', existingItem?.parentType);
 
   const getInitialParent = (item: any): string => {
@@ -718,6 +727,8 @@ export function AddClothingScreen() {
   const [wearCount, setWearCount] = useState(existingItem?.wearCount ?? 0);
   const [remarks, setRemarks] = useState(existingItem?.remarks || '');
   const [showImagePicker, setShowImagePicker] = useState(false);
+  // 'edit': 进入编辑页面（裁剪/抠图）；'replace': 直接选择新照片替换
+  const [imagePickerMode, setImagePickerMode] = useState<'edit' | 'replace'>('edit');
   const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
   const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
   // 从裁剪页面返回时重置编辑状态
@@ -727,10 +738,9 @@ export function AddClothingScreen() {
     }, [])
   );
 
-  // 当 existingItem 加载完成时，同步更新所有状态（包括分类）
+  // 当 existingItem 加载完成时，同步更新所有状态
   useEffect(() => {
     if (existingItem) {
-      setImageUri(existingItem.imageUri || '');
       setColor(existingItem.color || '');
       setBrand(existingItem.brand || '');
       setSize(existingItem.size || '');
@@ -753,6 +763,13 @@ export function AddClothingScreen() {
       setRemoveBackground(!!existingIsProcessed);
     }
   }, [existingItem]);
+
+  // 只在 existingItem.id 变化时同步一次图片 URI（初始化用）
+  useEffect(() => {
+    if (existingItem?.imageUri) {
+      setImageUri(existingItem.imageUri);
+    }
+  }, [existingItem?.id]);
 
   // 添加模式下自动打开图片选择器
   useEffect(() => {
@@ -919,24 +936,35 @@ export function AddClothingScreen() {
   };
 
   const performSave = async (asDraft: boolean, wardrobeId: number) => {
+    // 如果正在提交，不执行
+    if (isSubmitting) return;
+
     setIsSubmitting(true);
     try {
-      let processedUri = imageUri;
-      let thumbnailUri = existingItem?.thumbnailUri || imageUri;
+      let processedUri = '';
+      let thumbnailUri = '';
 
-      if (!asDraft && imageUri && (!existingItem || imageUri !== existingItem.imageUri)) {
-        // 如果当前 imageUri 已经是我们的 PNG 格式，说明已经处理过（裁剪/抠图）
-        // 直接使用，不再重复调用 API
-        const isAlreadyProcessed = imageUri.includes('/images/') && imageUri.endsWith('.png');
-        if (isAlreadyProcessed) {
-          processedUri = imageUri;
-          thumbnailUri = existingItem?.thumbnailUri || imageUri;
-        } else {
-          // 新图片，需要处理
-          const result = await processImage(imageUri, removeBackground);
-          processedUri = result.imageUri;
-          thumbnailUri = result.thumbnailUri;
-        }
+      // 获取当前的 imageUri（优先用 state，其次用 existingItem）
+      const currentImageUri = imageUri || existingItem?.imageUri || '';
+
+      // 只要 imageUri 发生变化，就必须重新处理
+      if (!asDraft && currentImageUri && existingItem && currentImageUri !== existingItem.imageUri) {
+        const result = await processImage(currentImageUri, removeBackground);
+        processedUri = result.imageUri || existingItem?.imageUri || currentImageUri;
+        thumbnailUri = result.thumbnailUri || existingItem?.thumbnailUri || processedUri;
+      } else if (existingItem?.imageUri) {
+        processedUri = existingItem.imageUri;
+        thumbnailUri = existingItem.thumbnailUri || existingItem.imageUri;
+      } else if (currentImageUri) {
+        processedUri = currentImageUri;
+        thumbnailUri = currentImageUri;
+      }
+
+      // 确保 imageUri 有效
+      if (!processedUri || !thumbnailUri) {
+        Alert.alert('图片保存失败', '请重试');
+        setIsSubmitting(false);
+        return;
       }
 
       const clothingData = {
@@ -1023,7 +1051,7 @@ export function AddClothingScreen() {
 
       <ScrollView ref={scrollViewRef} style={styles.scrollView} showsVerticalScrollIndicator={false} scrollIndicatorInsets={{ right: 1 }} keyboardShouldPersistTaps="handled">
         {/* Image Area */}
-        <TouchableOpacity style={styles.imageArea} onPress={() => setShowImagePicker(true)} activeOpacity={0.9}>
+        <TouchableOpacity style={styles.imageArea} onPress={() => { setImagePickerMode('edit'); setShowImagePicker(true); }} activeOpacity={0.9}>
           {imageUri ? (
             <>
               <Image source={{ uri: imageUri }} style={styles.image} />
@@ -1032,7 +1060,7 @@ export function AddClothingScreen() {
                 <View style={styles.imageActionRow}>
                   <TouchableOpacity
                     style={[styles.imageActionBtn, removeBackground && styles.imageActionBtnPrimary]}
-                    onPress={() => setShowImagePicker(true)}
+                    onPress={() => { setImagePickerMode('edit'); setShowImagePicker(true); }}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="create-outline" size={12} color={removeBackground ? '#fff' : theme.colors.text} />
@@ -1045,6 +1073,7 @@ export function AddClothingScreen() {
                     style={styles.imageActionBtn}
                     onPress={() => {
                       setRemoveBackground(false);
+                      setImagePickerMode('replace');
                       setShowImagePicker(true);
                     }}
                     activeOpacity={0.7}
@@ -1302,7 +1331,8 @@ export function AddClothingScreen() {
           setRemoveBackground(shouldRemoveBg);
           setShowImagePicker(false);
         }}
-        initialImageUri={imageUri || undefined}
+        initialImageUri={imagePickerMode === 'edit' ? (imageUri || undefined) : undefined}
+        skipEdit={false}
       />
 
       {/* 衣橱选择居中对话框 */}

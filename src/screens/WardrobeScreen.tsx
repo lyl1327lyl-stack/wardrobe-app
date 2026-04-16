@@ -555,14 +555,6 @@ export function WardrobeScreen() {
     loadDrafts();
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      loadData();
-      loadWardrobes();
-      loadDrafts();
-    }, [])
-  );
-
   // 当前选中的衣橱
   const currentWardrobe = getCurrentWardrobe();
 

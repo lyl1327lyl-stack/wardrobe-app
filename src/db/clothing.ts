@@ -166,11 +166,19 @@ export async function deleteAllClothing(): Promise<void> {
   await db.runAsync('DELETE FROM clothing_items');
 }
 
-export async function incrementWearCount(id: number): Promise<void> {
+export async function incrementWearCount(id: number, lastWornAt?: string): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     'UPDATE clothing_items SET wearCount = wearCount + 1, lastWornAt = ? WHERE id = ?',
-    [localDateString(), id]
+    [lastWornAt || localDateString(), id]
+  );
+}
+
+export async function decrementWearCount(id: number): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync(
+    'UPDATE clothing_items SET wearCount = MAX(0, wearCount - 1) WHERE id = ?',
+    [id]
   );
 }
 

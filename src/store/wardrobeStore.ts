@@ -149,6 +149,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     set(state => ({
       clothing: state.clothing.map(c => c.id === item.id ? item : c),
       soldClothing: state.soldClothing.map(c => c.id === item.id ? item : c),
+      draftClothing: state.draftClothing.map(c => c.id === item.id ? item : c),
     }));
   },
 
@@ -623,7 +624,9 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   addWearRecord: async (clothingId, date) => {
     const id = await wearRecordsDb.addWearRecord(clothingId, date);
-    // 更新衣物的 wearCount 和 lastWornAt
+    // 持久化 wearCount 到数据库（这样应用重启后仍能正确恢复）
+    await clothingDb.incrementWearCount(clothingId, date);
+    // 更新内存状态
     const { clothing } = get();
     const item = clothing.find(c => c.id === clothingId);
     if (item) {
@@ -641,6 +644,10 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   addWearRecords: async (clothingIds, date) => {
     await wearRecordsDb.addWearRecords(clothingIds, date);
+    // 持久化 wearCount 到数据库
+    for (const clothingId of clothingIds) {
+      await clothingDb.incrementWearCount(clothingId, date);
+    }
     // 批量更新衣物的 wearCount 和 lastWornAt
     set(state => ({
       clothing: state.clothing.map(c =>
@@ -652,7 +659,29 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   deleteWearRecord: async (id) => {
+    // 先获取记录以找到 clothingId
+    const record = await wearRecordsDb.getWearRecordById(id);
+    if (!record) return;
+
+    const { clothingId } = record;
+
+    // 删除记录
     await wearRecordsDb.deleteWearRecord(id);
+
+    // 持久化 wearCount 递减到数据库
+    await clothingDb.decrementWearCount(clothingId);
+
+    // 获取剩余记录的最新日期
+    const lastDate = await wearRecordsDb.getLastWornDateFromRecords(clothingId);
+
+    // 更新内存状态
+    set(state => ({
+      clothing: state.clothing.map(c =>
+        c.id === clothingId
+          ? { ...c, wearCount: Math.max(0, (c.wearCount || 0) - 1), lastWornAt: lastDate }
+          : c
+      ),
+    }));
   },
 
   getWearDatesByClothing: (_clothingId) => {

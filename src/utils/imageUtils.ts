@@ -4,8 +4,7 @@ import {
   makeDirectoryAsync,
   deleteAsync,
   getInfoAsync,
-  readAsStringAsync,
-  writeAsStringAsync,
+  copyAsync,
 } from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { removeBackground } from './backgroundRemoval';
@@ -48,74 +47,80 @@ export async function takePhoto(): Promise<string | null> {
 export async function processImage(uri: string, removeBg: boolean = false): Promise<{ imageUri: string; thumbnailUri: string }> {
   await ensureImageDir();
 
-  const timestamp = Date.now();
-  const imagePath = `${IMAGE_DIR}img_${timestamp}.jpg`;
-  const thumbnailPath = `${IMAGE_DIR}thumb_${timestamp}.png`; // PNG for transparent background
+  // 使用时间戳+随机数确保绝对唯一的文件名，避免 RN Image 缓存问题
+  const uniqueId = `${Date.now()}_${Math.floor(Math.random() * 999999)}`;
+  const imagePath = `${IMAGE_DIR}img_${uniqueId}.jpg`;
+  const thumbnailPath = `${IMAGE_DIR}thumb_${uniqueId}.jpg`;
 
   let thumbnailUri = thumbnailPath;
 
   if (removeBg) {
-    // 背景移除模式：主图和缩略图都用移除背景的结果
+    // 背景移除模式
     const bgRemovedUri = await removeBackground(uri);
     if (bgRemovedUri) {
       // bgRemovedUri 是 data URI (PNG 格式，带透明)
-      // 先按主图尺寸保存，再缩放一份缩略图
-      const base64Match = bgRemovedUri.match(/base64,(.+)$/);
-      if (base64Match) {
-        // 保存完整尺寸 PNG 作为主图（imageUri）
-        await writeAsStringAsync(imagePath.replace('.jpg', '.png'), base64Match[1], { encoding: 'base64' });
-        // 缩放生成缩略图
-        const thumbnail = await manipulateAsync(
-          `data:image/png;base64,${base64Match[1]}`,
-          [{ resize: { width: THUMBNAIL_SIZE } }],
-          { format: SaveFormat.PNG }
-        );
-        const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
-        await writeAsStringAsync(thumbnailPath, base64Thumb, { encoding: 'base64' });
-        thumbnailUri = thumbnailPath;
-        console.log('[processImage] Background removed: saved main as PNG, thumbnail generated');
-      }
+      // 保存完整尺寸 PNG 作为主图
+      const mainPngPath = `${IMAGE_DIR}img_${uniqueId}.png`;
+      // manipulateAsync 处理 data URI 输出到缓存，再用 copyAsync 复制到永久目录
+      const manipulated = await manipulateAsync(
+        bgRemovedUri,
+        [{ resize: { width: IMAGE_SIZE } }],
+        { format: SaveFormat.PNG }
+      );
+      // 核心修复：立即复制到永久目录
+      await copyAsync({ from: manipulated.uri, to: mainPngPath });
+
+      // 生成缩略图
+      const thumbnail = await manipulateAsync(
+        bgRemovedUri,
+        [{ resize: { width: THUMBNAIL_SIZE } }],
+        { format: SaveFormat.PNG }
+      );
+      await copyAsync({ from: thumbnail.uri, to: thumbnailPath });
+
+      console.log('[processImage] Background removed: main saved to', mainPngPath, 'thumb to', thumbnailPath);
+      return { imageUri: mainPngPath, thumbnailUri: thumbnailPath };
     } else {
       // API 调用失败，回退到普通处理
       const manipulated = await manipulateAsync(
         uri,
         [{ resize: { width: IMAGE_SIZE } }],
-        { compress: 0.9 }
+        { compress: 1.0, format: SaveFormat.JPEG }
       );
-      const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
-      await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
+      await copyAsync({ from: manipulated.uri, to: imagePath });
+
       const thumbnail = await manipulateAsync(
         uri,
         [{ resize: { width: THUMBNAIL_SIZE } }],
-        { compress: 0.8 }
+        { compress: 0.9, format: SaveFormat.JPEG }
       );
-      const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
-      await writeAsStringAsync(thumbnailPath.replace('.png', '.jpg'), base64Thumb, { encoding: 'base64' });
-      thumbnailUri = thumbnailPath.replace('.png', '.jpg');
+      await copyAsync({ from: thumbnail.uri, to: thumbnailPath });
+
+      console.log('[processImage] Fallback: main saved to', imagePath, 'thumb to', thumbnailPath);
+      return { imageUri: imagePath, thumbnailUri };
     }
   } else {
-    // 普通模式：不移除背景
+    // 普通模式
     const manipulated = await manipulateAsync(
       uri,
       [{ resize: { width: IMAGE_SIZE } }],
-      { compress: 0.9 }
+      { compress: 1.0, format: SaveFormat.JPEG }
     );
-    const base64Image = await readAsStringAsync(manipulated.uri, { encoding: 'base64' });
-    await writeAsStringAsync(imagePath, base64Image, { encoding: 'base64' });
+    await copyAsync({ from: manipulated.uri, to: imagePath });
 
     const isPng = uri.toLowerCase().endsWith('.png');
     const thumbnail = await manipulateAsync(
       uri,
       [{ resize: { width: THUMBNAIL_SIZE } }],
-      isPng ? { format: SaveFormat.PNG } : { compress: 0.8 }
+      isPng
+        ? { format: SaveFormat.PNG }
+        : { compress: 0.9, format: SaveFormat.JPEG }
     );
-    const base64Thumb = await readAsStringAsync(thumbnail.uri, { encoding: 'base64' });
-    const thumbPath = isPng ? thumbnailPath : thumbnailPath.replace('.png', '.jpg');
-    await writeAsStringAsync(thumbPath, base64Thumb, { encoding: 'base64' });
-    thumbnailUri = thumbPath;
-  }
+    await copyAsync({ from: thumbnail.uri, to: thumbnailPath });
 
-  return { imageUri: imagePath.replace('.jpg', '.png'), thumbnailUri };
+    console.log('[processImage] Normal: main saved to', imagePath, 'thumb to', thumbnailPath);
+    return { imageUri: imagePath, thumbnailUri };
+  }
 }
 
 export async function deleteImage(imageUri: string, thumbnailUri: string) {

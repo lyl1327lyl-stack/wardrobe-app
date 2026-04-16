@@ -255,7 +255,7 @@ export function WearCalendarSheet({
 }: WearCalendarSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { clothing } = useWardrobeStore();
+  const { clothing, addWearRecords } = useWardrobeStore();
   const [records, setRecords] = useState<ClothingItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddPicker, setShowAddPicker] = useState(false);
@@ -301,7 +301,7 @@ export function WearCalendarSheet({
               const wearRecords = await wearRecordsDb.getWearRecordsByDate(date);
               const record = wearRecords.find(r => r.clothingId === clothingId);
               if (record && onDeleteRecord) {
-                onDeleteRecord(record.id);
+                await onDeleteRecord(record.id);
               }
               loadRecords();
             } catch (error) {
@@ -328,9 +328,8 @@ export function WearCalendarSheet({
   const handleConfirmAdd = async () => {
     if (selectedAddIds.length === 0) return;
     try {
-      for (const id of selectedAddIds) {
-        await wearRecordsDb.addWearRecord(id, date);
-      }
+      // 使用 store 的 addWearRecords，它会更新内存中的 wearCount
+      await addWearRecords(selectedAddIds, date);
       setSelectedAddIds([]);
       setShowAddPicker(false);
       loadRecords();

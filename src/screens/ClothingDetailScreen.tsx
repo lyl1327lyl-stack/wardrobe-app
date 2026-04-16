@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { deleteImage } from '../utils/imageUtils';
 import { ClothingItem } from '../types';
@@ -441,11 +441,21 @@ const makeStyles = (theme: Theme) =>
 export function ClothingDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ClothingDetail'>>();
-  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, trashClothing, soldClothing, publishDraft } = useWardrobeStore();
+  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, publishDraft, addWearRecord, deleteWearRecord } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const [item, setItem] = useState<ClothingItem | null>(null);
+  // 直接从 store 订阅，不要用本地 state
+  const allClothing = useWardrobeStore(s => s.clothing);
+  const allTrashClothing = useWardrobeStore(s => s.trashClothing);
+  const allSoldClothing = useWardrobeStore(s => s.soldClothing);
+
+  const item = useMemo(() => {
+    return allClothing.find(c => c.id === route.params.id) ||
+      allTrashClothing.find(c => c.id === route.params.id) ||
+      allSoldClothing.find(c => c.id === route.params.id) || null;
+  }, [allClothing, allTrashClothing, allSoldClothing, route.params.id]);
+
   const [showOutfitPicker, setShowOutfitPicker] = useState(false);
   const [showDiscardSheet, setShowDiscardSheet] = useState(false);
   const [showSellSheet, setShowSellSheet] = useState(false);
@@ -458,18 +468,10 @@ export function ClothingDetailScreen() {
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
   });
 
-  // 使用 useFocusEffect 在屏幕获得焦点时刷新数据
-  useFocusEffect(
-    useCallback(() => {
-      const found = getClothingByIdIncludingAll(route.params.id);
-      setItem(found || null);
-    }, [route.params.id, getClothingByIdIncludingAll])
-  );
-
   // 根据路由或物品状态判断来源
   const source: DetailSource = route.params.source ||
-    (trashClothing.find(c => c.id === route.params.id) ? 'trash' :
-     soldClothing.find(c => c.id === route.params.id) ? 'sold' : 'wardrobe');
+    (allTrashClothing.find(c => c.id === route.params.id) ? 'trash' :
+     allSoldClothing.find(c => c.id === route.params.id) ? 'sold' : 'wardrobe');
 
   const isTrash = source === 'trash';
   const isSold = source === 'sold';
@@ -533,11 +535,8 @@ export function ClothingDetailScreen() {
           onPress: () => {
             (async () => {
               try {
-                await wearRecordsDb.addWearRecord(item.id, date);
+                await addWearRecord(item.id, date);
                 await loadWearDates();
-                const newCount = await wearRecordsDb.getWearCountFromRecords(item.id);
-                const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
-                setItem(prev => prev ? { ...prev, wearCount: newCount, lastWornAt: lastDate } : null);
               } catch (e) {
                 console.error('记录穿着失败:', e);
               }
@@ -549,13 +548,14 @@ export function ClothingDetailScreen() {
   };
 
   // 删除穿着记录后刷新
-  const handleDeleteRecord = async () => {
-    await loadWearDates();
-    // 更新衣物的 wearCount
-    if (item) {
-      const count = await wearRecordsDb.getWearCountFromRecords(item.id);
-      const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
-      setItem(prev => prev ? { ...prev, wearCount: count, lastWornAt: lastDate } : null);
+  const handleDeleteRecord = async (recordId: number) => {
+    if (!item) return;
+    try {
+      // 使用 store 的 deleteWearRecord（它会正确更新数据库和内存状态）
+      await deleteWearRecord(recordId);
+      await loadWearDates();
+    } catch (e) {
+      console.error('删除穿着记录失败:', e);
     }
   };
 
@@ -678,10 +678,8 @@ export function ClothingDetailScreen() {
           onPress: () => {
             (async () => {
               try {
-                await wearRecordsDb.addWearRecord(item.id, dateStr);
+                await addWearRecord(item.id, dateStr);
                 await loadWearDates();
-                const newCount = await wearRecordsDb.getWearCountFromRecords(item.id);
-                setItem(prev => prev ? { ...prev, wearCount: newCount, lastWornAt: dateStr } : null);
                 Alert.alert('已记录穿着');
               } catch (e) {
                 console.error('记录穿着失败:', e);
@@ -757,7 +755,6 @@ export function ClothingDetailScreen() {
   const handleEditReason = async (reason: string) => {
     if (item) {
       await updateClothing({ ...item, discardReason: reason });
-      setItem(prev => prev ? { ...prev, discardReason: reason } : null);
     }
     setShowEditReason(false);
   };

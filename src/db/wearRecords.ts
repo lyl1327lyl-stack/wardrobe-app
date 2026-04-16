@@ -68,6 +68,16 @@ export async function getWearDatesByMonth(clothingId: number, year: number, mont
   return result.map(r => r.wornDate);
 }
 
+// 获取单条穿着记录（用于删除时查找 clothingId）
+export async function getWearRecordById(id: number): Promise<WearRecord | null> {
+  const db = await getDatabase();
+  const result = await db.getFirstAsync<WearRecord>(
+    'SELECT * FROM wear_records WHERE id = ?',
+    [id]
+  );
+  return result || null;
+}
+
 // 删除单条穿着记录
 export async function deleteWearRecord(id: number): Promise<void> {
   const db = await getDatabase();
