@@ -7,6 +7,7 @@ import { processImage } from '../utils/imageUtils';
 import { registerCropCallback } from '../screens/ImageCropScreen';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
+import { getRemoveBgCredits } from '../utils/backgroundRemoval';
 interface Props {
   visible: boolean;
   onClose: () => void;
@@ -194,6 +195,21 @@ const makeStyles = (theme: Theme) =>
       fontSize: 13,
       color: theme.colors.textSecondary,
     },
+    creditsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingBottom: 12,
+    },
+    creditsText: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+    },
+    creditsExhausted: {
+      color: theme.colors.danger,
+      fontWeight: '600',
+    },
   });
 
 export function ImagePickerModal({ visible, onClose, onImageSelected, initialImageUri, skipEdit }: Props) {
@@ -209,6 +225,8 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
   const [userRequestedRemoveBg, setUserRequestedRemoveBg] = useState(false);
   // 导航到裁剪页面时临时隐藏编辑页
   const [isCropNavigating, setIsCropNavigating] = useState(false);
+  // Remove.bg 剩余免费额度
+  const [creditsInfo, setCreditsInfo] = useState<{ remaining: number } | null>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -218,12 +236,18 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
       setIsRemovingBg(false);
       setUserRequestedRemoveBg(false);
       setIsCropNavigating(false);
+      setCreditsInfo(null);
     } else if (initialImageUri) {
       // 编辑已有图片模式：直接进入编辑页面
       setStep('edit');
       setSelectedUri(initialImageUri);
       setProcessedUri(null);
       setUserRequestedRemoveBg(false);
+      // 获取免费额度
+      getRemoveBgCredits().then(setCreditsInfo).catch(() => setCreditsInfo(null));
+    } else {
+      // 新选图模式：进入编辑页时获取免费额度
+      getRemoveBgCredits().then(setCreditsInfo).catch(() => setCreditsInfo(null));
     }
   }, [visible, initialImageUri]);
 
@@ -287,6 +311,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
   const handleRemoveBg = async () => {
     const sourceUri = processedUri || selectedUri;
     if (!sourceUri) return;
+    if (creditsInfo && creditsInfo.remaining <= 0) return;
 
     setIsRemovingBg(true);
     try {
@@ -294,6 +319,8 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
       if (result.imageUri) {
         setProcessedUri(result.imageUri);
         setUserRequestedRemoveBg(true); // 用户明确要求抠图
+        // 扣减免费额度
+        setCreditsInfo(prev => prev ? { ...prev, remaining: Math.max(0, prev.remaining - 1) } : null);
       }
     } catch (e) {
       console.error('[ImagePicker] Remove bg failed:', e);
@@ -390,6 +417,17 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
 
         {/* 底部操作栏 */}
         <View style={styles.editFooter}>
+          {/* 免费额度提示 */}
+          {creditsInfo !== null && (
+            <View style={styles.creditsRow}>
+              <Ionicons name="information-circle-outline" size={13} color={creditsInfo.remaining <= 0 ? theme.colors.danger : theme.colors.textSecondary} />
+              <Text style={[styles.creditsText, creditsInfo.remaining <= 0 && styles.creditsExhausted]}>
+                {creditsInfo.remaining <= 0
+                  ? '免费抠图额度已用完'
+                  : `免费抠图剩余 ${creditsInfo.remaining} 次`}
+              </Text>
+            </View>
+          )}
           <View style={styles.bottomActionBar}>
             {/* 裁剪按钮 */}
             <TouchableOpacity
@@ -418,10 +456,10 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
               style={[
                 styles.actionBtn,
                 userRequestedRemoveBg && { backgroundColor: theme.colors.accent, borderColor: theme.colors.accent },
-                isRemovingBg && styles.actionBtnDisabled,
+                (isRemovingBg || (creditsInfo !== null && creditsInfo.remaining <= 0)) && styles.actionBtnDisabled,
               ]}
               onPress={handleRemoveBg}
-              disabled={isRemovingBg}
+              disabled={isRemovingBg || (creditsInfo !== null && creditsInfo.remaining <= 0)}
               activeOpacity={0.7}
             >
               {isRemovingBg ? (
@@ -433,7 +471,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
                 <>
                   <Ionicons name={userRequestedRemoveBg ? 'refresh' : 'sparkles'} size={20} color={userRequestedRemoveBg ? theme.colors.white : theme.colors.text} />
                   <Text style={[styles.actionBtnText, userRequestedRemoveBg && { color: theme.colors.white }]}>
-                    {userRequestedRemoveBg ? '重新抠图' : 'AI抠图'}
+                    {creditsInfo !== null && creditsInfo.remaining <= 0 ? '额度用完' : (userRequestedRemoveBg ? '重新抠图' : 'AI抠图')}
                   </Text>
                 </>
               )}

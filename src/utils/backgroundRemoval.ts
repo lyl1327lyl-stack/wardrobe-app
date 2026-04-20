@@ -115,3 +115,30 @@ export async function isBackgroundRemovalConfigured(): Promise<boolean> {
   const apiKey = getApiKey();
   return !!apiKey;
 }
+
+// 获取 Remove.bg 账户剩余免费额度
+export async function getRemoveBgCredits(): Promise<{ remaining: number } | null> {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+
+  try {
+    const response = await fetch('https://api.remove.bg/v1.0/account', {
+      method: 'GET',
+      headers: { 'X-Api-Key': apiKey },
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const credits = data?.data?.attributes?.credits;
+    if (!credits) return null;
+
+    // free_calls 是免费剩余次数，total 是总次数（免费50 + 付费）
+    // 如果 free_calls 为 0，说明免费额度用完了
+    const remaining = credits.api?.free_calls ?? 0;
+    return { remaining };
+  } catch (error) {
+    console.error('[BackgroundRemoval] Credits check error:', error);
+    return null;
+  }
+}
