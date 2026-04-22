@@ -693,19 +693,25 @@ export function WardrobeScreen() {
 
   const handleBatchWear = () => {
     if (selectedIds.length === 0) return;
+    const now = new Date();
+    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const selectedCount = selectedIds.length;
+
     Alert.alert(
       '记录穿着',
-      `确定要记录这 ${selectedIds.length} 件衣物的穿着吗？`,
+      `确定要记录这 ${selectedCount} 件衣物的穿着吗？\n\n今日已记录的衣服将自动跳过。`,
       [
         { text: '取消', style: 'cancel' },
         {
           text: '确认',
           onPress: async () => {
             try {
-              const now = new Date();
-              const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-              await addWearRecords(selectedIds.map(id => Number(id)), dateStr);
-              Alert.alert('已记录穿着');
+              const recordedCount = await addWearRecords(selectedIds.map(id => Number(id)), dateStr);
+              if (recordedCount === 0) {
+                Alert.alert('今日已记录', '所选衣物今天都已记录过穿着，无需重复记录。');
+              } else {
+                Alert.alert('已记录穿着', `成功记录 ${recordedCount} 件衣物的穿着。`);
+              }
               cancelSelection();
               await loadData();
             } catch (e) {

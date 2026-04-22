@@ -26,11 +26,14 @@ export async function addWearRecord(clothingId: number, date: string): Promise<n
 }
 
 // 批量添加穿着记录（多件衣服同一天）
-export async function addWearRecords(clothingIds: number[], date: string): Promise<void> {
-  const db = await getDatabase();
+// 返回实际新增记录数量（不含已存在的）
+export async function addWearRecords(clothingIds: number[], date: string): Promise<number> {
+  let newCount = 0;
   for (const clothingId of clothingIds) {
-    await addWearRecord(clothingId, date);
+    const id = await addWearRecord(clothingId, date);
+    if (id) newCount++;
   }
+  return newCount;
 }
 
 // 获取某件衣物的所有穿着记录

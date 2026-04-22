@@ -92,7 +92,7 @@ interface WardrobeState {
   // 穿着记录 Actions
   loadWearRecords: () => Promise<void>;
   addWearRecord: (clothingId: number, date: string) => Promise<number>;
-  addWearRecords: (clothingIds: number[], date: string) => Promise<void>;
+  addWearRecords: (clothingIds: number[], date: string) => Promise<number>;
   deleteWearRecord: (id: number) => Promise<void>;
   getWearDatesByClothing: (clothingId: number) => string[];
   getWearRecordsByDate: (date: string) => WearRecord[];
@@ -649,19 +649,28 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   addWearRecords: async (clothingIds, date) => {
-    await wearRecordsDb.addWearRecords(clothingIds, date);
+    // 获取当天已有的记录
+    const existingRecords = await wearRecordsDb.getWearRecordsByDate(date);
+    const alreadyRecordedIds = new Set(existingRecords.map(r => r.clothingId));
+
+    // 只对未记录的衣服添加记录
+    const toRecord = clothingIds.filter(id => !alreadyRecordedIds.has(id));
+    if (toRecord.length === 0) return 0;
+
+    await wearRecordsDb.addWearRecords(toRecord, date);
     // 持久化 wearCount 到数据库
-    for (const clothingId of clothingIds) {
+    for (const clothingId of toRecord) {
       await clothingDb.incrementWearCount(clothingId, date);
     }
     // 批量更新衣物的 wearCount 和 lastWornAt
     set(state => ({
       clothing: state.clothing.map(c =>
-        clothingIds.includes(c.id)
+        toRecord.includes(c.id)
           ? { ...c, wearCount: (c.wearCount || 0) + 1, lastWornAt: date }
           : c
       ),
     }));
+    return toRecord.length;
   },
 
   deleteWearRecord: async (id) => {
