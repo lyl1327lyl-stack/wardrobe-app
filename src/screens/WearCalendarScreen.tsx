@@ -131,6 +131,10 @@ const makeStyles = (theme: Theme) =>
     dayCellHasRecords: {
       backgroundColor: theme.colors.primary + '10', // 10% opacity primary
     },
+    // 未来计划穿着 - 用另一种颜色区分
+    dayCellPlanned: {
+      backgroundColor: theme.colors.accent + '25',
+    },
     dayNumber: {
       fontSize: 10,
       fontWeight: '600',
@@ -231,7 +235,7 @@ export function WearCalendarScreen() {
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { clothing, addWearRecords } = useWardrobeStore();
+  const { clothing, addWearRecords, deleteWearRecord } = useWardrobeStore();
 
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -299,7 +303,7 @@ export function WearCalendarScreen() {
   };
 
   const handleDeleteRecord = async (recordId: number) => {
-    await wearRecordsDb.deleteWearRecord(recordId);
+    await deleteWearRecord(recordId);
     loadMonthData();
   };
 
@@ -324,6 +328,8 @@ export function WearCalendarScreen() {
       const dayRecords = wearData[dateStr] || [];
       const isToday = dateStr === today;
       const hasRecords = dayRecords.length > 0;
+      // 判断是否未来日期
+      const isFuture = dateStr > today;
       // 周日 (每行第7格，index 6) 不需要右边距
       const weekIndex = (firstDay + day - 1) % 7;
       const isSunday = weekIndex === 6;
@@ -334,7 +340,7 @@ export function WearCalendarScreen() {
           style={[
             styles.dayCell,
             isToday && styles.dayCellToday,
-            hasRecords && styles.dayCellHasRecords,
+            hasRecords && !isToday && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
             !isSunday && { marginRight: CELL_MARGIN },
             { marginBottom: CELL_MARGIN },
           ]}
@@ -342,7 +348,7 @@ export function WearCalendarScreen() {
           activeOpacity={0.7}
         >
           <View style={styles.dayNumberRow}>
-            <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, hasRecords && styles.dayNumberEmpty]}>
+            <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, hasRecords && !isToday && styles.dayNumberEmpty]}>
               {day}
             </Text>
             {isToday && <Ionicons name="star" size={10} color={theme.colors.primary} style={styles.todayMarker} />}
@@ -433,7 +439,11 @@ export function WearCalendarScreen() {
         <View style={styles.legend}>
           <View style={styles.legendItem}>
             <View style={[styles.legendDot, { backgroundColor: theme.colors.primary + '30' }]} />
-            <Text style={styles.legendText}>有穿着记录</Text>
+            <Text style={styles.legendText}>已穿着</Text>
+          </View>
+          <View style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: theme.colors.accent + '40' }]} />
+            <Text style={styles.legendText}>计划穿着</Text>
           </View>
           <View style={styles.legendItem}>
             <Ionicons name="star" size={12} color={theme.colors.primary} />

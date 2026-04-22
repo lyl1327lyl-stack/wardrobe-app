@@ -1,12 +1,6 @@
 import { getDatabase } from './database';
 import { WearRecord } from '../types';
 
-// 本地日期字符串，避免时区偏移
-function localDateString(): string {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 // 添加单条穿着记录
 export async function addWearRecord(clothingId: number, date: string): Promise<number> {
   const db = await getDatabase();
@@ -93,22 +87,30 @@ export async function deleteAllWearRecords(clothingId: number): Promise<void> {
   await db.runAsync('DELETE FROM wear_records WHERE clothingId = ?', [clothingId]);
 }
 
-// 获取穿着次数统计（从穿着记录计算）
+// 本地日期字符串，避免时区偏移
+function localDateString(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// 获取穿着次数统计（从穿着记录计算，只统计截至今天的记录）
 export async function getWearCountFromRecords(clothingId: number): Promise<number> {
   const db = await getDatabase();
+  const today = localDateString();
   const result = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM wear_records WHERE clothingId = ?',
-    [clothingId]
+    'SELECT COUNT(*) as count FROM wear_records WHERE clothingId = ? AND wornDate <= ?',
+    [clothingId, today]
   );
   return result?.count ?? 0;
 }
 
-// 获取最后穿着日期（从穿着记录计算）
+// 获取最后穿着日期（从穿着记录计算，只统计截至今天的记录）
 export async function getLastWornDateFromRecords(clothingId: number): Promise<string | null> {
   const db = await getDatabase();
+  const today = localDateString();
   const result = await db.getFirstAsync<{ wornDate: string }>(
-    'SELECT wornDate FROM wear_records WHERE clothingId = ? ORDER BY wornDate DESC LIMIT 1',
-    [clothingId]
+    'SELECT wornDate FROM wear_records WHERE clothingId = ? AND wornDate <= ? ORDER BY wornDate DESC LIMIT 1',
+    [clothingId, today]
   );
   return result?.wornDate ?? null;
 }

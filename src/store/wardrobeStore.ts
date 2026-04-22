@@ -32,6 +32,7 @@ interface WardrobeState {
 
   // Actions - 衣物
   loadData: () => Promise<void>;
+  recalculateAllWearCounts: () => Promise<void>;
   addClothing: (item: Omit<ClothingItem, 'id'>) => Promise<number>;
   updateClothing: (item: ClothingItem) => Promise<void>;
   moveToTrash: (id: number, reason?: string) => Promise<void>;
@@ -135,6 +136,25 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       console.error('Failed to load data:', error);
       set({ isLoading: false });
     }
+  },
+
+  // 重新计算所有衣物的穿着次数（只统计截至今天的记录）
+  recalculateAllWearCounts: async () => {
+    const { clothing } = get();
+
+    for (const item of clothing) {
+      const count = await wearRecordsDb.getWearCountFromRecords(item.id);
+      const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
+
+      // 只在数值变化时更新
+      if (item.wearCount !== count || item.lastWornAt !== lastDate) {
+        await clothingDb.updateClothing({ ...item, wearCount: count, lastWornAt: lastDate });
+      }
+    }
+
+    // 重新加载数据以确保一致性
+    const freshClothing = await clothingDb.getAllClothing();
+    set({ clothing: freshClothing });
   },
 
   addClothing: async (item) => {
@@ -657,16 +677,36 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     const toRecord = clothingIds.filter(id => !alreadyRecordedIds.has(id));
     if (toRecord.length === 0) return 0;
 
+    const today = localDateString();
+    const isFuture = date > today;
+
     await wearRecordsDb.addWearRecords(toRecord, date);
-    // 持久化 wearCount 到数据库
-    for (const clothingId of toRecord) {
-      await clothingDb.incrementWearCount(clothingId, date);
+
+    // 只有截至今天的记录才计入穿着次数
+    if (!isFuture) {
+      for (const clothingId of toRecord) {
+        await clothingDb.incrementWearCount(clothingId, date);
+      }
     }
+
     // 批量更新衣物的 wearCount 和 lastWornAt
+    // 只有非未来的记录才更新 lastWornAt（取所有记录中最大的日期）
+    const allRecords = await Promise.all(
+      toRecord.map(id => wearRecordsDb.getWearRecordsByClothing(id))
+    );
+    const recordDates = allRecords.flat().map(r => r.wornDate).filter(d => d <= today);
+    const latestDate = recordDates.length > 0
+      ? recordDates.reduce((a, b) => a > b ? a : b)
+      : null;
+
     set(state => ({
       clothing: state.clothing.map(c =>
         toRecord.includes(c.id)
-          ? { ...c, wearCount: (c.wearCount || 0) + 1, lastWornAt: date }
+          ? {
+              ...c,
+              wearCount: isFuture ? c.wearCount : (c.wearCount || 0) + 1,
+              lastWornAt: latestDate || c.lastWornAt
+            }
           : c
       ),
     }));
@@ -674,26 +714,37 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   deleteWearRecord: async (id) => {
-    // 先获取记录以找到 clothingId
+    // 先获取记录以找到 clothingId 和日期
     const record = await wearRecordsDb.getWearRecordById(id);
     if (!record) return;
 
-    const { clothingId } = record;
+    const { clothingId, wornDate } = record;
+    const today = localDateString();
+    const isFuture = wornDate > today;
 
     // 删除记录
     await wearRecordsDb.deleteWearRecord(id);
 
-    // 持久化 wearCount 递减到数据库
-    await clothingDb.decrementWearCount(clothingId);
+    // 只有截至今天的记录才递减穿着次数（未来的记录从未计入）
+    if (!isFuture) {
+      await clothingDb.decrementWearCount(clothingId);
+    }
 
-    // 获取剩余记录的最新日期
-    const lastDate = await wearRecordsDb.getLastWornDateFromRecords(clothingId);
+    // 获取剩余记录中截至今天的最晚日期
+    const allRecords = await wearRecordsDb.getWearRecordsByClothing(clothingId);
+    const pastRecords = allRecords.filter(r => r.wornDate <= today);
+    const lastDate = pastRecords.length > 0
+      ? pastRecords.reduce((a, b) => a.wornDate > b.wornDate ? a : b).wornDate
+      : null;
+
+    // 计算剩余的穿着次数（只统计截至今天的记录）
+    const wearCount = pastRecords.length;
 
     // 更新内存状态
     set(state => ({
       clothing: state.clothing.map(c =>
         c.id === clothingId
-          ? { ...c, wearCount: Math.max(0, (c.wearCount || 0) - 1), lastWornAt: lastDate }
+          ? { ...c, wearCount, lastWornAt: lastDate || c.lastWornAt }
           : c
       ),
     }));

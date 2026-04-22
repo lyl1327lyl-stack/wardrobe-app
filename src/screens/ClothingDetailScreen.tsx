@@ -9,7 +9,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { deleteImage } from '../utils/imageUtils';
 import { ClothingItem } from '../types';
@@ -463,6 +463,9 @@ export function ClothingDetailScreen() {
   const [showWearCalendar, setShowWearCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [wearDates, setWearDates] = useState<string[]>([]);
+  // 动态穿着次数（只统计截至今天的记录）
+  const [dynamicWearCount, setDynamicWearCount] = useState<number>(0);
+  const [dynamicLastWorn, setDynamicLastWorn] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
@@ -493,9 +496,31 @@ export function ClothingDetailScreen() {
     }
   }, [item, currentMonth, isTrash, isSold, isDraft]);
 
+  // 动态加载穿着次数（只统计截至今天的记录）
+  const loadDynamicWearStats = useCallback(async () => {
+    if (item && !isTrash && !isSold && !isDraft) {
+      try {
+        const count = await wearRecordsDb.getWearCountFromRecords(item.id);
+        const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
+        setDynamicWearCount(count);
+        setDynamicLastWorn(lastDate);
+      } catch (error) {
+        console.error('Failed to load wear stats:', error);
+      }
+    }
+  }, [item, isTrash, isSold, isDraft]);
+
   useEffect(() => {
     loadWearDates();
-  }, [loadWearDates]);
+    loadDynamicWearStats();
+  }, [loadWearDates, loadDynamicWearStats]);
+
+  // 每次屏幕进入焦点时重新加载穿着统计（处理日期变化的情况）
+  useFocusEffect(
+    useCallback(() => {
+      loadDynamicWearStats();
+    }, [loadDynamicWearStats])
+  );
 
   // 月份切换
   const prevMonth = () => {
@@ -580,6 +605,26 @@ export function ClothingDetailScreen() {
       fontWeight: '600',
       color: theme.colors.text,
     },
+    legend: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      gap: 16,
+      marginBottom: 8,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    legendDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    legendText: {
+      fontSize: 11,
+      color: theme.colors.textTertiary,
+    },
     monthNav: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -636,6 +681,24 @@ export function ClothingDetailScreen() {
       height: 32,
       borderRadius: 16,
       backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // 已穿着（过去）的样式
+    dayFilledPast: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    // 计划穿着（未来）的样式
+    dayFilledPlanned: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.accent,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -782,7 +845,7 @@ export function ClothingDetailScreen() {
     );
   };
 
-  const costPerWear = calcCostPerWear(item.price || 0, item.wearCount);
+  const costPerWear = calcCostPerWear(item.price || 0, dynamicWearCount);
 
   return (
     <View style={styles.container}>
@@ -906,12 +969,12 @@ export function ClothingDetailScreen() {
         <View style={styles.card}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{item.wearCount}</Text>
+              <Text style={styles.statValue}>{dynamicWearCount}</Text>
               <Text style={styles.statLabel}>穿着次数</Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
-              <Text style={[styles.statValue, styles.statHighlight]}>{getDaysAgo(item.lastWornAt)}</Text>
+              <Text style={[styles.statValue, styles.statHighlight]}>{getDaysAgo(dynamicLastWorn)}</Text>
               <Text style={styles.statLabel}>上次穿着</Text>
             </View>
             <View style={styles.statDivider} />
@@ -965,6 +1028,16 @@ export function ClothingDetailScreen() {
                 </TouchableOpacity>
               </View>
             </View>
+            <View style={getCalendarStyles.legend}>
+              <View style={getCalendarStyles.legendItem}>
+                <View style={[getCalendarStyles.legendDot, { backgroundColor: theme.colors.primary }]} />
+                <Text style={getCalendarStyles.legendText}>已穿着</Text>
+              </View>
+              <View style={getCalendarStyles.legendItem}>
+                <View style={[getCalendarStyles.legendDot, { backgroundColor: theme.colors.accent }]} />
+                <Text style={getCalendarStyles.legendText}>计划</Text>
+              </View>
+            </View>
             <View style={getCalendarStyles.weekDaysRow}>
               {['日', '一', '二', '三', '四', '五', '六'].map(day => (
                 <View key={day} style={getCalendarStyles.weekDay}>
@@ -998,7 +1071,7 @@ export function ClothingDetailScreen() {
                       activeOpacity={0.7}
                     >
                       {hasRecord ? (
-                        <View style={getCalendarStyles.dayFilled}>
+                        <View style={isFuture ? getCalendarStyles.dayFilledPlanned : getCalendarStyles.dayFilled}>
                           <Text style={getCalendarStyles.dayFilledText}>{d}</Text>
                         </View>
                       ) : (

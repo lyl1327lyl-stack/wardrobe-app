@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -27,6 +27,7 @@ import { ImageCropScreen } from './src/screens/ImageCropScreen';
 import { WearCalendarScreen } from './src/screens/WearCalendarScreen';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useTheme } from './src/hooks/useTheme';
+import { useWardrobeStore } from './src/store/wardrobeStore';
 
 const RootStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -146,6 +147,18 @@ function LoadingScreen() {
       <Text style={{ fontSize: 16, color: '#6B6B6B' }}>加载中...</Text>
     </View>
   );
+}
+
+// 修复穿着次数（只统计截至今天的记录）
+function WearCountFixer({ children }: { children: React.ReactNode }) {
+  const { recalculateAllWearCounts } = useWardrobeStore();
+
+  useEffect(() => {
+    // 应用启动时修复穿着次数
+    recalculateAllWearCounts();
+  }, []);
+
+  return <>{children}</>;
 }
 
 // Main navigator that uses theme
@@ -278,7 +291,9 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
-        <AppNavigator />
+        <WearCountFixer>
+          <AppNavigator />
+        </WearCountFixer>
       </ThemeProvider>
     </GestureHandlerRootView>
   );
