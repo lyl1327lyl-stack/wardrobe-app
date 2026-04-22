@@ -252,9 +252,6 @@ const makeStyles = (theme: Theme) =>
     gridItemImage: {
       width: '100%',
       height: '100%',
-      backgroundColor: theme.colors.borderLight,
-      borderWidth: 1,
-      borderColor: 'transparent',
     },
     // 网格视图价格标签 - 只在右下角显示价格
     gridPriceBadge: {
@@ -550,8 +547,6 @@ export function WardrobeScreen() {
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showBatchDiscardSheet, setShowBatchDiscardSheet] = useState(false);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
-  // 用于刷新图片，解决选择模式导致的图片空白问题
-  const [imageRefreshKey, setImageRefreshKey] = useState(0);
 
   useEffect(() => {
     loadData();
@@ -564,7 +559,7 @@ export function WardrobeScreen() {
   const currentWardrobe = getCurrentWardrobe();
 
   // 调试日志
-  console.log('[WardrobeScreen] RENDER - imageRefreshKey:', imageRefreshKey, 'isSelecting:', isSelecting, 'selectedIds:', selectedIds, 'clothingCount:', clothing.length);
+  console.log('[WardrobeScreen] RENDER - isSelecting:', isSelecting, 'selectedIds:', selectedIds, 'clothingCount:', clothing.length);
 
   const handlePress = (item: ClothingItem) => {
     navigation.navigate('ClothingDetail', { id: item.id });
@@ -658,10 +653,8 @@ export function WardrobeScreen() {
     console.log('[cancelSelection] START - isSelecting:', true, '-> will set to false');
     setIsSelecting(false);
     setSelectedIds([]);
-    console.log('[cancelSelection] will update imageRefreshKey from', imageRefreshKey, 'to', imageRefreshKey + 1);
-    setImageRefreshKey(imageRefreshKey + 1);
     console.log('[cancelSelection] END');
-  }, [imageRefreshKey]);
+  }, []);
 
   const handleLongPress = useCallback((id: number) => {
     if (!isSelecting) {
@@ -846,10 +839,10 @@ export function WardrobeScreen() {
               const isSelected = selectedIds.includes(itemId);
               const imageUri = item.thumbnailUri || item.imageUri;
               const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
-              console.log('[GridItem] render:', itemId, '| isSelecting:', isSelecting, '| imageRefreshKey:', imageRefreshKey, '| imageUri:', imageUri);
+              console.log('[GridItem] render:', itemId, '| isSelecting:', isSelecting, '| imageUri:', imageUri);
               return (
                 <TouchableOpacity
-                  key={`grid-${itemId}`}
+                  key={`grid-${itemId}-${isSelected}`}
                   style={[
                     styles.gridItemTransparentWrap,
                     isSelecting && isSelected && styles.gridItemSelected
@@ -859,14 +852,9 @@ export function WardrobeScreen() {
                   activeOpacity={0.85}
                 >
                   <Image
-                    key={`img-${itemId}-${imageRefreshKey}`}
                     source={{ uri: imageUri }}
                     style={styles.gridItemImage}
                     resizeMode="cover"
-                    onLoadStart={() => console.log('[Image] loadStart:', itemId, imageUri, '| isSelecting:', isSelecting)}
-                    onLoad={() => console.log('[Image] loaded:', itemId, imageUri)}
-                    onLoadEnd={() => console.log('[Image] loadEnd:', itemId, imageUri)}
-                    onError={(e) => console.log('[Image] error:', itemId, imageUri, e.nativeEvent.error)}
                   />
                   {isSelecting && isSelected && (
                     <View style={styles.gridSelectBadge}>
@@ -933,7 +921,7 @@ export function WardrobeScreen() {
                     const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
                     return (
                       <TouchableOpacity
-                        key={`card-${itemId}`}
+                        key={`card-${itemId}-${isSelected}`}
                         style={[
                           isTransparent ? styles.itemCardTransparent : styles.itemCard,
                           isSelecting && isSelected && styles.itemCardSelected
@@ -944,8 +932,8 @@ export function WardrobeScreen() {
                       >
                         <Image
                           source={{ uri: imageUri }}
-                          style={[styles.itemImage, isTransparent && { resizeMode: 'contain', backgroundColor: 'transparent' }]}
-                          resizeMode={isTransparent ? 'contain' : 'cover'}
+                          style={styles.itemImage}
+                          resizeMode="cover"
                         />
                         {isSelecting && isSelected && (
                           <View style={styles.selectBadge}>
