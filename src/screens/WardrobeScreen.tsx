@@ -16,7 +16,6 @@ import { DEFAULT_OPTIONS, getAllChildren } from '../utils/customOptions';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import { SellItemSheet } from '../components/SellItemSheet';
 import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
 import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
 import * as wearRecordsDb from '../db/wearRecords';
@@ -433,19 +432,19 @@ const makeStyles = (theme: Theme) =>
       left: 0,
       right: 0,
       backgroundColor: theme.colors.card,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      paddingHorizontal: 20,
-      paddingTop: 16,
+      paddingHorizontal: 24,
+      paddingTop: 20,
       paddingBottom: 40,
       alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
       ...theme.shadows.lg,
     },
     batchCountWrap: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 14,
+      marginBottom: 16,
       gap: 8,
     },
     batchCountDot: {
@@ -468,14 +467,17 @@ const makeStyles = (theme: Theme) =>
       gap: 12,
     },
     batchBtn: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
-      paddingHorizontal: 24,
       paddingVertical: 14,
-      borderRadius: 28,
-      minWidth: 120,
+      borderRadius: 14,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      maxWidth: 160,
     },
     batchBtnSecondary: {
       backgroundColor: theme.colors.background,
@@ -521,7 +523,6 @@ export function WardrobeScreen() {
     loadData,
     loadDrafts,
     moveMultipleToTrash,
-    sellMultipleClothing,
     moveMultipleClothingToWardrobe,
     addWearRecords,
     wardrobes,
@@ -544,7 +545,6 @@ export function WardrobeScreen() {
   // 批量选择状态
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [showSellSheet, setShowSellSheet] = useState(false);
   const [showBatchDiscardSheet, setShowBatchDiscardSheet] = useState(false);
   const [showMoveSheet, setShowMoveSheet] = useState(false);
 
@@ -673,17 +673,6 @@ export function WardrobeScreen() {
     cancelSelection();
   };
 
-  const handleBatchSell = () => {
-    if (selectedIds.length === 0) return;
-    setShowSellSheet(true);
-  };
-
-  const handleSellConfirm = async (price: number, platform: string) => {
-    await sellMultipleClothing(selectedIds.map(id => Number(id)), price, platform);
-    setShowSellSheet(false);
-    cancelSelection();
-  };
-
   const handleMoveToWardrobe = async (targetWardrobeId: number) => {
     await moveMultipleClothingToWardrobe(selectedIds.map(id => Number(id)), targetWardrobeId);
     // 刷新数据
@@ -775,6 +764,13 @@ export function WardrobeScreen() {
                     <Text style={styles.draftBadgeText}>{draftClothing.length}</Text>
                   </View>
                 )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => navigation.navigate('WearCalendar')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>
@@ -1145,26 +1141,6 @@ export function WardrobeScreen() {
               </View>
               <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>废衣篓</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.batchBtn, styles.batchBtnSecondary]}
-              onPress={handleBatchWear}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.batchBtnIconWrap, styles.batchBtnSecondaryIcon]}>
-                <Ionicons name="checkmark-done-outline" size={18} color={theme.colors.primary} />
-              </View>
-              <Text style={[styles.batchBtnText, styles.batchBtnSecondaryText]}>穿着</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.batchBtn, styles.batchBtnSuccess]}
-              onPress={handleBatchSell}
-              activeOpacity={0.8}
-            >
-              <View style={styles.batchBtnIconWrap}>
-                <Ionicons name="cash-outline" size={18} color={theme.colors.white} />
-              </View>
-              <Text style={[styles.batchBtnText, styles.batchBtnWhiteText]}>卖出</Text>
-            </TouchableOpacity>
           </View>
         </View>
       )}
@@ -1179,14 +1155,6 @@ export function WardrobeScreen() {
           <Ionicons name="add" size={28} color={theme.colors.white} />
         </TouchableOpacity>
       )}
-
-      {/* 卖出表单 */}
-      <SellItemSheet
-        visible={showSellSheet}
-        onClose={() => setShowSellSheet(false)}
-        onSell={handleSellConfirm}
-        title="批量卖出"
-      />
 
       {/* 批量丢弃原因选择 */}
       <BatchDiscardReasonSheet

@@ -24,6 +24,7 @@ import { CustomOptionsScreen } from './src/screens/CustomOptionsScreen';
 import { WardrobeManagementScreen } from './src/screens/WardrobeManagementScreen';
 import { DraftsScreen } from './src/screens/DraftsScreen';
 import { ImageCropScreen } from './src/screens/ImageCropScreen';
+import { WearCalendarScreen } from './src/screens/WearCalendarScreen';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useTheme } from './src/hooks/useTheme';
 
@@ -254,6 +255,14 @@ function AppNavigator() {
         <RootStack.Screen
           name="ImageCrop"
           component={ImageCropScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="WearCalendar"
+          component={WearCalendarScreen}
           options={{
             headerShown: false,
             presentation: 'card',
