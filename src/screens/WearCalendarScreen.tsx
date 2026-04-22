@@ -21,7 +21,6 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 // 7列等分：左右各留16padding，6个间距(每行6个gap)
 const CELL_SIZE = Math.floor((SCREEN_WIDTH - 32 - 24) / 7);
 const CELL_MARGIN = 4;
-console.log('CELL_SIZE:', CELL_SIZE, 'SCREEN_WIDTH:', SCREEN_WIDTH);
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
@@ -115,18 +114,16 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       flexWrap: 'wrap',
       paddingHorizontal: 16,
-      marginBottom: 6,
     },
     dayCell: {
       width: CELL_SIZE,
-      height: CELL_SIZE + 16,
+      height: CELL_SIZE + 22,
       backgroundColor: theme.colors.card,
       borderRadius: 10,
       padding: 4,
     },
     dayCellToday: {
-      borderWidth: 2,
-      borderColor: theme.colors.primary,
+      backgroundColor: theme.colors.primary + '35',
     },
     dayCellEmpty: {
       backgroundColor: 'transparent',
@@ -135,28 +132,41 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.colors.primary + '10', // 10% opacity primary
     },
     dayNumber: {
-      fontSize: 14,
+      fontSize: 10,
       fontWeight: '600',
       color: theme.colors.text,
-      marginBottom: 4,
+    },
+    dayNumberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 1,
+      position: 'relative',
     },
     dayNumberToday: {
       color: theme.colors.primary,
       fontWeight: '700',
     },
+    todayMarker: {
+      position: 'absolute',
+      top: 3,
+      right: 3,
+    },
     dayNumberEmpty: {
       color: theme.colors.textTertiary,
     },
-    // 缩略图网格 - 2x2 固定14x14
+    // 缩略图网格 - 固定2行2列，每格四等分
     thumbnailsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      flexDirection: 'column',
       gap: 2,
-      marginTop: 2,
+    },
+    thumbnailRow: {
+      flexDirection: 'row',
+      gap: 2,
     },
     thumbnailWrap: {
-      width: 14,
-      height: 14,
+      // 四等分：格子宽度 - padding - gap， 除2
+      width: Math.floor((CELL_SIZE - 10) / 2),
+      height: Math.floor((CELL_SIZE - 10) / 2),
       borderRadius: 3,
       overflow: 'hidden',
       backgroundColor: theme.colors.borderLight,
@@ -167,7 +177,7 @@ const makeStyles = (theme: Theme) =>
     },
     overflowBadge: {
       position: 'absolute',
-      bottom: 2,
+      top: 2,
       right: 2,
       backgroundColor: 'rgba(0,0,0,0.6)',
       borderRadius: 4,
@@ -302,13 +312,11 @@ export function WearCalendarScreen() {
     const firstDay = getFirstDayOfMonth(currentYear, currentMonth);
     const cells: React.ReactNode[] = [];
 
-    console.log('renderCalendarDays:', { SCREEN_WIDTH, CELL_SIZE, firstDay, daysInMonth });
-
     // firstDay: 0=周一, 6=周日，需要在第一天前放 firstDay 个空格子
     for (let i = 0; i < firstDay; i++) {
       const weekIndex = i % 7;
       const isSunday = weekIndex === 6;
-      cells.push(<View key={`empty-${i}`} style={[styles.dayCell, styles.dayCellEmpty, !isSunday && { marginRight: CELL_MARGIN }]} />);
+      cells.push(<View key={`empty-${i}`} style={[styles.dayCell, styles.dayCellEmpty, !isSunday && { marginRight: CELL_MARGIN }, { marginBottom: CELL_MARGIN }]} />);
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -326,26 +334,43 @@ export function WearCalendarScreen() {
           style={[
             styles.dayCell,
             isToday && styles.dayCellToday,
-            !isToday && hasRecords && styles.dayCellHasRecords,
+            hasRecords && styles.dayCellHasRecords,
             !isSunday && { marginRight: CELL_MARGIN },
+            { marginBottom: CELL_MARGIN },
           ]}
           onPress={() => handleDayPress(dateStr)}
           activeOpacity={0.7}
         >
-          <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, !isToday && hasRecords && styles.dayNumberEmpty]}>
-            {day}
-          </Text>
+          <View style={styles.dayNumberRow}>
+            <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, hasRecords && styles.dayNumberEmpty]}>
+              {day}
+            </Text>
+            {isToday && <Ionicons name="star" size={10} color={theme.colors.primary} style={styles.todayMarker} />}
+          </View>
           {hasRecords && (
             <View style={styles.thumbnailsGrid}>
-              {dayRecords.slice(0, 4).map((item, idx) => (
-                <View key={item.id} style={styles.thumbnailWrap}>
-                  <Image
-                    source={{ uri: item.thumbnailUri || item.imageUri }}
-                    style={styles.thumbnail}
-                    resizeMode="cover"
-                  />
-                </View>
-              ))}
+              <View style={styles.thumbnailRow}>
+                {dayRecords.slice(0, 2).map((item) => (
+                  <View key={item.id} style={styles.thumbnailWrap}>
+                    <Image
+                      source={{ uri: item.thumbnailUri || item.imageUri }}
+                      style={styles.thumbnail}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ))}
+              </View>
+              <View style={styles.thumbnailRow}>
+                {dayRecords.slice(2, 4).map((item) => (
+                  <View key={item.id} style={styles.thumbnailWrap}>
+                    <Image
+                      source={{ uri: item.thumbnailUri || item.imageUri }}
+                      style={styles.thumbnail}
+                      resizeMode="cover"
+                    />
+                  </View>
+                ))}
+              </View>
               {dayRecords.length > 4 && (
                 <View style={styles.overflowBadge}>
                   <Text style={styles.overflowText}>+{dayRecords.length - 4}</Text>
@@ -411,7 +436,7 @@ export function WearCalendarScreen() {
             <Text style={styles.legendText}>有穿着记录</Text>
           </View>
           <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { borderWidth: 2, borderColor: theme.colors.primary, backgroundColor: 'transparent' }]} />
+            <Ionicons name="star" size={12} color={theme.colors.primary} />
             <Text style={styles.legendText}>今天</Text>
           </View>
         </View>
