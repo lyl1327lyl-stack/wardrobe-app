@@ -375,7 +375,16 @@ export function CropView({
       console.log('[Confirm] pixelX/Y:', pixelX.toFixed(1), pixelY.toFixed(1), '| pixelSize:', pixelSize.toFixed(1));
 
       await ensureImageDir();
-      const savedPath = `${documentDirectory}images/crop_${Date.now()}_${Math.floor(Math.random() * 999999)}.jpg`;
+
+      // 判断是否为 PNG（原图或抠图后），保留透明通道
+      const isPng = currentImageUri.toLowerCase().endsWith('.png')
+        || currentImageUri.startsWith('data:image/png');
+      const savedExt = isPng ? 'png' : 'jpg';
+      const savedPath = `${documentDirectory}images/crop_${Date.now()}_${Math.floor(Math.random() * 999999)}.${savedExt}`;
+      const outputFormat = isPng ? SaveFormat.PNG : SaveFormat.JPEG;
+      console.log('[Crop] currentImageUri:', currentImageUri);
+      console.log('[Crop] isPng:', isPng, '| savedExt:', savedExt, '| outputFormat:', outputFormat);
+      console.log('[Crop] savedPath:', savedPath);
       const MAX_DIM = 1500;
 
       // Step 1: 按原图长边 resize
@@ -384,7 +393,7 @@ export function CropView({
         imgW > imgH
           ? [{ resize: { width: MAX_DIM } }]
           : [{ resize: { height: MAX_DIM } }],
-        { format: SaveFormat.JPEG, compress: 0.92 }
+        isPng ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.92 }
       );
 
       // Step 2: 直接用像素坐标 crop（不需要 frac）
@@ -401,9 +410,9 @@ export function CropView({
       const step2 = await manipulateAsync(
         step1.uri,
         [{ crop: { originX, originY, width: cropW, height: cropH } }],
-        { format: SaveFormat.JPEG, compress: 0.92 }
+        isPng ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.92 }
       );
-      console.log('[Confirm] step2 size:', step2.width, 'x', step2.height);
+      console.log('[Confirm] step2 size:', step2.width, 'x', step2.height, '| format:', outputFormat);
 
       await copyAsync({ from: step2.uri, to: savedPath });
       onConfirm(savedPath);
