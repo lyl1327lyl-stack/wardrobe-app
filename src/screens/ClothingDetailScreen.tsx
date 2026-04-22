@@ -810,13 +810,13 @@ export function ClothingDetailScreen() {
         <View style={styles.imageSection}>
           <View style={[
             styles.imageWrapper,
-            item.thumbnailUri?.endsWith('.png') && { backgroundColor: theme.colors.background }
+            item.imageUri?.endsWith('.png') && { backgroundColor: theme.colors.background }
           ]}>
             <Image
-              source={{ uri: item.thumbnailUri || item.imageUri }}
+              source={{ uri: item.imageUri || item.originalImageUri || item.thumbnailUri }}
               style={[
                 styles.image,
-                item.thumbnailUri?.endsWith('.png') && { resizeMode: 'contain' }
+                item.imageUri?.endsWith('.png') && { resizeMode: 'contain' }
               ]}
             />
             {item.color && <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />}

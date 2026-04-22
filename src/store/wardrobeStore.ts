@@ -180,6 +180,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   permanentDelete: async (id) => {
     await clothingDb.permanentDeleteClothing(id);
     set(state => ({
+      clothing: state.clothing.filter(c => c.id !== id),
       trashClothing: state.trashClothing.filter(c => c.id !== id),
       soldClothing: state.soldClothing.filter(c => c.id !== id),
     }));
@@ -187,10 +188,14 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   emptyTrash: async () => {
     const { trashClothing } = get();
+    const ids = trashClothing.map(c => c.id);
     for (const item of trashClothing) {
       await clothingDb.permanentDeleteClothing(item.id);
     }
-    set({ trashClothing: [] });
+    set(state => ({
+      clothing: state.clothing.filter(c => !ids.includes(c.id)),
+      trashClothing: [],
+    }));
   },
 
   sellClothing: async (id, soldPrice, soldPlatform) => {
@@ -466,6 +471,7 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   permanentDeleteMultiple: async (ids) => {
     await Promise.all(ids.map(id => clothingDb.permanentDeleteClothing(id)));
     set(state => ({
+      clothing: state.clothing.filter(c => !ids.includes(c.id)),
       trashClothing: state.trashClothing.filter(c => !ids.includes(c.id)),
       soldClothing: state.soldClothing.filter(c => !ids.includes(c.id)),
     }));

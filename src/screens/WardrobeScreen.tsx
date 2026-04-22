@@ -239,18 +239,22 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 3,
       borderColor: theme.colors.primary,
     },
-    // 透明图片背景 - 无边框，融入页面背景
+    // 透明图片背景 - 使用与 gridItemWrap 一致的背景色
     gridItemTransparentWrap: {
       width: '31%',
       aspectRatio: 1,
       borderRadius: 12,
       overflow: 'hidden',
-      backgroundColor: theme.colors.background,
+      backgroundColor: theme.colors.borderLight,
+      borderWidth: 1,
+      borderColor: 'transparent',
     },
     gridItemImage: {
       width: '100%',
       height: '100%',
       backgroundColor: theme.colors.borderLight,
+      borderWidth: 1,
+      borderColor: 'transparent',
     },
     // 网格视图价格标签 - 只在右下角显示价格
     gridPriceBadge: {
@@ -522,6 +526,7 @@ export function WardrobeScreen() {
     moveMultipleToTrash,
     sellMultipleClothing,
     moveMultipleClothingToWardrobe,
+    addWearRecords,
     wardrobes,
     currentWardrobeId,
     loadWardrobes,
@@ -557,6 +562,9 @@ export function WardrobeScreen() {
 
   // 当前选中的衣橱
   const currentWardrobe = getCurrentWardrobe();
+
+  // 调试日志
+  console.log('[WardrobeScreen] RENDER - imageRefreshKey:', imageRefreshKey, 'isSelecting:', isSelecting, 'selectedIds:', selectedIds, 'clothingCount:', clothing.length);
 
   const handlePress = (item: ClothingItem) => {
     navigation.navigate('ClothingDetail', { id: item.id });
@@ -647,10 +655,13 @@ export function WardrobeScreen() {
   }, [selectedIds.length, filteredClothing]);
 
   const cancelSelection = useCallback(() => {
+    console.log('[cancelSelection] START - isSelecting:', true, '-> will set to false');
     setIsSelecting(false);
     setSelectedIds([]);
-    setImageRefreshKey(k => k + 1);
-  }, []);
+    console.log('[cancelSelection] will update imageRefreshKey from', imageRefreshKey, 'to', imageRefreshKey + 1);
+    setImageRefreshKey(imageRefreshKey + 1);
+    console.log('[cancelSelection] END');
+  }, [imageRefreshKey]);
 
   const handleLongPress = useCallback((id: number) => {
     if (!isSelecting) {
@@ -700,7 +711,7 @@ export function WardrobeScreen() {
             try {
               const now = new Date();
               const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-              await wearRecordsDb.addWearRecords(selectedIds.map(id => Number(id)), dateStr);
+              await addWearRecords(selectedIds.map(id => Number(id)), dateStr);
               Alert.alert('已记录穿着');
               cancelSelection();
               await loadData();
@@ -835,11 +846,12 @@ export function WardrobeScreen() {
               const isSelected = selectedIds.includes(itemId);
               const imageUri = item.thumbnailUri || item.imageUri;
               const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
+              console.log('[GridItem] render:', itemId, '| isSelecting:', isSelecting, '| imageRefreshKey:', imageRefreshKey, '| imageUri:', imageUri);
               return (
                 <TouchableOpacity
                   key={`grid-${itemId}`}
                   style={[
-                    isTransparent ? styles.gridItemTransparentWrap : styles.gridItemWrap,
+                    styles.gridItemTransparentWrap,
                     isSelecting && isSelected && styles.gridItemSelected
                   ]}
                   onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
@@ -849,8 +861,12 @@ export function WardrobeScreen() {
                   <Image
                     key={`img-${itemId}-${imageRefreshKey}`}
                     source={{ uri: imageUri }}
-                    style={[styles.gridItemImage, isTransparent && { resizeMode: 'contain', backgroundColor: 'transparent' }]}
-                    resizeMode={isTransparent ? 'contain' : 'cover'}
+                    style={styles.gridItemImage}
+                    resizeMode="cover"
+                    onLoadStart={() => console.log('[Image] loadStart:', itemId, imageUri, '| isSelecting:', isSelecting)}
+                    onLoad={() => console.log('[Image] loaded:', itemId, imageUri)}
+                    onLoadEnd={() => console.log('[Image] loadEnd:', itemId, imageUri)}
+                    onError={(e) => console.log('[Image] error:', itemId, imageUri, e.nativeEvent.error)}
                   />
                   {isSelecting && isSelected && (
                     <View style={styles.gridSelectBadge}>
