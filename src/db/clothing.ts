@@ -45,11 +45,12 @@ export async function getClothingById(id: number): Promise<ClothingItem | null> 
 export async function addClothing(item: Omit<ClothingItem, 'id'>): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    `INSERT INTO clothing_items (imageUri, thumbnailUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       item.imageUri,
       item.thumbnailUri,
+      item.originalImageUri || '',
       item.type,
       item.parentType ?? '',
       item.color,
@@ -74,13 +75,14 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
     `UPDATE clothing_items SET
-      imageUri = ?, thumbnailUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
+      imageUri = ?, thumbnailUri = ?, originalImageUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
       seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wearCount = ?, lastWornAt = ?,
       soldAt = ?, soldPrice = ?, soldPlatform = ?, wardrobeId = ?
      WHERE id = ?`,
     [
       item.imageUri,
       item.thumbnailUri,
+      item.originalImageUri || '',
       item.type,
       item.parentType ?? '',
       item.color,
@@ -250,12 +252,13 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
     if (item.id) {
       await db.runAsync(
         `UPDATE clothing_items SET
-          imageUri = ?, thumbnailUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
+          imageUri = ?, thumbnailUri = ?, originalImageUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
           seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wardrobeId = ?
          WHERE id = ? AND isDraft = 1`,
         [
           item.imageUri,
           item.thumbnailUri,
+          item.originalImageUri || '',
           item.type,
           item.parentType ?? '',
           item.color,
@@ -275,11 +278,12 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
     } else {
       // 新增草稿
       const result = await db.runAsync(
-        `INSERT INTO clothing_items (imageUri, thumbnailUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId, isDraft)
+        `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId, isDraft)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           item.imageUri,
           item.thumbnailUri,
+          item.originalImageUri || '',
           item.type,
           item.parentType ?? '',
           item.color,

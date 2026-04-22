@@ -11,9 +11,11 @@ import { getRemoveBgCredits } from '../utils/backgroundRemoval';
 interface Props {
   visible: boolean;
   onClose: () => void;
-  onImageSelected: (uri: string, removeBg: boolean) => void;
+  onImageSelected: (uri: string, removeBg: boolean, originalUri?: string) => void;
   // 可选：传入已有图片 URI，直接进入编辑模式（用于编辑已有衣服的照片）
   initialImageUri?: string;
+  // 可选：原始图片 URI（裁剪/抠图前），用于重新编辑时保留原图
+  originalImageUri?: string;
   // 可选：跳过编辑步骤，选择完图片后直接返回（用于"更换照片"场景）
   skipEdit?: boolean;
 }
@@ -212,7 +214,7 @@ const makeStyles = (theme: Theme) =>
     },
   });
 
-export function ImagePickerModal({ visible, onClose, onImageSelected, initialImageUri, skipEdit }: Props) {
+export function ImagePickerModal({ visible, onClose, onImageSelected, initialImageUri, originalImageUri: initialOriginalUri, skipEdit }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const navigation = useNavigation<any>();
@@ -220,6 +222,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
   const [step, setStep] = useState<Step>('source');
   const [selectedUri, setSelectedUri] = useState<string | null>(null);
   const [processedUri, setProcessedUri] = useState<string | null>(null);
+  const [originalUri, setOriginalUri] = useState<string | null>(null);  // 原始图片路径（裁剪/抠图前）
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   // 用户是否明确点击了"AI抠图"（独立于裁剪状态）
   const [userRequestedRemoveBg, setUserRequestedRemoveBg] = useState(false);
@@ -233,6 +236,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
       setStep('source');
       setSelectedUri(null);
       setProcessedUri(null);
+      setOriginalUri(null);
       setIsRemovingBg(false);
       setUserRequestedRemoveBg(false);
       setIsCropNavigating(false);
@@ -242,6 +246,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
       setStep('edit');
       setSelectedUri(initialImageUri);
       setProcessedUri(null);
+      setOriginalUri(initialOriginalUri || initialImageUri);  // 编辑时使用传入的原图
       setUserRequestedRemoveBg(false);
       // 获取免费额度
       getRemoveBgCredits().then(setCreditsInfo).catch(() => setCreditsInfo(null));
@@ -249,7 +254,7 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
       // 新选图模式：进入编辑页时获取免费额度
       getRemoveBgCredits().then(setCreditsInfo).catch(() => setCreditsInfo(null));
     }
-  }, [visible, initialImageUri]);
+  }, [visible, initialImageUri, initialOriginalUri]);
 
   // 选择图片 - 跳过编辑模式则直接返回结果，否则进入编辑页面
   const handlePick = async () => {
@@ -264,11 +269,12 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
         const uri = result.assets[0].uri;
         if (skipEdit) {
           // 跳过编辑：直接返回
-          onImageSelected(uri, false);
+          onImageSelected(uri, false, uri);
           onClose();
         } else {
           setSelectedUri(uri);
           setProcessedUri(null);
+          setOriginalUri(uri);  // 新选择的图片作为原始图片
           setStep('edit');
         }
       }
@@ -294,11 +300,12 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
       if (!result.canceled && result.assets[0]) {
         const uri = result.assets[0].uri;
         if (skipEdit) {
-          onImageSelected(uri, false);
+          onImageSelected(uri, false, uri);
           onClose();
         } else {
           setSelectedUri(uri);
           setProcessedUri(null);
+          setOriginalUri(uri);  // 新拍照的图片作为原始图片
           setStep('edit');
         }
       }
@@ -335,7 +342,8 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
     const uriToUse = processedUri || selectedUri;
     if (uriToUse) {
       // 用独立的 userRequestedRemoveBg 判断是否抠图，不用 processedUri（裁剪也会设置它）
-      onImageSelected(uriToUse, userRequestedRemoveBg);
+      // originalUri 为原始图片路径（裁剪/抠图前），用于支持二次裁剪
+      onImageSelected(uriToUse, userRequestedRemoveBg, originalUri || uriToUse);
       onClose();
     }
   };
@@ -435,7 +443,8 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
               activeOpacity={0.7}
               disabled={isRemovingBg}
               onPress={() => {
-                const uriToCrop = processedUri || selectedUri;
+                // 优先使用 originalUri（原始图片），确保裁剪的是原图而非已裁剪过的图
+                const uriToCrop = originalUri || processedUri || selectedUri;
                 if (!uriToCrop) return;
                 // 注册回调：裁剪完成后将结果写入 processedUri 并恢复本 Modal
                 registerCropCallback((croppedUri: string) => {

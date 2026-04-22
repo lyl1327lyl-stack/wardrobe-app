@@ -117,6 +117,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
   await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
   await addColumnIfNotExists('clothing_items', 'isDraft', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfNotExists('clothing_items', 'originalImageUri', 'TEXT DEFAULT ""');
 
   // 确保 wardrobes 表存在
   await ensureWardrobesTable(dbInstance!);

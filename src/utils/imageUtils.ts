@@ -44,7 +44,7 @@ export async function takePhoto(): Promise<string | null> {
   return result.assets[0].uri;
 }
 
-export async function processImage(uri: string, removeBg: boolean = false): Promise<{ imageUri: string; thumbnailUri: string }> {
+export async function processImage(uri: string, removeBg: boolean = false, originalImageUri?: string): Promise<{ imageUri: string; thumbnailUri: string; originalImageUri: string }> {
   await ensureImageDir();
 
   // 使用时间戳+随机数确保绝对唯一的文件名，避免 RN Image 缓存问题
@@ -55,6 +55,9 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
   const imagePath = `${IMAGE_DIR}img_${uniqueId}.${imageExt}`;
   const thumbnailPath = `${IMAGE_DIR}thumb_${uniqueId}.${imageExt}`;
 
+  // originalImageUri: 原始图片路径，裁剪/抠图前保留原图
+  // 如果未提供，使用输入 URI 作为原始图
+  const originalUri = originalImageUri || uri;
   let thumbnailUri = thumbnailPath;
 
   if (removeBg) {
@@ -83,7 +86,7 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
       await copyAsync({ from: thumbnail.uri, to: thumbPngPath });
 
       console.log('[processImage] Background removed: main saved to', mainPngPath, 'thumb to', thumbPngPath);
-      return { imageUri: mainPngPath, thumbnailUri: thumbPngPath };
+      return { imageUri: mainPngPath, thumbnailUri: thumbPngPath, originalImageUri: originalUri };
     } else {
       // API 调用失败，回退到普通处理
       const manipulated = await manipulateAsync(
@@ -101,7 +104,7 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
       await copyAsync({ from: thumbnail.uri, to: thumbnailPath });
 
       console.log('[processImage] Fallback: main saved to', imagePath, 'thumb to', thumbnailPath);
-      return { imageUri: imagePath, thumbnailUri };
+      return { imageUri: imagePath, thumbnailUri, originalImageUri: originalUri };
     }
   } else {
     // 普通模式 - 保持原图格式（PNG透明图应保持PNG）
@@ -125,7 +128,7 @@ export async function processImage(uri: string, removeBg: boolean = false): Prom
     await copyAsync({ from: thumbnail.uri, to: thumbnailPath });
 
     console.log('[processImage] Normal: main saved to', imagePath, 'thumb to', thumbnailPath);
-    return { imageUri: imagePath, thumbnailUri };
+    return { imageUri: imagePath, thumbnailUri, originalImageUri: originalUri };
   }
 }
 

@@ -24,6 +24,7 @@ export interface ClothingItem {
   id: number;
   imageUri: string;
   thumbnailUri: string;
+  originalImageUri: string;  // 原始图片路径，裁剪/抠图前保留原图
   type: string;
   parentType: string;  // 一级分类名称（空字符串表示直接选了一级分类）
   color: string;

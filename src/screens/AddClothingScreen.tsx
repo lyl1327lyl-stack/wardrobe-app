@@ -710,6 +710,7 @@ export function AddClothingScreen() {
   };
 
   const [imageUri, setImageUri] = useState(isEditingDraft ? (route.params?.prefilledImageUri || '') : (existingItem?.imageUri || ''));
+  const [originalImageUri, setOriginalImageUri] = useState(existingItem?.originalImageUri || '');
   const [removeBackground, setRemoveBackground] = useState(false);
   const [selectedParent, setSelectedParent] = useState<string>(getInitialParent(existingItem));
   const [selectedChild, setSelectedChild] = useState<string>(getInitialChild(existingItem));
@@ -783,6 +784,7 @@ export function AddClothingScreen() {
   // 初始状态快照，用于检测未保存更改
   const initialState = useRef({
     imageUri: '',
+    originalImageUri: '',
     type: '',
     color: '',
     brand: '',
@@ -801,6 +803,7 @@ export function AddClothingScreen() {
     if (isDataReady && existingItem) {
       initialState.current = {
         imageUri: existingItem.imageUri || '',
+        originalImageUri: existingItem.originalImageUri || existingItem.imageUri || '',
         type: existingItem.type || '',
         color: existingItem.color || '',
         brand: existingItem.brand || '',
@@ -822,7 +825,7 @@ export function AddClothingScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const currentState = {
-    imageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, occasions,
+    imageUri, originalImageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, occasions,
     clothingStyles, purchaseDate: purchaseDate ? formatDate(purchaseDate) : '', price, remarks,
   };
 
@@ -946,10 +949,12 @@ export function AddClothingScreen() {
 
       // 获取当前的 imageUri（优先用 state，其次用 existingItem）
       const currentImageUri = imageUri || existingItem?.imageUri || '';
+      // 获取原始图片路径（优先用 state，其次用 existingItem）
+      const currentOriginalUri = originalImageUri || existingItem?.originalImageUri || currentImageUri;
 
       // 只要 imageUri 发生变化，就必须重新处理
       if (!asDraft && currentImageUri && existingItem && currentImageUri !== existingItem.imageUri) {
-        const result = await processImage(currentImageUri, removeBackground);
+        const result = await processImage(currentImageUri, removeBackground, currentOriginalUri);
         processedUri = result.imageUri || existingItem?.imageUri || currentImageUri;
         thumbnailUri = result.thumbnailUri || existingItem?.thumbnailUri || processedUri;
       } else if (existingItem?.imageUri) {
@@ -970,6 +975,7 @@ export function AddClothingScreen() {
       const clothingData = {
         imageUri: processedUri,
         thumbnailUri,
+        originalImageUri: currentOriginalUri,
         type: selectedChild || selectedParent || '',
         parentType: selectedChild ? selectedParent : (selectedParent || ''),
         color: asDraft && !color ? '' : color,
@@ -1326,12 +1332,16 @@ export function AddClothingScreen() {
       <ImagePickerModal
         visible={showImagePicker}
         onClose={() => setShowImagePicker(false)}
-        onImageSelected={(uri, shouldRemoveBg) => {
+        onImageSelected={(uri, shouldRemoveBg, originalUri) => {
           setImageUri(uri);
+          if (originalUri) {
+            setOriginalImageUri(originalUri);
+          }
           setRemoveBackground(shouldRemoveBg);
           setShowImagePicker(false);
         }}
         initialImageUri={imagePickerMode === 'edit' ? (imageUri || undefined) : undefined}
+        originalImageUri={imagePickerMode === 'edit' ? (originalImageUri || imageUri || undefined) : undefined}
         skipEdit={false}
       />
 
