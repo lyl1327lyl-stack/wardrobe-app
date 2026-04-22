@@ -78,6 +78,8 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'space-between',
       paddingHorizontal: 16,
       paddingVertical: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
     },
     monthBtn: {
       width: 36,
@@ -85,7 +87,6 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 18,
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: theme.colors.card,
     },
     monthText: {
       fontSize: 17,
@@ -96,7 +97,11 @@ const makeStyles = (theme: Theme) =>
     weekDaysRow: {
       flexDirection: 'row',
       paddingHorizontal: 16,
+      paddingVertical: 8,
       marginBottom: 4,
+      backgroundColor: theme.colors.background,
+      borderRadius: 8,
+      marginHorizontal: 16,
     },
     weekDay: {
       width: CELL_SIZE,
@@ -152,8 +157,8 @@ const makeStyles = (theme: Theme) =>
     },
     todayMarker: {
       position: 'absolute',
-      top: 3,
-      right: 3,
+      top: 1,
+      right: 1,
     },
     dayNumberEmpty: {
       color: theme.colors.textTertiary,
@@ -183,15 +188,15 @@ const makeStyles = (theme: Theme) =>
       position: 'absolute',
       top: 2,
       right: 2,
-      backgroundColor: 'rgba(0,0,0,0.6)',
-      borderRadius: 4,
-      paddingHorizontal: 4,
+      backgroundColor: theme.colors.primary,
+      borderRadius: 8,
+      paddingHorizontal: 5,
       paddingVertical: 2,
       minWidth: 18,
       alignItems: 'center',
     },
     overflowText: {
-      fontSize: 10,
+      fontSize: 9,
       color: theme.colors.white,
       fontWeight: '700',
     },
@@ -211,7 +216,7 @@ const makeStyles = (theme: Theme) =>
     legendDot: {
       width: 10,
       height: 10,
-      borderRadius: 5,
+      borderRadius: 3,
       backgroundColor: theme.colors.primary,
     },
     legendText: {
@@ -351,7 +356,7 @@ export function WearCalendarScreen() {
             <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, hasRecords && !isToday && styles.dayNumberEmpty]}>
               {day}
             </Text>
-            {isToday && <Ionicons name="star" size={10} color={theme.colors.primary} style={styles.todayMarker} />}
+            {isToday && <Ionicons name="star" size={12} color={theme.colors.primary} style={styles.todayMarker} />}
           </View>
           {hasRecords && (
             <View style={styles.thumbnailsGrid}>
@@ -415,11 +420,11 @@ export function WearCalendarScreen() {
         {/* 月份导航 */}
         <View style={styles.monthNav}>
           <TouchableOpacity style={styles.monthBtn} onPress={goToPrevMonth} activeOpacity={0.7}>
-            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
+            <Ionicons name="chevron-back-circle" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={styles.monthText}>{formatMonthYear()}</Text>
           <TouchableOpacity style={styles.monthBtn} onPress={goToNextMonth} activeOpacity={0.7}>
-            <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
+            <Ionicons name="chevron-forward-circle" size={24} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
 
