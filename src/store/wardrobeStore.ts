@@ -48,6 +48,7 @@ interface WardrobeState {
   addOutfit: (outfit: Omit<Outfit, 'id'>) => Promise<number>;
   updateOutfit: (outfit: Outfit) => Promise<void>;
   deleteOutfit: (id: number) => Promise<void>;
+  deleteOutfits: (ids: number[]) => Promise<void>;
   setFilterType: (type: ClothingType | '全部') => void;
   setFilterSeason: (season: Season | '全部') => void;
   getFilteredClothing: () => ClothingItem[];
@@ -304,6 +305,13 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     await outfitDb.deleteOutfit(id);
     set(state => ({
       outfits: state.outfits.filter(o => o.id !== id),
+    }));
+  },
+
+  deleteOutfits: async (ids) => {
+    await Promise.all(ids.map(id => outfitDb.deleteOutfit(id)));
+    set(state => ({
+      outfits: state.outfits.filter(o => !ids.includes(o.id)),
     }));
   },
 

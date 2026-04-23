@@ -13,7 +13,8 @@ import { AddClothingScreen } from './src/screens/AddClothingScreen';
 import { ClothingDetailScreen } from './src/screens/ClothingDetailScreen';
 import { CategoryDetailScreen } from './src/screens/CategoryDetailScreen';
 import { OutfitsScreen } from './src/screens/OutfitsScreen';
-import { OutfitDetailScreen } from './src/screens/OutfitDetailScreen';
+import { ClothingSelectionScreen } from './src/screens/outfit/ClothingSelectionScreen';
+import { OutfitEditorScreen } from './src/screens/outfit/OutfitEditorScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
 import { StatsDetailScreen } from './src/screens/StatsDetailScreen';
 import { TrashScreen } from './src/screens/TrashScreen';
@@ -176,14 +177,6 @@ function AppNavigator() {
       <RootStack.Navigator screenOptions={{ headerShown: false }}>
         <RootStack.Screen name="Main" component={MainTabs} />
         <RootStack.Screen
-          name="OutfitDetail"
-          component={OutfitDetailScreen}
-          options={{
-            headerShown: false,
-            presentation: 'card',
-          }}
-        />
-        <RootStack.Screen
           name="ClothingDetail"
           component={ClothingDetailScreen}
           options={{
@@ -276,6 +269,22 @@ function AppNavigator() {
         <RootStack.Screen
           name="WearCalendar"
           component={WearCalendarScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="ClothingSelection"
+          component={ClothingSelectionScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="OutfitEditor"
+          component={OutfitEditorScreen}
           options={{
             headerShown: false,
             presentation: 'card',

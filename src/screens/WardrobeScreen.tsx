@@ -740,7 +740,7 @@ export function WardrobeScreen() {
               <Text style={styles.headerTitle}>{currentWardrobe?.name || '我的衣橱'}</Text>
               <Ionicons name="chevron-down" size={18} color={theme.colors.textTertiary} />
             </TouchableOpacity>
-            {/* 右侧：视图切换 + 草稿箱 */}
+            {/* 右侧：视图切换 + 日历 + 草稿箱 */}
             <View style={styles.headerRightIcons}>
               <TouchableOpacity
                 style={styles.headerIconBtn}
@@ -755,6 +755,13 @@ export function WardrobeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerIconBtn}
+                onPress={() => navigation.navigate('WearCalendar')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
                 onPress={() => navigation.navigate('Drafts')}
                 activeOpacity={0.7}
               >
@@ -764,13 +771,6 @@ export function WardrobeScreen() {
                     <Text style={styles.draftBadgeText}>{draftClothing.length}</Text>
                   </View>
                 )}
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerIconBtn}
-                onPress={() => navigation.navigate('WearCalendar')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>

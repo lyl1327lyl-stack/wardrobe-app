@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>搭配画板编辑器 Mockup</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 20px; }
+    .container { max-width: 1200px; margin: 0 auto; }
+    h1 { text-align: center; color: #333; margin-bottom: 10px; font-size: 24px; }
+    .subtitle { text-align: center; color: #666; margin-bottom: 30px; font-size: 14px; }
+    .mockup-row { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; }
+    .phone-frame { width: 375px; background: #fff; border-radius: 40px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+    .phone-header { height: 60px; background: #fff; border-bottom: 1px solid #eee; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
+    .phone-content { height: 667px; background: #f7f4ef; overflow: hidden; position: relative; }
+
+    /* Screen 1: Grid Selection */
+    .screen-header { height: 56px; background: #fff; border-bottom: 1px solid #e5e5e5; display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+    .back-btn { width: 36px; height: 36px; border-radius: 18px; background: #f0f0f0; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+    .header-title { font-size: 18px; font-weight: 600; color: #333; flex: 1; }
+    .save-btn { background: #8B7355; color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 500; cursor: pointer; }
+
+    .wardrobe-tabs { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; }
+    .tab { padding: 6px 14px; border-radius: 16px; font-size: 13px; background: #fff; color: #666; border: 1px solid #ddd; white-space: nowrap; cursor: pointer; }
+    .tab.active { background: #8B7355; color: #fff; border-color: #8B7355; }
+
+    .clothing-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px 16px; }
+    .clothing-item { aspect-ratio: 1; background: #fff; border-radius: 12px; overflow: hidden; border: 3px solid transparent; cursor: pointer; position: relative; }
+    .clothing-item.selected { border-color: #8B7355; }
+    .clothing-item img { width: 100%; height: 100%; object-fit: cover; }
+    .check-mark { position: absolute; top: 6px; right: 6px; width: 22px; height: 22px; background: #8B7355; border-radius: 11px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 12px; }
+
+    /* Screen 2: Canvas Editor - 1:1 ratio */
+    .canvas-area { width: calc(100% - 32px); margin: 16px; background: #fff; border-radius: 16px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+    .canvas-inner { width: 260px; height: 260px; position: relative; background: #fafafa; border-radius: 12px; }
+    .canvas-item { position: absolute; cursor: move; user-select: none; }
+    .canvas-item img { width: 100%; height: 100%; object-fit: contain; }
+    .item-rotate-btn { position: absolute; top: -10px; right: -10px; width: 20px; height: 20px; background: #8B7355; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; cursor: pointer; }
+    .item-delete-btn { position: absolute; top: -10px; left: -10px; width: 20px; height: 20px; background: #ff4444; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 9px; cursor: pointer; }
+
+    .layer-controls { position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 8px; background: rgba(0,0,0,0.75); padding: 6px 10px; border-radius: 18px; }
+    .layer-btn { width: 28px; height: 28px; background: #fff; border-radius: 14px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; color: #333; }
+    .layer-divider { width: 1px; background: rgba(255,255,255,0.3); margin: 0 4px; }
+    .add-item-btn { background: #8B7355; color: #fff; }
+
+    /* Canvas Tools Bar */
+    .canvas-tools { display: flex; justify-content: center; gap: 20px; padding: 12px 16px; background: #fff; border-top: 1px solid #f0f0f0; }
+    .canvas-tool { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+    .canvas-tool-icon { width: 40px; height: 40px; background: #f7f4ef; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: #666; }
+    .canvas-tool-label { font-size: 10px; color: #999; }
+
+    /* Screen 3: Outfit List - Grid View */
+    .style-filter { display: flex; gap: 8px; padding: 12px 16px; overflow-x: auto; }
+    .style-pill { padding: 6px 14px; border-radius: 16px; font-size: 13px; background: #fff; color: #666; border: 1px solid #ddd; white-space: nowrap; cursor: pointer; }
+    .style-pill.active { background: #8B7355; color: #fff; border-color: #8B7355; }
+
+    .outfit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; padding: 12px 16px; }
+    .outfit-grid-card { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .outfit-grid-thumb { aspect-ratio: 1; background: #f0f0f0; display: flex; align-items: center; justify-content: center; position: relative; }
+    .outfit-grid-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .outfit-grid-info { padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; }
+    .outfit-grid-style { font-size: 13px; color: #666; }
+    .outfit-grid-count { font-size: 11px; color: #999; }
+
+    /* FAB */
+    .fab { position: absolute; right: 20px; bottom: 32px; width: 60px; height: 60px; background: #8B7355; border-radius: 30px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 28px; box-shadow: 0 4px 16px rgba(139,115,85,0.4); cursor: pointer; }
+
+    /* Legend */
+    .legend { position: absolute; bottom: 60px; left: 16px; right: 16px; display: flex; justify-content: center; gap: 20px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+    .legend-text { font-size: 12px; color: #999; }
+
+    /* Style Selector */
+    .style-selector { padding: 16px; }
+    .style-label { font-size: 14px; color: #666; margin-bottom: 10px; }
+    .style-options { display: flex; flex-wrap: wrap; gap: 8px; }
+    .style-option { padding: 8px 16px; border-radius: 20px; font-size: 13px; background: #fff; color: #333; border: 1px solid #ddd; cursor: pointer; }
+    .style-option.selected { background: #8B7355; color: #fff; border-color: #8B7355; }
+
+    .section-title { font-size: 16px; font-weight: 600; color: #333; margin: 20px 0 12px 0; padding-left: 16px; }
+    .flow-desc { background: #fff; padding: 20px; border-radius: 16px; margin-top: 30px; }
+    .flow-step { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 16px; }
+    .step-num { width: 24px; height: 24px; background: #8B7355; color: #fff; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+    .step-content { font-size: 14px; color: #333; line-height: 1.5; }
+    .step-content strong { color: #8B7355; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>搭配画板编辑器</h1>
+    <p class="subtitle">自由组合 · 灵活布局 · 快速选择</p>
+
+    <div class="mockup-row">
+      <!-- Screen 1: 衣物选择 -->
+      <div class="phone-frame">
+        <div class="phone-header">
+          <span style="font-size:12px;color:#999;">状态栏</span>
+        </div>
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="back-btn">←</div>
+            <div class="header-title">创建搭配</div>
+            <div style="width:50px;"></div>
+          </div>
+
+          <div class="wardrobe-tabs">
+            <div class="tab active">全部</div>
+            <div class="tab">上装</div>
+            <div class="tab">下装</div>
+            <div class="tab">外套</div>
+            <div class="tab">鞋</div>
+            <div class="tab">配饰</div>
+          </div>
+
+          <div class="clothing-grid">
+            <div class="clothing-item selected">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23ddd' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23999' font-size='12'%3E图%3C/text%3E%3C/svg%3E" alt="">
+              <div class="check-mark">✓</div>
+            </div>
+            <div class="clothing-item selected">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23ccc' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23999' font-size='12'%3E图%3C/text%3E%3C/svg%3E" alt="">
+              <div class="check-mark">✓</div>
+            </div>
+            <div class="clothing-item">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23bbb' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23999' font-size='12'%3E图%3C/text%3E%3C/svg%3E" alt="">
+            </div>
+            <div class="clothing-item">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23aaa' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23999' font-size='12'%3E图%3C/text%3E%3C/svg%3E" alt="">
+            </div>
+            <div class="clothing-item">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23999' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23fff' font-size='12'%3E图%3C/text%3E%3C/svg%3E" alt="">
+            </div>
+            <div class="clothing-item">
+              <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect fill='%23888' width='100' height='100'/%3E%3Ctext x='50' y='55' text-anchor='middle' fill='%23fff' font-size='12'%3E图%3C/text%3E%3C/svg%3E" alt="">
+            </div>
+          </div>
+
+          <div style="position:absolute;bottom:0;left:0;right:0;height:80px;background:linear-gradient(transparent,#f7f4ef);pointer-events:none;"></div>
+
+          <div style="position:absolute;bottom:20px;left:50%;transform:translateX(-50%);background:#8B7355;color:#fff;padding:12px 24px;border-radius:24px;font-size:14px;font-weight:500;cursor:pointer;">
+            下一步 (2)
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 2: 画板编辑器 - 1:1 -->
+      <div class="phone-frame">
+        <div class="phone-header">
+          <span style="font-size:12px;color:#999;">状态栏</span>
+        </div>
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="back-btn">←</div>
+            <div class="header-title">搭配画板</div>
+            <div class="save-btn">保存</div>
+          </div>
+
+          <!-- 1:1 Canvas Area -->
+          <div class="canvas-area">
+            <div class="canvas-inner">
+              <!-- Canvas items (draggable) -->
+              <div class="canvas-item" style="top:15%;left:20%;width:60%;height:40%;">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 80'%3E%3Crect fill='%23E8D4C4' width='100' height='80' rx='4'/%3E%3C/svg%3E" alt="">
+                <div class="item-rotate-btn">↻</div>
+                <div class="item-delete-btn">×</div>
+              </div>
+              <div class="canvas-item" style="top:50%;left:15%;width:65%;height:45%;">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 80'%3E%3Crect fill='%234A6B8C' width='100' height='80' rx='4'/%3E%3C/svg%3E" alt="">
+                <div class="item-rotate-btn">↻</div>
+                <div class="item-delete-btn">×</div>
+              </div>
+              <div class="canvas-item" style="top:5%;left:55%;width:35%;height:25%;">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 50'%3E%3Crect fill='%23D4A574' width='60' height='50' rx='4'/%3E%3C/svg%3E" alt="">
+                <div class="item-rotate-btn">↻</div>
+                <div class="item-delete-btn">×</div>
+              </div>
+
+              <!-- Layer Controls -->
+              <div class="layer-controls">
+                <div class="layer-btn add-item-btn" title="添加单品">+</div>
+                <div class="layer-divider"></div>
+                <div class="layer-btn" title="上移一层">⬆</div>
+                <div class="layer-btn" title="下移一层">⬇</div>
+                <div class="layer-btn" title="置顶">⤒</div>
+                <div class="layer-btn" title="置底">⤓</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Canvas Tools Bar -->
+          <div class="canvas-tools">
+            <div class="canvas-tool">
+              <div class="canvas-tool-icon">↶</div>
+              <div class="canvas-tool-label">撤销</div>
+            </div>
+            <div class="canvas-tool">
+              <div class="canvas-tool-icon">↷</div>
+              <div class="canvas-tool-label">重做</div>
+            </div>
+            <div class="canvas-tool">
+              <div class="canvas-tool-icon" style="background:#fff;border:1px solid #ddd;">▦</div>
+              <div class="canvas-tool-label">网格</div>
+            </div>
+            <div class="canvas-tool">
+              <div class="canvas-tool-icon" style="color:#ff4444;">🗑</div>
+              <div class="canvas-tool-label">清空</div>
+            </div>
+            <div class="canvas-tool">
+              <div class="canvas-tool-icon">⟐</div>
+              <div class="canvas-tool-label">背景</div>
+            </div>
+          </div>
+
+          <!-- Legend -->
+          <div class="legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#8B7355;"></div>
+              <div class="legend-text">拖动调整</div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#ff4444;"></div>
+              <div class="legend-text">点击删除</div>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="background:#8B7355;"></div>
+              <div class="legend-text">↻ 旋转</div>
+            </div>
+          </div>
+
+          <!-- Style Selector -->
+          <div class="style-selector" style="position:absolute;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #eee;">
+            <div style="font-size:12px;color:#999;margin-bottom:6px;">选择风格</div>
+            <div style="display:flex;gap:6px;overflow-x:auto;padding-bottom:16px;">
+              <div style="padding:6px 12px;border-radius:14px;font-size:12px;background:#8B7355;color:#fff;">休闲</div>
+              <div style="padding:6px 12px;border-radius:14px;font-size:12px;background:#fff;color:#666;border:1px solid #ddd;">简约</div>
+              <div style="padding:6px 12px;border-radius:14px;font-size:12px;background:#fff;color:#666;border:1px solid #ddd;">运动</div>
+              <div style="padding:6px 12px;border-radius:14px;font-size:12px;background:#fff;color:#666;border:1px solid #ddd;">通勤</div>
+              <div style="padding:6px 12px;border-radius:14px;font-size:12px;background:#fff;color:#666;border:1px solid #ddd;">文艺</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Screen 3: 搭配列表 - 网格视图 -->
+      <div class="phone-frame">
+        <div class="phone-header">
+          <span style="font-size:12px;color:#999;">状态栏</span>
+        </div>
+        <div class="phone-content">
+          <div class="screen-header">
+            <div class="header-title" style="text-align:center;padding-left:36px;">我的搭配</div>
+          </div>
+
+          <!-- 风格筛选 -->
+          <div class="style-filter">
+            <div class="style-pill active">全部</div>
+            <div class="style-pill">休闲</div>
+            <div class="style-pill">简约</div>
+            <div class="style-pill">运动</div>
+            <div class="style-pill">通勤</div>
+            <div class="style-pill">文艺</div>
+          </div>
+
+          <!-- 搭配网格 -->
+          <div class="outfit-grid">
+            <div class="outfit-grid-card">
+              <div class="outfit-grid-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23E8D4C4' x='40' y='30' width='120' height='80' rx='4'/%3E%3Crect fill='%234A6B8C' x='30' y='100' width='130' height='90' rx='4'/%3E%3Crect fill='%23D4A574' x='120' y='10' width='60' height='50' rx='4'/%3E%3C/svg%3E" alt="">
+              </div>
+              <div class="outfit-grid-info">
+                <div class="outfit-grid-style">休闲</div>
+                <div class="outfit-grid-count">4件</div>
+              </div>
+            </div>
+
+            <div class="outfit-grid-card">
+              <div class="outfit-grid-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23C4E8C4' x='50' y='40' width='100' height='70' rx='4'/%3E%3Crect fill='%238B4513' x='40' y='100' width='110' height='80' rx='4'/%3E%3C/svg%3E" alt="">
+              </div>
+              <div class="outfit-grid-info">
+                <div class="outfit-grid-style">简约</div>
+                <div class="outfit-grid-count">2件</div>
+              </div>
+            </div>
+
+            <div class="outfit-grid-card">
+              <div class="outfit-grid-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23FFE4E1' x='35' y='25' width='130' height='85' rx='4'/%3E%3Crect fill='%23666' x='25' y='100' width='140' height='95' rx='4'/%3E%3Crect fill='%23DEB887' x='130' y='5' width='55' height='45' rx='4'/%3E%3Crect fill='%23F5DEB3' x='10' y='15' width='50' height='40' rx='4'/%3E%3C/svg%3E" alt="">
+              </div>
+              <div class="outfit-grid-info">
+                <div class="outfit-grid-style">通勤</div>
+                <div class="outfit-grid-count">4件</div>
+              </div>
+            </div>
+
+            <div class="outfit-grid-card">
+              <div class="outfit-grid-thumb">
+                <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect fill='%23ADD8E6' x='45' y='35' width='110' height='75' rx='4'/%3E%3Crect fill='%23333' x='35' y='100' width='120' height='85' rx='4'/%3E%3C/svg%3E" alt="">
+              </div>
+              <div class="outfit-grid-info">
+                <div class="outfit-grid-style">运动</div>
+                <div class="outfit-grid-count">2件</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FAB -->
+          <div class="fab">+</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="flow-desc">
+      <div class="section-title">操作流程</div>
+      <div class="flow-step">
+        <div class="step-num">1</div>
+        <div class="step-content"><strong>创建搭配</strong> — 点击右下角「+」按钮，进入创建流程</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">2</div>
+        <div class="step-content"><strong>选择衣物</strong> — 从衣物网格中多选单品（最多支持20件），支持按分类筛选</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">3</div>
+        <div class="step-content"><strong>画板编辑</strong> — 进入1:1画板，通过拖动、缩放、旋转调整衣物位置，每件衣物有独立的操作按钮</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">4</div>
+        <div class="step-content"><strong>层级调整</strong> — 使用底部工具栏调整前后遮挡关系（置顶/置底/上移/下移），支持添加更多单品</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">5</div>
+        <div class="step-content"><strong>选择风格</strong> — 从衣物创建时的风格选项中选择一个标签，无需命名</div>
+      </div>
+      <div class="flow-step">
+        <div class="step-num">6</div>
+        <div class="step-content"><strong>保存完成</strong> — 保存搭配，后续可在列表页按风格筛选，点击进入编辑</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

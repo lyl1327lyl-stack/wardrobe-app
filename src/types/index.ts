@@ -57,11 +57,23 @@ export interface OutfitItemPosition {
   scale: number;
 }
 
+export interface CanvasItemData {
+  clothingId: number;
+  imageUri: string;
+  x: number;
+  y: number;
+  scale: number;
+  rotation: number;
+  zIndex: number;
+}
+
 export interface Outfit {
   id: number;
   name: string;
   itemIds: number[];
   itemPositions?: Record<number, OutfitItemPosition>;
+  canvasData?: CanvasItemData[];
+  style?: string;
   thumbnailUri?: string;
   createdAt: string;
 }

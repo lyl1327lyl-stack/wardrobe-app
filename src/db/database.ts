@@ -17,6 +17,29 @@ async function columnExists(db: SQLite.SQLiteDatabase, table: string, column: st
   }
 }
 
+// 迁移：确保outfits表的所有列存在
+async function ensureOutfitsColumns(db: SQLite.SQLiteDatabase): Promise<void> {
+  const addColumnIfNotExists = async (table: string, column: string, definition: string) => {
+    const exists = await columnExists(db, table, column);
+    console.log(`[DB Migration] Checking ${table}.${column}, exists: ${exists}`);
+    if (!exists) {
+      try {
+        await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        console.log(`[DB Migration] Added column ${column} to ${table}`);
+      } catch (e: any) {
+        console.error(`[DB Migration] Failed to add column ${column} to ${table}:`, e?.message || e);
+      }
+    } else {
+      console.log(`[DB Migration] Column ${table}.${column} already exists`);
+    }
+  };
+
+  await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
+  await addColumnIfNotExists('outfits', 'canvasData', 'TEXT DEFAULT "{}"');
+  await addColumnIfNotExists('outfits', 'style', 'TEXT DEFAULT ""');
+  await addColumnIfNotExists('outfits', 'thumbnailUri', 'TEXT DEFAULT ""');
+}
+
 // 执行 SQL，忽略错误（用于 CREATE TABLE IF NOT EXISTS）
 async function execSQL(db: SQLite.SQLiteDatabase, sql: string): Promise<void> {
   try {
@@ -27,7 +50,11 @@ async function execSQL(db: SQLite.SQLiteDatabase, sql: string): Promise<void> {
 }
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
-  if (dbInstance) return dbInstance;
+  if (dbInstance) {
+    // 即使数据库已打开，也确保所有列存在（迁移）
+    await ensureOutfitsColumns(dbInstance);
+    return dbInstance;
+  }
 
   dbInstance = SQLite.openDatabaseSync('wardrobe.db');
 
@@ -115,6 +142,9 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   await addColumnIfNotExists('clothing_items', 'styles', 'TEXT DEFAULT "[]"');
   await addColumnIfNotExists('clothing_items', 'parentType', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
+  await addColumnIfNotExists('outfits', 'canvasData', 'TEXT DEFAULT "{}"');
+  await addColumnIfNotExists('outfits', 'style', 'TEXT DEFAULT ""');
+  await addColumnIfNotExists('outfits', 'thumbnailUri', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
   await addColumnIfNotExists('clothing_items', 'isDraft', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfNotExists('clothing_items', 'originalImageUri', 'TEXT DEFAULT ""');

@@ -15,7 +15,6 @@ import { deleteImage } from '../utils/imageUtils';
 import { ClothingItem } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import { OutfitPickerModal } from '../components/OutfitPickerModal';
 import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
@@ -456,7 +455,6 @@ export function ClothingDetailScreen() {
       allSoldClothing.find(c => c.id === route.params.id) || null;
   }, [allClothing, allTrashClothing, allSoldClothing, route.params.id]);
 
-  const [showOutfitPicker, setShowOutfitPicker] = useState(false);
   const [showDiscardSheet, setShowDiscardSheet] = useState(false);
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
@@ -1148,11 +1146,6 @@ export function ClothingDetailScreen() {
               <Text style={styles.primaryActionText}>记录穿着</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.secondaryAction} onPress={() => setShowOutfitPicker(true)} activeOpacity={0.7}>
-              <Ionicons name="shirt-outline" size={18} color={theme.colors.primary} />
-              <Text style={styles.secondaryActionText}>搭配</Text>
-            </TouchableOpacity>
-
             <TouchableOpacity style={styles.iconAction} onPress={handleTrash} activeOpacity={0.7}>
               <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
             </TouchableOpacity>
@@ -1163,12 +1156,6 @@ export function ClothingDetailScreen() {
           </>
         )}
       </View>
-
-      <OutfitPickerModal
-        visible={showOutfitPicker}
-        onClose={() => setShowOutfitPicker(false)}
-        clothingItem={item}
-      />
 
       <DiscardReasonSheet
         visible={showDiscardSheet}
