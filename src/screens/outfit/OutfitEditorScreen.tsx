@@ -35,7 +35,7 @@ const CANVAS_HEIGHT = SCREEN_HEIGHT - 100 - 60 - 80 - 32 - 40;
 const BASE_IMAGE_SIZE = 70;
 
 type RootStackParamList = {
-  ClothingSelection: undefined;
+  ClothingSelection: { source?: 'Outfits' | 'Editor' } | undefined;
   OutfitEditor: {
     selectedIds?: number[];
     outfitId?: number;
@@ -313,7 +313,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
     let thumbnailUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
     try {
       console.log('[handleSave] Generating thumbnail with Skia...');
-      thumbnailUri = await generateOutfitThumbnail(canvasItems);
+      thumbnailUri = await generateOutfitThumbnail(canvasItems, CANVAS_WIDTH, CANVAS_HEIGHT, BASE_IMAGE_SIZE);
       console.log('[handleSave] Thumbnail generated:', thumbnailUri);
     } catch (e: any) {
       console.warn('[handleSave] Thumbnail generation failed:', e?.message || e);
@@ -418,7 +418,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
       {/* 底部工具栏 */}
       <CanvasToolsBar
-        onAdd={() => navigation.navigate('ClothingSelection')}
+        onAdd={() => navigation.navigate('ClothingSelection', { source: 'Editor' })}
         onMoveUp={() => selectedItemId && bringForward(selectedItemId)}
         onMoveDown={() => selectedItemId && sendBackward(selectedItemId)}
         onBackground={() => setShowBackgroundPicker(true)}

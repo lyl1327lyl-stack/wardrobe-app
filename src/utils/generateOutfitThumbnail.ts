@@ -1,5 +1,4 @@
 import { NativeModules } from 'react-native';
-import RNFS from 'react-native-fs';
 
 type CanvasItem = {
   imageUri: string;
@@ -16,6 +15,9 @@ const { OutfitComposer } = NativeModules;
 
 export async function generateOutfitThumbnail(
   canvasItems: CanvasItem[],
+  canvasWidth: number,
+  canvasHeight: number,
+  baseImageSize: number,
 ): Promise<string> {
   if (!OutfitComposer) {
     console.warn('[OutfitComposer] Native module not found, using fallback');
@@ -23,7 +25,14 @@ export async function generateOutfitThumbnail(
   }
 
   try {
-    const result = await OutfitComposer.compose(canvasItems, THUMB_SIZE, THUMB_SIZE);
+    const result = await OutfitComposer.compose(
+      canvasItems,
+      THUMB_SIZE,
+      THUMB_SIZE,
+      canvasWidth,
+      canvasHeight,
+      baseImageSize,
+    );
     return result.uri;
   } catch (e: any) {
     console.warn('[OutfitComposer] Compose failed:', e?.message || e);

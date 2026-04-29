@@ -72,11 +72,13 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     // 只在画板为空时创建新的canvas items
     const currentItems = get().canvasItems;
     if (currentItems.length === 0) {
+      const itemsPerRow = 4;
+      const cellSize = 90; // BASE_IMAGE_SIZE(70) + 间距(20)
       const canvasItems: CanvasItem[] = items.map((item, index) => ({
         clothingId: item.id,
         imageUri: item.imageUri,
-        x: 20 + (index % 3) * 20,
-        y: 20 + Math.floor(index / 3) * 20,
+        x: 20 + (index % itemsPerRow) * cellSize,
+        y: 20 + Math.floor(index / itemsPerRow) * cellSize,
         scale: 1,
         rotation: 0,
         zIndex: index,
@@ -90,11 +92,14 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     const maxZIndex = state.canvasItems.length > 0
       ? Math.max(...state.canvasItems.map(i => i.zIndex))
       : 0;
+    const itemsPerRow = 4;
+    const cellSize = 90;
+    const count = state.canvasItems.length;
     const newItem: CanvasItem = {
       clothingId: clothing.id,
       imageUri: clothing.imageUri,
-      x: 30,
-      y: 30,
+      x: 30 + (count % itemsPerRow) * cellSize,
+      y: 30 + Math.floor(count / itemsPerRow) * cellSize,
       scale: 1,
       rotation: 0,
       zIndex: maxZIndex + 1,

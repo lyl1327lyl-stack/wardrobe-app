@@ -24,7 +24,7 @@ const NUM_COLUMNS = 2;
 const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / NUM_COLUMNS;
 
 type RootStackParamList = {
-  ClothingSelection: undefined;
+  ClothingSelection: { source?: 'Outfits' | 'Editor' } | undefined;
   OutfitEditor: { selectedIds?: number[]; outfitId?: number };
 };
 
@@ -47,7 +47,7 @@ export function OutfitsScreen() {
   }, [outfits, selectedFilter]);
 
   const handleCreateOutfit = useCallback(() => {
-    navigation.navigate('ClothingSelection');
+    navigation.navigate('ClothingSelection', { source: 'Outfits' });
   }, [navigation]);
 
   const handleEditOutfit = useCallback((outfitId: number) => {
