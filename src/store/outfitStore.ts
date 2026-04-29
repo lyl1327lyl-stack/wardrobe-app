@@ -11,6 +11,11 @@ export interface CanvasItem {
   zIndex: number;
 }
 
+export interface CanvasBackground {
+  type: 'color' | 'gradient' | 'none';
+  value: string; // 颜色值或渐变定义
+}
+
 export interface OutfitCanvasState {
   // 选中的衣物（从选择页带来）
   selectedClothings: ClothingItem[];
@@ -21,6 +26,7 @@ export interface OutfitCanvasState {
   historyIndex: number;
   // 画板设置
   showGrid: boolean;
+  canvasBackground: CanvasBackground;
   // 当前编辑的outfit id（如果是重新编辑）
   editingOutfitId: number | null;
   // 选中的风格
@@ -39,11 +45,12 @@ export interface OutfitCanvasState {
   redo: () => void;
   clearCanvas: () => void;
   toggleGrid: () => void;
+  setCanvasBackground: (background: CanvasBackground) => void;
   setEditingOutfitId: (id: number | null) => void;
   setSelectedStyle: (style: string) => void;
   reset: () => void;
   saveToHistory: () => void;
-  loadFromOutfit: (canvasData: CanvasItem[], style: string, outfitId: number) => void;
+  loadFromOutfit: (canvasData: CanvasItem[], style: string, outfitId: number, background?: CanvasBackground) => void;
 }
 
 const initialState = {
@@ -52,6 +59,7 @@ const initialState = {
   history: [[]],
   historyIndex: 0,
   showGrid: false,
+  canvasBackground: { type: 'none', value: '' } as CanvasBackground,
   editingOutfitId: null,
   selectedStyle: '',
 };
@@ -194,6 +202,10 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     set(state => ({ showGrid: !state.showGrid }));
   },
 
+  setCanvasBackground: (background) => {
+    set({ canvasBackground: background });
+  },
+
   setEditingOutfitId: (id) => {
     set({ editingOutfitId: id });
   },
@@ -217,11 +229,12 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     set({ history: newHistory, historyIndex: newHistory.length - 1 });
   },
 
-  loadFromOutfit: (canvasData, style, outfitId) => {
+  loadFromOutfit: (canvasData, style, outfitId, background) => {
     set({
       canvasItems: canvasData,
       selectedStyle: style,
       editingOutfitId: outfitId,
+      canvasBackground: background || { type: 'none', value: '' },
       history: [canvasData],
       historyIndex: 0,
     });

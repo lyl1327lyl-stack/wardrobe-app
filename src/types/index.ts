@@ -51,6 +51,10 @@ export interface ClothingItem {
   isDraft?: boolean;
 }
 
+/**
+ * @deprecated 使用 CanvasItemData 替代
+ * 保留类型定义用于读取旧数据
+ */
 export interface OutfitItemPosition {
   x: number;
   y: number;
@@ -71,6 +75,7 @@ export interface Outfit {
   id: number;
   name: string;
   itemIds: number[];
+  /** @deprecated 使用 canvasData 替代 */
   itemPositions?: Record<number, OutfitItemPosition>;
   canvasData?: CanvasItemData[];
   style?: string;

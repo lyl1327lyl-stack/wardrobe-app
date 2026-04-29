@@ -1,4 +1,4 @@
-import React, { useMemo, useCallback, useState } from 'react';
+import React, { useMemo, useCallback, useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,23 +8,29 @@ import {
   Dimensions,
   ScrollView,
   Alert,
-  PanResponder,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import {
+  PanGestureHandler,
+  PinchGestureHandler,
+  State,
+} from 'react-native-gesture-handler';
 import { generateOutfitThumbnail } from '../../utils/generateOutfitThumbnail';
 
 import { useTheme } from '../../hooks/useTheme';
-import { useOutfitStore, CanvasItem } from '../../store/outfitStore';
+import { useOutfitStore, CanvasItem, CanvasBackground } from '../../store/outfitStore';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
 import { StyleSelector } from '../../components/outfit/StyleSelector';
+import { BackgroundPicker } from '../../components/outfit/BackgroundPicker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CANVAS_PADDING = 16;
 const CANVAS_SIZE = SCREEN_WIDTH - CANVAS_PADDING * 2;
+const BASE_IMAGE_SIZE = 70;
 
 type RootStackParamList = {
   ClothingSelection: undefined;
@@ -63,120 +69,145 @@ function DraggableItem({
   styles,
   theme,
 }: DraggableItemProps) {
+  // 使用普通 state 管理位置和缩放
   const [position, setPosition] = useState({ x: item.x, y: item.y });
-  const [itemScale, setItemScale] = useState(item.scale);
+  const [scale, setScale] = useState(item.scale);
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: () => {
-          onSelect();
-        },
-        onPanResponderMove: (_, gestureState) => {
-          const newX = Math.max(0, Math.min(canvasSize - 80, position.x + gestureState.dx));
-          const newY = Math.max(0, Math.min(canvasSize - 80, position.y + gestureState.dy));
-          setPosition({ x: newX, y: newY });
-        },
-        onPanResponderRelease: () => {
-          onUpdate(item.clothingId, { x: position.x, y: position.y });
-        },
-      }),
-    [position, canvasSize, item.clothingId, onSelect, onUpdate]
-  );
+  // 手势起始位置
+  const panRef = useRef<any>(null);
+  const pinchRef = useRef<any>(null);
 
-  const handlePinch = useCallback(
-    (scale: number) => {
-      const newScale = Math.max(0.5, Math.min(3, itemScale * scale));
-      setItemScale(newScale);
-      onUpdate(item.clothingId, { scale: newScale });
-    },
-    [itemScale, item.clothingId, onUpdate]
-  );
+  // 记录手势开始时的状态
+  const startPosition = useRef({ x: 0, y: 0 });
+  const startScale = useRef(1);
 
-  const imageSize = 70 * itemScale;
+  // 当 item 的位置从外部更新时，同步到 state
+  useEffect(() => {
+    setPosition({ x: item.x, y: item.y });
+  }, [item.x, item.y]);
+
+  useEffect(() => {
+    setScale(item.scale);
+  }, [item.scale]);
+
+  // 拖拽手势处理
+  const onPanGestureEvent = useCallback((event: any) => {
+    // 持续更新位置
+    const maxSize = BASE_IMAGE_SIZE * scale;
+    const newX = Math.max(0, Math.min(canvasSize - maxSize, startPosition.current.x + event.nativeEvent.translationX));
+    const newY = Math.max(0, Math.min(canvasSize - maxSize, startPosition.current.y + event.nativeEvent.translationY));
+    setPosition({ x: newX, y: newY });
+  }, [canvasSize, scale]);
+
+  const onPanHandlerStateChange = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.BEGAN) {
+      onSelect();
+      startPosition.current = { x: position.x, y: position.y };
+    } else if (event.nativeEvent.state === State.END) {
+      onUpdate(item.clothingId, { x: position.x, y: position.y });
+    }
+  }, [item.clothingId, position.x, position.y, onSelect, onUpdate]);
+
+  // 双指缩放手势处理
+  const onPinchGestureEvent = useCallback((event: any) => {
+    // 持续更新缩放
+    const newScale = Math.max(0.5, Math.min(3, startScale.current * event.nativeEvent.scale));
+    setScale(newScale);
+  }, []);
+
+  const onPinchHandlerStateChange = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.BEGAN) {
+      startScale.current = scale;
+    } else if (event.nativeEvent.state === State.END) {
+      onUpdate(item.clothingId, { scale });
+    }
+  }, [item.clothingId, scale, onUpdate]);
+
+  const imageSize = BASE_IMAGE_SIZE * scale;
 
   return (
-    <View
-      style={[
-        styles.canvasItem,
-        {
-          left: position.x,
-          top: position.y,
-          zIndex: item.zIndex,
-          width: imageSize,
-          height: imageSize,
-          borderColor: isSelected ? theme.colors.primary : 'transparent',
-          borderWidth: isSelected ? 2 : 0,
-        },
-      ]}
-      {...panResponder.panHandlers}
+    <PinchGestureHandler
+      ref={pinchRef}
+      simultaneousHandlers={panRef}
+      onGestureEvent={onPinchGestureEvent}
+      onHandlerStateChange={onPinchHandlerStateChange}
     >
-      {/* Pinchable area using TouchableOpacity with onPressIn for pinch start */}
-      <TouchableOpacity
-        activeOpacity={0.9}
-        onPressIn={() => {
-          // Store initial scale on pinch start
-        }}
-        onPress={() => onSelect()}
-        onLongPress={() => {
-          // Show scale controls on long press
-          Alert.alert(
-            '调整大小',
-            '使用双指捏合可以放大或缩小',
-            [{ text: '知道了' }]
-          );
-        }}
-        style={{ flex: 1 }}
+      <PanGestureHandler
+        ref={panRef}
+        simultaneousHandlers={pinchRef}
+        onGestureEvent={onPanGestureEvent}
+        onHandlerStateChange={onPanHandlerStateChange}
+        minPointers={1}
+        avgTouches
       >
-        <Image
-          source={{ uri: item.imageUri }}
-          style={{ width: '100%', height: '100%' }}
-          resizeMode="contain"
-        />
-      </TouchableOpacity>
-      {isSelected && (
-        <>
+        <View
+          style={[
+            styles.canvasItem,
+            {
+              left: position.x,
+              top: position.y,
+              zIndex: item.zIndex,
+              width: imageSize,
+              height: imageSize,
+              borderColor: isSelected ? theme.colors.primary : 'transparent',
+              borderWidth: isSelected ? 2 : 0,
+            },
+          ]}
+        >
           <TouchableOpacity
-            style={[styles.rotateButton, { top: -10, right: -10 }]}
-            onPress={() => onRotate(item.clothingId)}
+            activeOpacity={0.9}
+            onPress={() => onSelect()}
+            style={{ flex: 1 }}
           >
-            <Text style={styles.rotateButtonText}>↻</Text>
+            <Image
+              source={{ uri: item.imageUri }}
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.deleteButton, { top: -10, left: -10 }]}
-            onPress={() => onDelete(item.clothingId)}
-          >
-            <Text style={styles.deleteButtonText}>×</Text>
-          </TouchableOpacity>
-          {/* Scale buttons */}
-          <View style={[styles.scaleControls, { bottom: -10, left: 0, right: 0 }]}>
-            <TouchableOpacity
-              style={styles.scaleButton}
-              onPress={() => {
-                const newScale = Math.max(0.5, itemScale - 0.1);
-                setItemScale(newScale);
-                onUpdate(item.clothingId, { scale: newScale });
-              }}
-            >
-              <Text style={styles.scaleButtonText}>−</Text>
-            </TouchableOpacity>
-            <Text style={styles.scaleText}>{Math.round(itemScale * 100)}%</Text>
-            <TouchableOpacity
-              style={styles.scaleButton}
-              onPress={() => {
-                const newScale = Math.min(3, itemScale + 0.1);
-                setItemScale(newScale);
-                onUpdate(item.clothingId, { scale: newScale });
-              }}
-            >
-              <Text style={styles.scaleButtonText}>+</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
-    </View>
+          {isSelected && (
+            <>
+              <TouchableOpacity
+                style={[styles.rotateButton, { top: -10, right: -10 }]}
+                onPress={() => onRotate(item.clothingId)}
+              >
+                <Text style={styles.rotateButtonText}>↻</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteButton, { top: -10, left: -10 }]}
+                onPress={() => onDelete(item.clothingId)}
+              >
+                <Text style={styles.deleteButtonText}>×</Text>
+              </TouchableOpacity>
+              {/* Scale buttons */}
+              <View style={[styles.scaleControls, { bottom: -10, left: 0, right: 0 }]}>
+                <TouchableOpacity
+                  style={styles.scaleButton}
+                  onPress={() => {
+                    const newScale = Math.max(0.5, scale - 0.1);
+                    setScale(newScale);
+                    onUpdate(item.clothingId, { scale: newScale });
+                  }}
+                >
+                  <Text style={styles.scaleButtonText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.scaleText}>{Math.round(scale * 100)}%</Text>
+                <TouchableOpacity
+                  style={styles.scaleButton}
+                  onPress={() => {
+                    const newScale = Math.min(3, scale + 0.1);
+                    setScale(newScale);
+                    onUpdate(item.clothingId, { scale: newScale });
+                  }}
+                >
+                  <Text style={styles.scaleButtonText}>+</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </View>
+      </PanGestureHandler>
+    </PinchGestureHandler>
   );
 }
 
@@ -199,6 +230,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
     clearCanvas,
     toggleGrid,
     showGrid,
+    canvasBackground,
+    setCanvasBackground,
     selectedStyle,
     setSelectedStyle,
     historyIndex,
@@ -212,6 +245,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const { addOutfit, updateOutfit, outfits } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
 
   const styles = useMemo(() => createStyles(theme, insets), [theme, insets]);
 
@@ -270,7 +304,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
         index: 0,
         routes: [
           {
-            name: exitTo.screen,
+            name: exitTo.screen as any,
             params: {
               screen: exitTo.tab,
             },
@@ -311,7 +345,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
     const outfitData = {
       name: `${selectedStyle}搭配`,
       itemIds: canvasItems.map(i => i.clothingId),
-      itemPositions: {} as Record<string, any>,
       canvasData: canvasItems,
       style: selectedStyle,
       thumbnailUri,
@@ -367,7 +400,11 @@ export function OutfitEditorScreen({ onSave }: Props) {
         {/* 1:1 画布区域 */}
         <View style={styles.canvasWrapper}>
           <TouchableOpacity
-            style={[styles.canvas, showGrid && styles.canvasGrid]}
+            style={[
+              styles.canvas,
+              showGrid && styles.canvasGrid,
+              canvasBackground.type === 'color' && { backgroundColor: canvasBackground.value },
+            ]}
             activeOpacity={1}
             onPress={handleBackgroundPress}
           >
@@ -455,10 +492,18 @@ export function OutfitEditorScreen({ onSave }: Props) {
         onRedo={redo}
         onToggleGrid={toggleGrid}
         onClear={clearCanvas}
-        onChangeBackground={() => {}}
+        onChangeBackground={() => setShowBackgroundPicker(true)}
         canUndo={historyIndex > 0}
         canRedo={historyIndex < history.length - 1}
         showGrid={showGrid}
+      />
+
+      {/* 背景选择器 */}
+      <BackgroundPicker
+        visible={showBackgroundPicker}
+        onClose={() => setShowBackgroundPicker(false)}
+        currentBackground={canvasBackground}
+        onSelectBackground={setCanvasBackground}
       />
     </View>
   );

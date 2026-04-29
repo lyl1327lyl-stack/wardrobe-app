@@ -20,6 +20,7 @@ export async function getAllOutfits(): Promise<Outfit[]> {
     ...item,
     id: Number(item.id),
     itemIds: JSON.parse(item.itemIds || '[]'),
+    // itemPositions 已废弃，保留读取以兼容旧数据
     itemPositions: JSON.parse(item.itemPositions || '{}'),
     canvasData: item.canvasData ? JSON.parse(item.canvasData) : undefined,
     style: item.style || '',
@@ -36,7 +37,8 @@ export async function addOutfit(
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
-      JSON.stringify(outfit.itemPositions || {}),
+      // itemPositions 已废弃，写入空对象
+      '{}',
       outfit.canvasData ? JSON.stringify(outfit.canvasData) : '{}',
       outfit.style || '',
       outfit.thumbnailUri || '',
@@ -60,7 +62,8 @@ export async function updateOutfit(
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
-      JSON.stringify(outfit.itemPositions || {}),
+      // itemPositions 已废弃，写入空对象
+      '{}',
       outfit.canvasData ? JSON.stringify(outfit.canvasData) : '{}',
       outfit.style || '',
       outfit.thumbnailUri || '',
