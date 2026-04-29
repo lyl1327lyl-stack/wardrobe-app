@@ -1,41 +1,23 @@
-import { NativeModules } from 'react-native';
-
-type CanvasItem = {
-  imageUri: string;
-  x: number;
-  y: number;
-  scale: number;
-  rotation: number;
-  zIndex: number;
-};
-
-const THUMB_SIZE = 512;
-
-const { OutfitComposer } = NativeModules;
+import { captureRef } from 'react-native-view-shot';
+import type { View } from 'react-native';
 
 export async function generateOutfitThumbnail(
-  canvasItems: CanvasItem[],
-  canvasWidth: number,
-  canvasHeight: number,
-  baseImageSize: number,
+  canvasViewRef: React.RefObject<View | null>,
+  fallbackUri?: string,
 ): Promise<string> {
-  if (!OutfitComposer) {
-    console.warn('[OutfitComposer] Native module not found, using fallback');
-    return canvasItems.length > 0 ? canvasItems[0].imageUri : '';
+  if (!canvasViewRef.current) {
+    return fallbackUri || '';
   }
 
   try {
-    const result = await OutfitComposer.compose(
-      canvasItems,
-      THUMB_SIZE,
-      THUMB_SIZE,
-      canvasWidth,
-      canvasHeight,
-      baseImageSize,
-    );
-    return result.uri;
+    const uri = await captureRef(canvasViewRef, {
+      format: 'png',
+      quality: 0.85,
+      width: 512,
+    });
+    return uri;
   } catch (e: any) {
-    console.warn('[OutfitComposer] Compose failed:', e?.message || e);
-    return canvasItems.length > 0 ? canvasItems[0].imageUri : '';
+    console.warn('[generateOutfitThumbnail] Capture failed:', e?.message || e);
+    return fallbackUri || '';
   }
 }

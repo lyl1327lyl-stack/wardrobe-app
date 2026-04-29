@@ -226,6 +226,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
+  const canvasRef = useRef<View>(null);
 
   const styles = useMemo(() => createStyles(theme, insets), [theme, insets]);
 
@@ -309,15 +310,16 @@ export function OutfitEditorScreen({ onSave }: Props) {
       return;
     }
 
-    // Generate thumbnail using Skia
-    let thumbnailUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
+    // Generate thumbnail by capturing canvas view
+    const fallbackUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
+    let thumbnailUri = fallbackUri;
     try {
-      console.log('[handleSave] Generating thumbnail with Skia...');
-      thumbnailUri = await generateOutfitThumbnail(canvasItems, CANVAS_WIDTH, CANVAS_HEIGHT, BASE_IMAGE_SIZE);
+      console.log('[handleSave] Capturing canvas view...');
+      thumbnailUri = await generateOutfitThumbnail(canvasRef, fallbackUri);
       console.log('[handleSave] Thumbnail generated:', thumbnailUri);
     } catch (e: any) {
       console.warn('[handleSave] Thumbnail generation failed:', e?.message || e);
-      thumbnailUri = canvasItems[0].imageUri;
+      thumbnailUri = fallbackUri;
     }
 
     console.log('[handleSave] Final thumbnailUri:', thumbnailUri);
@@ -380,6 +382,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
         {/* 1:1 画布区域 */}
         <View style={styles.canvasWrapper}>
           <TouchableOpacity
+            ref={canvasRef}
             style={[
               styles.canvas,
               showGrid && styles.canvasGrid,
