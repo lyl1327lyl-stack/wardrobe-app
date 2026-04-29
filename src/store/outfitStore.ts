@@ -69,17 +69,20 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
 
   setSelectedClothings: (items) => {
     set({ selectedClothings: items });
-    // 自动创建canvas items
-    const canvasItems: CanvasItem[] = items.map((item, index) => ({
-      clothingId: item.id,
-      imageUri: item.imageUri,
-      x: 20 + (index % 3) * 20,
-      y: 20 + Math.floor(index / 3) * 20,
-      scale: 1,
-      rotation: 0,
-      zIndex: index,
-    }));
-    set({ canvasItems, history: [canvasItems], historyIndex: 0 });
+    // 只在画板为空时创建新的canvas items
+    const currentItems = get().canvasItems;
+    if (currentItems.length === 0) {
+      const canvasItems: CanvasItem[] = items.map((item, index) => ({
+        clothingId: item.id,
+        imageUri: item.imageUri,
+        x: 20 + (index % 3) * 20,
+        y: 20 + Math.floor(index / 3) * 20,
+        scale: 1,
+        rotation: 0,
+        zIndex: index,
+      }));
+      set({ canvasItems, history: [canvasItems], historyIndex: 0 });
+    }
   },
 
   addCanvasItem: (clothing) => {

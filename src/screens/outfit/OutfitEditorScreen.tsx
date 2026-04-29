@@ -27,9 +27,11 @@ import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
 import { StyleSelector } from '../../components/outfit/StyleSelector';
 import { BackgroundPicker } from '../../components/outfit/BackgroundPicker';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const CANVAS_PADDING = 16;
-const CANVAS_SIZE = SCREEN_WIDTH - CANVAS_PADDING * 2;
+const CANVAS_WIDTH = SCREEN_WIDTH - CANVAS_PADDING * 2;
+// 画板高度：屏幕高度 - 顶部导航(约100) - 风格选择(约60) - 底栏(约80) - 内容padding(32) - 额外边距(40)
+const CANVAS_HEIGHT = SCREEN_HEIGHT - 100 - 60 - 80 - 32 - 40;
 const BASE_IMAGE_SIZE = 70;
 
 type RootStackParamList = {
@@ -48,7 +50,8 @@ interface Props {
 
 interface DraggableItemProps {
   item: CanvasItem;
-  canvasSize: number;
+  canvasWidth: number;
+  canvasHeight: number;
   onUpdate: (clothingId: number, updates: Partial<CanvasItem>) => void;
   onDelete: (clothingId: number) => void;
   onRotate: (clothingId: number) => void;
@@ -60,7 +63,8 @@ interface DraggableItemProps {
 
 function DraggableItem({
   item,
-  canvasSize,
+  canvasWidth,
+  canvasHeight,
   onUpdate,
   onDelete,
   onRotate,
@@ -94,10 +98,10 @@ function DraggableItem({
   const onPanGestureEvent = useCallback((event: any) => {
     // 持续更新位置
     const maxSize = BASE_IMAGE_SIZE * scale;
-    const newX = Math.max(0, Math.min(canvasSize - maxSize, startPosition.current.x + event.nativeEvent.translationX));
-    const newY = Math.max(0, Math.min(canvasSize - maxSize, startPosition.current.y + event.nativeEvent.translationY));
+    const newX = Math.max(0, Math.min(canvasWidth - maxSize, startPosition.current.x + event.nativeEvent.translationX));
+    const newY = Math.max(0, Math.min(canvasHeight - maxSize, startPosition.current.y + event.nativeEvent.translationY));
     setPosition({ x: newX, y: newY });
-  }, [canvasSize, scale]);
+  }, [canvasWidth, canvasHeight, scale]);
 
   const onPanHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
@@ -168,41 +172,17 @@ function DraggableItem({
           {isSelected && (
             <>
               <TouchableOpacity
-                style={[styles.rotateButton, { top: -10, right: -10 }]}
-                onPress={() => onRotate(item.clothingId)}
-              >
-                <Text style={styles.rotateButtonText}>↻</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.deleteButton, { top: -10, left: -10 }]}
                 onPress={() => onDelete(item.clothingId)}
               >
                 <Text style={styles.deleteButtonText}>×</Text>
               </TouchableOpacity>
-              {/* Scale buttons */}
-              <View style={[styles.scaleControls, { bottom: -10, left: 0, right: 0 }]}>
-                <TouchableOpacity
-                  style={styles.scaleButton}
-                  onPress={() => {
-                    const newScale = Math.max(0.5, scale - 0.1);
-                    setScale(newScale);
-                    onUpdate(item.clothingId, { scale: newScale });
-                  }}
-                >
-                  <Text style={styles.scaleButtonText}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.scaleText}>{Math.round(scale * 100)}%</Text>
-                <TouchableOpacity
-                  style={styles.scaleButton}
-                  onPress={() => {
-                    const newScale = Math.min(3, scale + 0.1);
-                    setScale(newScale);
-                    onUpdate(item.clothingId, { scale: newScale });
-                  }}
-                >
-                  <Text style={styles.scaleButtonText}>+</Text>
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity
+                style={[styles.rotateButton, { bottom: -10, right: -10 }]}
+                onPress={() => onRotate(item.clothingId)}
+              >
+                <Text style={styles.rotateButtonText}>↻</Text>
+              </TouchableOpacity>
             </>
           )}
         </View>
@@ -412,7 +392,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
               <DraggableItem
                 key={item.clothingId}
                 item={item}
-                canvasSize={CANVAS_SIZE}
+                canvasWidth={CANVAS_WIDTH}
+                canvasHeight={CANVAS_HEIGHT}
                 onUpdate={updateCanvasItem}
                 onDelete={handleDelete}
                 onRotate={handleRotate}
@@ -430,57 +411,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
             )}
           </TouchableOpacity>
         </View>
-
-        {/* 层级控制 */}
-        <View style={styles.layerControls}>
-          <TouchableOpacity
-            style={[styles.layerButton, { backgroundColor: theme.colors.primary }]}
-            onPress={() => navigation.navigate('ClothingSelection')}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.layerDivider} />
-          <TouchableOpacity
-            style={styles.layerButton}
-            onPress={() => selectedItemId && bringForward(selectedItemId)}
-          >
-            <Ionicons name="arrow-up" size={16} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.layerButton}
-            onPress={() => selectedItemId && sendBackward(selectedItemId)}
-          >
-            <Ionicons name="arrow-down" size={16} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.layerButton}
-            onPress={() => selectedItemId && bringToFront(selectedItemId)}
-          >
-            <Ionicons name="arrow-up-circle" size={16} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.layerButton}
-            onPress={() => selectedItemId && sendToBack(selectedItemId)}
-          >
-            <Ionicons name="arrow-down-circle" size={16} color={theme.colors.text} />
-          </TouchableOpacity>
-        </View>
-
-        {/* 操作提示 */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} />
-            <Text style={styles.legendText}>拖动调整位置</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.colors.danger }]} />
-            <Text style={styles.legendText}>点击删除</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.colors.primary }]} />
-            <Text style={styles.legendText}>↻ 旋转</Text>
-          </View>
-        </View>
       </ScrollView>
 
       {/* 风格选择 */}
@@ -488,14 +418,11 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
       {/* 底部工具栏 */}
       <CanvasToolsBar
-        onUndo={undo}
-        onRedo={redo}
-        onToggleGrid={toggleGrid}
-        onClear={clearCanvas}
-        onChangeBackground={() => setShowBackgroundPicker(true)}
-        canUndo={historyIndex > 0}
-        canRedo={historyIndex < history.length - 1}
-        showGrid={showGrid}
+        onAdd={() => navigation.navigate('ClothingSelection')}
+        onMoveUp={() => selectedItemId && bringForward(selectedItemId)}
+        onMoveDown={() => selectedItemId && sendBackward(selectedItemId)}
+        onBackground={() => setShowBackgroundPicker(true)}
+        hasSelection={!!selectedItemId}
       />
 
       {/* 背景选择器 */}
@@ -558,10 +485,11 @@ const createStyles = (theme: any, insets: any) =>
     },
     canvasWrapper: {
       paddingHorizontal: CANVAS_PADDING,
+      flex: 1,
     },
     canvas: {
-      width: CANVAS_SIZE,
-      height: CANVAS_SIZE,
+      width: CANVAS_WIDTH,
+      height: CANVAS_HEIGHT,
       backgroundColor: theme.colors.card,
       borderRadius: 16,
       overflow: 'hidden',
@@ -609,76 +537,5 @@ const createStyles = (theme: any, insets: any) =>
       color: '#fff',
       fontSize: 14,
       fontWeight: 'bold',
-    },
-    scaleControls: {
-      position: 'absolute',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-    },
-    scaleButton: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: theme.colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    scaleButtonText: {
-      color: '#fff',
-      fontSize: 16,
-      fontWeight: 'bold',
-    },
-    scaleText: {
-      fontSize: 12,
-      color: theme.colors.text,
-      minWidth: 40,
-      textAlign: 'center',
-    },
-    layerControls: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: 16,
-      backgroundColor: 'rgba(0,0,0,0.75)',
-      paddingVertical: 6,
-      paddingHorizontal: 12,
-      borderRadius: 18,
-      alignSelf: 'center',
-      gap: 8,
-    },
-    layerButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: '#fff',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    layerDivider: {
-      width: 1,
-      height: 20,
-      backgroundColor: 'rgba(255,255,255,0.3)',
-    },
-    legend: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 20,
-      marginTop: 16,
-    },
-    legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    legendDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 3,
-    },
-    legendText: {
-      fontSize: 12,
-      color: theme.colors.textTertiary,
     },
   });

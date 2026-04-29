@@ -19,6 +19,11 @@ import { ClothingItem, ClothingType } from '../../types';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { useOutfitStore } from '../../store/outfitStore';
 
+type RootStackParamList = {
+  ClothingSelection: undefined;
+  OutfitEditor: { selectedIds?: number[] };
+};
+
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_PADDING = 16;
 const GRID_GAP = 8;
@@ -34,24 +39,20 @@ const CLOTHING_TABS: { label: string; value: ClothingType | '全部' }[] = [
   { label: '配饰', value: '配饰' },
 ];
 
-type RootStackParamList = {
-  ClothingSelection: undefined;
-  OutfitEditor: { selectedIds: number[] };
-};
-
 export function ClothingSelectionScreen() {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const clothing = useWardrobeStore(state => state.clothing);
-  const existingSelectedClothings = useOutfitStore(state => state.selectedClothings);
+  const existingCanvasItems = useOutfitStore(state => state.canvasItems);
 
-  const [selectedIds, setSelectedIds] = useState<number[]>(
-    existingSelectedClothings.map(c => c.id)
-  );
+  // 已在画板上的衣物ID
+  const existingIds = existingCanvasItems.map(item => item.clothingId);
+
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [activeTab, setActiveTab] = useState<ClothingType | '全部'>('全部');
 
-  const setSelectedClothings = useOutfitStore(state => state.setSelectedClothings);
+  const addCanvasItem = useOutfitStore(state => state.addCanvasItem);
 
   const filteredClothing = useMemo(() => {
     if (activeTab === '全部') return clothing;
@@ -69,21 +70,21 @@ export function ClothingSelectionScreen() {
   }, []);
 
   const handleNext = useCallback(() => {
-    const selectedItems = clothing.filter(c => selectedIds.includes(c.id));
-    setSelectedClothings(selectedItems);
-    navigation.navigate('OutfitEditor', {
-      selectedIds,
-      mode: 'create',
-      exitTo: { screen: 'Main', tab: '搭配' },
-    });
-  }, [selectedIds, clothing, navigation, setSelectedClothings]);
+    // 只添加新选中的衣物（不在画板上的）
+    const newItems = clothing.filter(c =>
+      selectedIds.includes(c.id) && !existingIds.includes(c.id)
+    );
+
+    // 添加到画板
+    newItems.forEach(item => addCanvasItem(item));
+
+    // 返回编辑器
+    navigation.goBack();
+  }, [selectedIds, clothing, existingIds, navigation, addCanvasItem]);
 
   // Reset outfitStore when entering to clear any previous state
   React.useEffect(() => {
-    // Clear previous selections when entering this screen
-    return () => {
-      // Don't reset here - we need selectedClothings to persist while navigating to OutfitEditor
-    };
+    // 空的effect
   }, []);
 
   const styles = useMemo(() => createStyles(theme, insets), [theme, insets]);
