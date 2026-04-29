@@ -228,6 +228,70 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const canvasRef = useRef<View>(null);
 
+  // Track unsaved changes — use refs to avoid stale closure issues
+  const initialSnapshot = useRef<string | null>(null);
+  const isSaving = useRef(false);
+  const itemsRef = useRef(canvasItems);
+  itemsRef.current = canvasItems;
+  const bgRef = useRef(canvasBackground);
+  bgRef.current = canvasBackground;
+  const styleRef = useRef(selectedStyle);
+  styleRef.current = selectedStyle;
+  const handleSaveRef = useRef<() => void>(() => {});
+
+  // Capture baseline snapshot after initial data loads
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (initialSnapshot.current === null) {
+        initialSnapshot.current = JSON.stringify({
+          items: itemsRef.current,
+          bg: bgRef.current,
+          style: styleRef.current,
+        });
+      }
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [route.params]);
+
+  // Intercept back navigation when there are unsaved changes
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('beforeRemove', (e: any) => {
+      if (isSaving.current) {
+        isSaving.current = false;
+        return; // Allow navigation after save
+      }
+
+      const current = JSON.stringify({
+        items: itemsRef.current,
+        bg: bgRef.current,
+        style: styleRef.current,
+      });
+
+      if (initialSnapshot.current === null || current === initialSnapshot.current) {
+        return; // No changes or no snapshot yet
+      }
+
+      e.preventDefault();
+      Alert.alert(
+        '未保存的修改',
+        '画板有未保存的修改，请选择：',
+        [
+          {
+            text: '放弃更改',
+            style: 'destructive',
+            onPress: () => navigation.dispatch(e.data.action),
+          },
+          {
+            text: '保存',
+            onPress: () => handleSaveRef.current(),
+          },
+        ],
+      );
+    });
+
+    return unsubscribe;
+  }, [navigation]);
+
   const styles = useMemo(() => createStyles(theme, insets), [theme, insets]);
 
   // Load existing outfit data when editing
@@ -353,6 +417,9 @@ export function OutfitEditorScreen({ onSave }: Props) {
       // Reset outfit store
       reset();
 
+      // 标记为保存退出，跳过 beforeRemove 拦截
+      isSaving.current = true;
+
       // 统一出口：回到 exitTo 指定的目标 Tab
       exitEditor();
     } catch (error: any) {
@@ -360,6 +427,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       Alert.alert('保存失败', error?.message || '请重试');
     }
   }, [canvasItems, selectedStyle, editingOutfitId, navigation, addOutfit, updateOutfit, reset, exitEditor]);
+  handleSaveRef.current = handleSave;
 
   const handleBackgroundPress = useCallback(() => {
     setSelectedItemId(null);

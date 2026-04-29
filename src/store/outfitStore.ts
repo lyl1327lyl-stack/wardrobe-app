@@ -31,6 +31,8 @@ export interface OutfitCanvasState {
   editingOutfitId: number | null;
   // 选中的风格
   selectedStyle: string;
+  // 搭配主界面风格筛选
+  outfitFilter: string;
 
   // Actions
   setSelectedClothings: (items: ClothingItem[]) => void;
@@ -48,6 +50,7 @@ export interface OutfitCanvasState {
   setCanvasBackground: (background: CanvasBackground) => void;
   setEditingOutfitId: (id: number | null) => void;
   setSelectedStyle: (style: string) => void;
+  setOutfitFilter: (filter: string) => void;
   reset: () => void;
   saveToHistory: () => void;
   loadFromOutfit: (canvasData: CanvasItem[], style: string, outfitId: number, background?: CanvasBackground) => void;
@@ -62,6 +65,7 @@ const initialState = {
   canvasBackground: { type: 'none', value: '' } as CanvasBackground,
   editingOutfitId: null,
   selectedStyle: '',
+  outfitFilter: '全部',
 };
 
 export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
@@ -72,14 +76,14 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     // 只在画板为空时创建新的canvas items
     const currentItems = get().canvasItems;
     if (currentItems.length === 0) {
-      const itemsPerRow = 4;
-      const cellSize = 90; // BASE_IMAGE_SIZE(70) + 间距(20)
+      const itemsPerRow = 2;
+      const cellSize = 160; // BASE_IMAGE_SIZE(70) * scale(2) + 间距(20)
       const canvasItems: CanvasItem[] = items.map((item, index) => ({
         clothingId: item.id,
         imageUri: item.imageUri,
         x: 20 + (index % itemsPerRow) * cellSize,
         y: 20 + Math.floor(index / itemsPerRow) * cellSize,
-        scale: 1,
+        scale: 2,
         rotation: 0,
         zIndex: index,
       }));
@@ -92,15 +96,15 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     const maxZIndex = state.canvasItems.length > 0
       ? Math.max(...state.canvasItems.map(i => i.zIndex))
       : 0;
-    const itemsPerRow = 4;
-    const cellSize = 90;
+    const itemsPerRow = 2;
+    const cellSize = 160;
     const count = state.canvasItems.length;
     const newItem: CanvasItem = {
       clothingId: clothing.id,
       imageUri: clothing.imageUri,
       x: 30 + (count % itemsPerRow) * cellSize,
       y: 30 + Math.floor(count / itemsPerRow) * cellSize,
-      scale: 1,
+      scale: 2,
       rotation: 0,
       zIndex: maxZIndex + 1,
     };
@@ -222,8 +226,13 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     set({ selectedStyle: style });
   },
 
+  setOutfitFilter: (filter) => {
+    set({ outfitFilter: filter });
+  },
+
   reset: () => {
-    set(initialState);
+    const filter = get().outfitFilter;
+    set({ ...initialState, outfitFilter: filter });
   },
 
   saveToHistory: () => {
