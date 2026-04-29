@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
-  ScrollView,
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,11 +26,9 @@ import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
 import { StyleSelector } from '../../components/outfit/StyleSelector';
 import { BackgroundPicker } from '../../components/outfit/BackgroundPicker';
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CANVAS_PADDING = 16;
 const CANVAS_WIDTH = SCREEN_WIDTH - CANVAS_PADDING * 2;
-// 画板高度：屏幕高度 - 顶部导航(约100) - 风格选择(约60) - 底栏(约80) - 内容padding(32) - 额外边距(40)
-const CANVAS_HEIGHT = SCREEN_HEIGHT - 100 - 60 - 80 - 32 - 40;
 const BASE_IMAGE_SIZE = 70;
 
 type RootStackParamList = {
@@ -155,6 +152,7 @@ function DraggableItem({
               height: imageSize,
               borderColor: isSelected ? theme.colors.primary : 'transparent',
               borderWidth: isSelected ? 2 : 0,
+              borderStyle: (isSelected ? 'dashed' : 'solid') as any,
             },
           ]}
         >
@@ -225,8 +223,21 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const { addOutfit, updateOutfit, outfits } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: 300 });
+  const [showTooltip, setShowTooltip] = useState(true);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const canvasRef = useRef<View>(null);
+
+  // Auto-dismiss tooltip when items are added or after 4 seconds
+  useEffect(() => {
+    if (canvasItems.length > 0) {
+      setShowTooltip(false);
+      return;
+    }
+    if (!showTooltip) return;
+    const timer = setTimeout(() => setShowTooltip(false), 4000);
+    return () => clearTimeout(timer);
+  }, [canvasItems.length, showTooltip]);
 
   // Track unsaved changes — use refs to avoid stale closure issues
   const initialSnapshot = useRef<string | null>(null);
@@ -305,8 +316,9 @@ export function OutfitEditorScreen({ onSave }: Props) {
       if (outfit) {
         const canvasData = (outfit as any).canvasData;
         const style = (outfit as any).style || '休闲';
+        const background = (outfit as any).canvasBackground;
         if (canvasData && canvasData.length > 0) {
-          loadFromOutfit(canvasData, style, outfitId);
+          loadFromOutfit(canvasData, style, outfitId, background);
           console.log('[OutfitEditorScreen] Loaded existing outfit:', outfitId);
         }
       }
@@ -392,6 +404,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       name: `${selectedStyle}搭配`,
       itemIds: canvasItems.map(i => i.clothingId),
       canvasData: canvasItems,
+      canvasBackground,
       style: selectedStyle,
       thumbnailUri,
       createdAt: new Date().toISOString(),
@@ -446,11 +459,16 @@ export function OutfitEditorScreen({ onSave }: Props) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.contentContainer}>
-        {/* 1:1 画布区域 */}
+      <View style={styles.content}>
         <View style={styles.canvasWrapper}>
           <TouchableOpacity
             ref={canvasRef}
+            onLayout={(e) => {
+              const { width, height } = e.nativeEvent.layout;
+              if (width > 0 && height > 0) {
+                setCanvasDims({ width, height });
+              }
+            }}
             style={[
               styles.canvas,
               showGrid && styles.canvasGrid,
@@ -463,8 +481,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
               <DraggableItem
                 key={item.clothingId}
                 item={item}
-                canvasWidth={CANVAS_WIDTH}
-                canvasHeight={CANVAS_HEIGHT}
+                canvasWidth={canvasDims.width}
+                canvasHeight={canvasDims.height}
                 onUpdate={updateCanvasItem}
                 onDelete={handleDelete}
                 onRotate={handleRotate}
@@ -474,6 +492,12 @@ export function OutfitEditorScreen({ onSave }: Props) {
                 theme={theme}
               />
             ))}
+            {showTooltip && canvasItems.length === 0 && (
+              <View style={styles.tooltipBubble} pointerEvents="none">
+                <Ionicons name="hand-left-outline" size={14} color={theme.colors.primary} />
+                <Text style={styles.tooltipText}>长按拖拽 · 双指缩放</Text>
+              </View>
+            )}
             {canvasItems.length === 0 && (
               <View style={styles.canvasEmpty}>
                 <Ionicons name="image-outline" size={48} color={theme.colors.textTertiary} />
@@ -482,7 +506,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
             )}
           </TouchableOpacity>
         </View>
-      </ScrollView>
+      </View>
 
       {/* 风格选择 */}
       <StyleSelector selectedStyle={selectedStyle} onStyleChange={setSelectedStyle} />
@@ -551,16 +575,12 @@ const createStyles = (theme: any, insets: any) =>
     content: {
       flex: 1,
     },
-    contentContainer: {
-      paddingVertical: 16,
-    },
     canvasWrapper: {
       paddingHorizontal: CANVAS_PADDING,
       flex: 1,
     },
     canvas: {
-      width: CANVAS_WIDTH,
-      height: CANVAS_HEIGHT,
+      flex: 1,
       backgroundColor: theme.colors.card,
       borderRadius: 16,
       overflow: 'hidden',
@@ -578,6 +598,26 @@ const createStyles = (theme: any, insets: any) =>
       marginTop: 12,
       fontSize: 14,
       color: theme.colors.textTertiary,
+    },
+    tooltipBubble: {
+      position: 'absolute',
+      top: 12,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.colors.primary + '15',
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: theme.colors.primary + '30',
+      zIndex: 10,
+    },
+    tooltipText: {
+      fontSize: 12,
+      color: theme.colors.primary,
+      marginLeft: 6,
+      fontWeight: '500',
     },
     canvasItem: {
       position: 'absolute',

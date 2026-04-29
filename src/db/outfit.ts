@@ -1,6 +1,6 @@
 import { getDatabase } from './database';
 import { Outfit } from '../types';
-import { CanvasItem } from '../store/outfitStore';
+import { CanvasItem, CanvasBackground } from '../store/outfitStore';
 
 export interface OutfitRow {
   id: number;
@@ -8,6 +8,7 @@ export interface OutfitRow {
   itemIds: string;
   itemPositions: string;
   canvasData?: string;
+  canvasBackground?: string;
   style?: string;
   thumbnailUri?: string;
   createdAt: string;
@@ -23,23 +24,25 @@ export async function getAllOutfits(): Promise<Outfit[]> {
     // itemPositions 已废弃，保留读取以兼容旧数据
     itemPositions: JSON.parse(item.itemPositions || '{}'),
     canvasData: item.canvasData ? JSON.parse(item.canvasData) : undefined,
+    canvasBackground: item.canvasBackground ? JSON.parse(item.canvasBackground) : undefined,
     style: item.style || '',
     thumbnailUri: item.thumbnailUri,
   }));
 }
 
 export async function addOutfit(
-  outfit: Omit<Outfit, 'id'> & { canvasData?: CanvasItem[]; style?: string; thumbnailUri?: string }
+  outfit: Omit<Outfit, 'id'> & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; thumbnailUri?: string }
 ): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    'INSERT INTO outfits (name, itemIds, itemPositions, canvasData, style, thumbnailUri, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO outfits (name, itemIds, itemPositions, canvasData, canvasBackground, style, thumbnailUri, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
       // itemPositions 已废弃，写入空对象
       '{}',
       outfit.canvasData ? JSON.stringify(outfit.canvasData) : '{}',
+      outfit.canvasBackground ? JSON.stringify(outfit.canvasBackground) : '{}',
       outfit.style || '',
       outfit.thumbnailUri || '',
       outfit.createdAt,
@@ -54,17 +57,18 @@ export async function deleteOutfit(id: number): Promise<void> {
 }
 
 export async function updateOutfit(
-  outfit: Outfit & { canvasData?: CanvasItem[]; style?: string; thumbnailUri?: string }
+  outfit: Outfit & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; thumbnailUri?: string }
 ): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    'UPDATE outfits SET name = ?, itemIds = ?, itemPositions = ?, canvasData = ?, style = ?, thumbnailUri = ? WHERE id = ?',
+    'UPDATE outfits SET name = ?, itemIds = ?, itemPositions = ?, canvasData = ?, canvasBackground = ?, style = ?, thumbnailUri = ? WHERE id = ?',
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
       // itemPositions 已废弃，写入空对象
       '{}',
       outfit.canvasData ? JSON.stringify(outfit.canvasData) : '{}',
+      outfit.canvasBackground ? JSON.stringify(outfit.canvasBackground) : '{}',
       outfit.style || '',
       outfit.thumbnailUri || '',
       outfit.id,

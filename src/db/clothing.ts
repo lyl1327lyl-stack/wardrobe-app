@@ -279,7 +279,7 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
       // 新增草稿
       const result = await db.runAsync(
         `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId, isDraft)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           item.imageUri,
           item.thumbnailUri,
@@ -314,7 +314,7 @@ export async function publishDraft(id: number): Promise<void> {
     const db = await getDatabase();
     await db.runAsync(
       'UPDATE clothing_items SET isDraft = 0, deletedAt = NULL, createdAt = ? WHERE id = ? AND isDraft = 1',
-      [localDateString(), id]
+      [new Date().toISOString(), id]
     );
   } catch (error) {
     console.warn('[ClothingDB] publishDraft failed:', error);
@@ -331,7 +331,7 @@ export async function publishAllDrafts(ids: number[]): Promise<void> {
   const placeholders = ids.map(() => '?').join(',');
   await db.runAsync(
     `UPDATE clothing_items SET isDraft = 0, createdAt = ? WHERE id IN (${placeholders}) AND isDraft = 1`,
-    [localDateString(), ...ids]
+    [new Date().toISOString(), ...ids]
   );
 }
 

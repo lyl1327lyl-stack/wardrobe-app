@@ -930,7 +930,6 @@ export function AddClothingScreen() {
 
     // 如果是编辑草稿并点击"创建"，先显示衣橱选择对话框
     if (isEditingDraft && !asDraft) {
-      setIsSubmitting(true);
       setShowWardrobeDialog(true);
       return;
     }
@@ -953,10 +952,15 @@ export function AddClothingScreen() {
       const currentOriginalUri = originalImageUri || existingItem?.originalImageUri || currentImageUri;
 
       // 只要 imageUri 发生变化，就必须重新处理
-      if (!asDraft && currentImageUri && existingItem && currentImageUri !== existingItem.imageUri) {
+      const imageChanged = currentImageUri && existingItem && currentImageUri !== existingItem.imageUri;
+      if (!asDraft && imageChanged) {
         const result = await processImage(currentImageUri, removeBackground, currentOriginalUri);
         processedUri = result.imageUri || existingItem?.imageUri || currentImageUri;
         thumbnailUri = result.thumbnailUri || existingItem?.thumbnailUri || processedUri;
+      } else if (imageChanged) {
+        // 草稿模式下图片有变更，直接使用新图片（不需要处理）
+        processedUri = currentImageUri;
+        thumbnailUri = currentImageUri;
       } else if (existingItem?.imageUri) {
         processedUri = existingItem.imageUri;
         thumbnailUri = existingItem.thumbnailUri || existingItem.imageUri;
@@ -1373,6 +1377,12 @@ export function AddClothingScreen() {
             </View>
             <View style={styles.dialogButtonRow}>
               <TouchableOpacity
+                style={styles.dialogCancelBtn}
+                onPress={() => { setShowWardrobeDialog(false); setPendingWardrobeId(null); }}
+              >
+                <Text style={styles.dialogCancelText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
                 style={[styles.dialogConfirmBtn, !pendingWardrobeId && styles.dialogConfirmBtnDisabled]}
                 onPress={() => {
                   if (pendingWardrobeId) {
@@ -1384,12 +1394,6 @@ export function AddClothingScreen() {
                 disabled={!pendingWardrobeId}
               >
                 <Text style={[styles.dialogConfirmText, !pendingWardrobeId && styles.dialogConfirmTextDisabled]}>确认创建</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.dialogCancelBtn}
-                onPress={() => { setShowWardrobeDialog(false); setIsSubmitting(false); setPendingWardrobeId(null); }}
-              >
-                <Text style={styles.dialogCancelText}>取消</Text>
               </TouchableOpacity>
             </View>
           </View>

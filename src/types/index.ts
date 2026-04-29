@@ -71,6 +71,11 @@ export interface CanvasItemData {
   zIndex: number;
 }
 
+export interface CanvasBackgroundData {
+  type: 'color' | 'gradient' | 'none';
+  value: string;
+}
+
 export interface Outfit {
   id: number;
   name: string;
@@ -78,6 +83,7 @@ export interface Outfit {
   /** @deprecated 使用 canvasData 替代 */
   itemPositions?: Record<number, OutfitItemPosition>;
   canvasData?: CanvasItemData[];
+  canvasBackground?: CanvasBackgroundData;
   style?: string;
   thumbnailUri?: string;
   createdAt: string;

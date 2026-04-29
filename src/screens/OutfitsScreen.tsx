@@ -105,6 +105,8 @@ export function OutfitsScreen() {
     const thumbUri = item.thumbnailUri;
     const isSelected = selectedIds.has(item.id);
     const count = getItemCount(item);
+    const bg = (item as any).canvasBackground;
+    const frameColor = bg?.type === 'color' ? bg.value : theme.colors.card;
 
     return (
       <TouchableOpacity
@@ -118,31 +120,29 @@ export function OutfitsScreen() {
             {isSelected && <Ionicons name="checkmark" size={14} color="#fff" />}
           </View>
         )}
-        <View style={styles.cardThumb}>
-          {thumbUri ? (
-            <Image
-              source={{ uri: thumbUri }}
-              style={styles.cardImage}
-              resizeMode="cover"
-            />
-          ) : (
-            <View style={styles.cardPlaceholder}>
-              <Ionicons name="shirt-outline" size={32} color={theme.colors.textTertiary} />
-            </View>
-          )}
-          {/* 底部渐变 + 数量标签 */}
-          <View style={styles.cardGradient} pointerEvents="none">
-            <View style={styles.cardCountBadge}>
-              <Text style={styles.cardCountText}>{count}件</Text>
+        <View style={[styles.cardThumb, { backgroundColor: frameColor }]}>
+          <View style={styles.cardInnerFrame}>
+            {thumbUri ? (
+              <Image
+                source={{ uri: thumbUri }}
+                style={styles.cardImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <View style={styles.cardPlaceholder}>
+                <Ionicons name="shirt-outline" size={28} color={theme.colors.textTertiary} />
+              </View>
+            )}
+            {/* 底部渐变 + 标签 */}
+            <View style={styles.cardGradient} pointerEvents="none">
+              <View style={styles.cardCountBadge}>
+                <Text style={styles.cardCountText}>{count}件</Text>
+              </View>
+              <View style={styles.cardStyleBadge}>
+                <Text style={styles.cardStyleBadgeText}>{style}</Text>
+              </View>
             </View>
           </View>
-        </View>
-        <View style={styles.cardInfo}>
-          <View style={styles.cardStyleRow}>
-            <View style={styles.styleDot} />
-            <Text style={styles.cardStyle}>{style}</Text>
-          </View>
-          <Ionicons name="chevron-forward" size={14} color={theme.colors.textTertiary} />
         </View>
       </TouchableOpacity>
     );
@@ -383,7 +383,13 @@ const createStyles = (theme: any, insets: any) =>
     },
     cardThumb: {
       aspectRatio: 1,
-      backgroundColor: theme.colors.borderLight,
+      backgroundColor: theme.colors.card,
+      padding: 10,
+    },
+    cardInnerFrame: {
+      flex: 1,
+      borderRadius: 10,
+      overflow: 'hidden',
       position: 'relative',
     },
     cardImage: {
@@ -394,7 +400,7 @@ const createStyles = (theme: any, insets: any) =>
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.borderLight,
+      backgroundColor: theme.colors.card,
     },
     cardGradient: {
       position: 'absolute',
@@ -402,13 +408,14 @@ const createStyles = (theme: any, insets: any) =>
       left: 0,
       right: 0,
       height: 48,
-      justifyContent: 'flex-end',
-      alignItems: 'flex-start',
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-end',
       paddingHorizontal: 8,
       paddingBottom: 8,
     },
     cardCountBadge: {
-      backgroundColor: 'rgba(0,0,0,0.55)',
+      backgroundColor: 'rgba(0,0,0,0.5)',
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 10,
@@ -418,28 +425,16 @@ const createStyles = (theme: any, insets: any) =>
       fontSize: 11,
       fontWeight: '600',
     },
-    cardInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 12,
-      paddingVertical: 12,
+    cardStyleBadge: {
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 10,
     },
-    cardStyleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    styleDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: theme.colors.primary,
-      marginRight: 6,
-    },
-    cardStyle: {
-      fontSize: 14,
+    cardStyleBadgeText: {
+      color: '#fff',
+      fontSize: 11,
       fontWeight: '600',
-      color: theme.colors.text,
     },
     checkbox: {
       position: 'absolute',
