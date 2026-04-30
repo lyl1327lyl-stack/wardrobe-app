@@ -40,8 +40,7 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.colors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      paddingBottom: 50,
-      maxHeight: '85%',
+      height: '60%',
     },
     handle: {
       width: 36,
@@ -342,6 +341,7 @@ export function WearCalendarSheet({
 
   useEffect(() => {
     if (visible && date) {
+      setShowAddPicker(false);
       loadRecords();
     }
   }, [visible, date]);
