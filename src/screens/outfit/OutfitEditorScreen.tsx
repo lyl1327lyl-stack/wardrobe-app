@@ -391,9 +391,22 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
     console.log('[handleSave] Final thumbnailUri:', thumbnailUri);
 
-    const groupId = (editingOutfitId && canvasItems.length > 0)
-      ? outfits.find(o => o.id === editingOutfitId)?.groupId || groupIdFromRoute || groups[0]?.id || 0
-      : groupIdFromRoute || groups[0]?.id || 0;
+    // 获取 groupId 的优先级：
+    // 1. 编辑已有搭配时，保留原 groupId
+    // 2. 从 route params 获取（从 GroupDetailScreen 新建时传入）
+    // 3. "未分组" 默认分组
+    const getDefaultGroupId = () => {
+      const defaultGroup = groups.find(g => g.name === '未分组');
+      return defaultGroup?.id || groups[0]?.id || 0;
+    };
+
+    let groupId: number;
+    if (editingOutfitId) {
+      const existingOutfit = outfits.find(o => o.id === editingOutfitId);
+      groupId = existingOutfit?.groupId || groupIdFromRoute || getDefaultGroupId();
+    } else {
+      groupId = groupIdFromRoute || getDefaultGroupId();
+    }
 
     const outfitData = {
       name: `${groups.find(g => g.id === groupId)?.name || '未分组'}搭配`,
