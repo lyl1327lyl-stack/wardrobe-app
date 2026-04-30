@@ -40,7 +40,8 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.colors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      height: '60%',
+      height: '72%',
+      overflow: 'hidden',
     },
     handle: {
       width: 36,
@@ -80,6 +81,7 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
     },
     content: {
+      flex: 1,
       paddingHorizontal: 20,
       paddingTop: 16,
     },
@@ -127,7 +129,15 @@ const makeStyles = (theme: Theme) =>
     },
     // 添加衣服的样式
     addClothingSection: {
+      flex: 1,
       marginTop: 8,
+    },
+    addClothingScroll: {
+      flex: 1,
+    },
+    addClothingFooter: {
+      paddingTop: 10,
+      paddingBottom: 20,
     },
     addClothingTitle: {
       fontSize: 14,
@@ -531,29 +541,29 @@ export function WearCalendarSheet({
         ))}
       </View>
 
-      {/* Mode tabs */}
-      <View style={styles.modeTabs}>
-        <TouchableOpacity
-          style={[styles.modeTab, pickerMode === 'items' && styles.modeTabActive]}
-          onPress={() => setPickerMode('items')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.modeTabText, pickerMode === 'items' && styles.modeTabTextActive]}>单品</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeTab, pickerMode === 'outfits' && styles.modeTabActive]}
-          onPress={() => setPickerMode('outfits')}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.modeTabText, pickerMode === 'outfits' && styles.modeTabTextActive]}>搭配</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView style={styles.addClothingScroll} showsVerticalScrollIndicator={false} bounces={false}>
+        {/* Mode tabs */}
+        <View style={styles.modeTabs}>
+          <TouchableOpacity
+            style={[styles.modeTab, pickerMode === 'items' && styles.modeTabActive]}
+            onPress={() => setPickerMode('items')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.modeTabText, pickerMode === 'items' && styles.modeTabTextActive]}>单品</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.modeTab, pickerMode === 'outfits' && styles.modeTabActive]}
+            onPress={() => setPickerMode('outfits')}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.modeTabText, pickerMode === 'outfits' && styles.modeTabTextActive]}>搭配</Text>
+          </TouchableOpacity>
+        </View>
 
-      {pickerMode === 'items' ? (
-        filteredClothing.length === 0 ? (
-          <Text style={styles.emptyText}>没有可添加的衣服</Text>
-        ) : (
-          <ScrollView style={{ height: 280 }} showsVerticalScrollIndicator={false}>
+        {pickerMode === 'items' ? (
+          filteredClothing.length === 0 ? (
+            <Text style={styles.emptyText}>没有可添加的衣服</Text>
+          ) : (
             <View style={styles.clothingGrid}>
               {filteredClothing.map(item => {
                 const isRecorded = recordedIds.has(item.id);
@@ -595,13 +605,11 @@ export function WearCalendarSheet({
               );
               })}
             </View>
-          </ScrollView>
-        )
-      ) : (
-        filteredOutfits.length === 0 ? (
-          <Text style={styles.emptyText}>还没有搭配，请先创建搭配</Text>
+          )
         ) : (
-          <ScrollView style={{ height: 280 }} showsVerticalScrollIndicator={false}>
+          filteredOutfits.length === 0 ? (
+            <Text style={styles.emptyText}>还没有搭配，请先创建搭配</Text>
+          ) : (
             <View style={styles.clothingGrid}>
               {filteredOutfits.map(outfit => {
                 const isRecorded = recordedOutfitIds.has(outfit.id);
@@ -651,30 +659,32 @@ export function WearCalendarSheet({
                 );
               })}
             </View>
-          </ScrollView>
-        )
-      )}
+          )
+        )}
+      </ScrollView>
 
-      <TouchableOpacity
-        style={[
-          styles.confirmAddBtn,
-          !hasSelection && styles.confirmAddBtnDisabled
-        ]}
-        onPress={handleConfirmAdd}
-        disabled={!hasSelection}
-        activeOpacity={0.8}
-      >
-        <Text style={styles.confirmAddBtnText}>
-          添加 {selectionCount > 0 ? `${selectionCount} ${pickerMode === 'outfits' ? '套搭配' : '件'}` : ''}
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.closePickerBtn}
-        onPress={() => setShowAddPicker(false)}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.closePickerBtnText}>取消</Text>
-      </TouchableOpacity>
+      <View style={styles.addClothingFooter}>
+        <TouchableOpacity
+          style={[
+            styles.confirmAddBtn,
+            !hasSelection && styles.confirmAddBtnDisabled
+          ]}
+          onPress={handleConfirmAdd}
+          disabled={!hasSelection}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.confirmAddBtnText}>
+            添加 {selectionCount > 0 ? `${selectionCount} ${pickerMode === 'outfits' ? '套搭配' : '件'}` : ''}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.closePickerBtn}
+          onPress={() => setShowAddPicker(false)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.closePickerBtnText}>取消</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
