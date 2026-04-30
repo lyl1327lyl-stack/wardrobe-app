@@ -1,7 +1,8 @@
 import { create } from 'zustand';
-import { ClothingItem, Outfit, ClothingType, Season, Occasion, Scene, Wardrobe, WearRecord } from '../types';
+import { ClothingItem, Outfit, OutfitGroup, ClothingType, Season, Occasion, Scene, Wardrobe, WearRecord } from '../types';
 import * as clothingDb from '../db/clothing';
 import * as outfitDb from '../db/outfit';
+import * as groupDb from '../db/group';
 import * as wardrobeDb from '../db/wardrobeDb';
 import * as wearRecordsDb from '../db/wearRecords';
 
@@ -21,6 +22,13 @@ interface WardrobeState {
   isLoading: boolean;
   filterType: ClothingType | '全部';
   filterSeason: Season | '全部';
+
+  // 分组相关
+  groups: OutfitGroup[];
+  loadGroups: () => Promise<void>;
+  addGroup: (name: string, description: string) => Promise<number>;
+  updateGroup: (id: number, name: string, description: string) => Promise<void>;
+  deleteGroupWithAction: (id: number, action: 'move' | 'delete_outfits') => Promise<void>;
 
   // 穿着记录相关
   wearRecords: WearRecord[];
@@ -112,6 +120,9 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   filterType: '全部',
   filterSeason: '全部',
 
+  // 分组相关初始状态
+  groups: [],
+
   // 穿着记录相关初始状态
   wearRecords: [],
 
@@ -125,14 +136,15 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   loadData: async () => {
     set({ isLoading: true });
     try {
-      const [clothing, trashClothing, soldClothing, draftClothing, outfits] = await Promise.all([
+      const [clothing, trashClothing, soldClothing, draftClothing, outfits, groups] = await Promise.all([
         clothingDb.getAllClothing(),
         clothingDb.getTrashClothing(),
         clothingDb.getSoldClothing(),
         clothingDb.getDraftClothing(),
         outfitDb.getAllOutfits(),
+        groupDb.getAllGroups(),
       ]);
-      set({ clothing, trashClothing, soldClothing, draftClothing, outfits, isLoading: false });
+      set({ clothing, trashClothing, soldClothing, draftClothing, outfits, groups, isLoading: false });
     } catch (error) {
       console.error('Failed to load data:', error);
       set({ isLoading: false });
@@ -312,6 +324,55 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     await Promise.all(ids.map(id => outfitDb.deleteOutfit(id)));
     set(state => ({
       outfits: state.outfits.filter(o => !ids.includes(o.id)),
+    }));
+  },
+
+  // ============ 分组 Actions ============
+
+  loadGroups: async () => {
+    const groups = await groupDb.getAllGroups();
+    set({ groups });
+  },
+
+  addGroup: async (name, description) => {
+    const id = await groupDb.addGroup(name, description);
+    const newGroup: OutfitGroup = {
+      id,
+      name,
+      description,
+      sortOrder: 0,
+      createdAt: new Date().toISOString(),
+    };
+    set(state => ({ groups: [...state.groups, newGroup] }));
+    return id;
+  },
+
+  updateGroup: async (id, name, description) => {
+    await groupDb.updateGroup(id, name, description);
+    set(state => ({
+      groups: state.groups.map(g =>
+        g.id === id ? { ...g, name, description } : g
+      ),
+    }));
+  },
+
+  deleteGroupWithAction: async (id, action) => {
+    const { groups } = get();
+    const defaultGroup = groups.find(g => g.name === '未分组');
+    const defaultGroupId = defaultGroup?.id ?? 1;
+
+    if (action === 'move') {
+      await groupDb.moveOutfitsToGroup(id, defaultGroupId);
+    } else if (action === 'delete_outfits') {
+      await groupDb.deleteOutfitsByGroup(id);
+    }
+
+    await groupDb.deleteGroup(id);
+    set(state => ({
+      groups: state.groups.filter(g => g.id !== id),
+      outfits: action === 'delete_outfits'
+        ? state.outfits.filter(o => (o as any).groupId !== id)
+        : state.outfits,
     }));
   },
 
