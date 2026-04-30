@@ -23,7 +23,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useOutfitStore, CanvasItem, CanvasBackground } from '../../store/outfitStore';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
-import { StyleSelector } from '../../components/outfit/StyleSelector';
 import { BackgroundPicker } from '../../components/outfit/BackgroundPicker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -32,11 +31,12 @@ const CANVAS_WIDTH = SCREEN_WIDTH - CANVAS_PADDING * 2;
 const BASE_IMAGE_SIZE = 70;
 
 type RootStackParamList = {
-  ClothingSelection: { source?: 'Outfits' | 'Editor' } | undefined;
+  ClothingSelection: { source?: 'Outfits' | 'Editor'; groupId?: number } | undefined;
   OutfitEditor: {
     selectedIds?: number[];
     outfitId?: number;
     mode?: 'create' | 'edit';
+    groupId?: number;
     exitTo?: { screen: string; tab: string };
   };
 };
@@ -195,6 +195,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'OutfitEditor'>>();
 
+  const groupIdFromRoute = route.params?.groupId;
+
   const {
     canvasItems,
     updateCanvasItem,
@@ -210,8 +212,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
     showGrid,
     canvasBackground,
     setCanvasBackground,
-    selectedStyle,
-    setSelectedStyle,
     historyIndex,
     history,
     saveToHistory,
@@ -220,7 +220,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
     reset,
   } = useOutfitStore();
 
-  const { addOutfit, updateOutfit, outfits } = useWardrobeStore();
+  const { addOutfit, updateOutfit, outfits, groups } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: 300 });
@@ -246,8 +246,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
   itemsRef.current = canvasItems;
   const bgRef = useRef(canvasBackground);
   bgRef.current = canvasBackground;
-  const styleRef = useRef(selectedStyle);
-  styleRef.current = selectedStyle;
   const handleSaveRef = useRef<() => void>(() => {});
 
   // Capture baseline snapshot after initial data loads
@@ -257,7 +255,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
         initialSnapshot.current = JSON.stringify({
           items: itemsRef.current,
           bg: bgRef.current,
-          style: styleRef.current,
         });
       }
     }, 500);
@@ -275,7 +272,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
       const current = JSON.stringify({
         items: itemsRef.current,
         bg: bgRef.current,
-        style: styleRef.current,
       });
 
       if (initialSnapshot.current === null || current === initialSnapshot.current) {
@@ -315,10 +311,9 @@ export function OutfitEditorScreen({ onSave }: Props) {
       const outfit = outfits.find(o => o.id === outfitId);
       if (outfit) {
         const canvasData = (outfit as any).canvasData;
-        const style = (outfit as any).style || '休闲';
         const background = (outfit as any).canvasBackground;
         if (canvasData && canvasData.length > 0) {
-          loadFromOutfit(canvasData, style, outfitId, background);
+          loadFromOutfit(canvasData, outfitId, background);
           console.log('[OutfitEditorScreen] Loaded existing outfit:', outfitId);
         }
       }
@@ -374,13 +369,9 @@ export function OutfitEditorScreen({ onSave }: Props) {
   }, [navigation, route.params?.exitTo]);
 
   const handleSave = useCallback(async () => {
-    console.log('[handleSave] START - selectedStyle:', selectedStyle, 'canvasItems:', canvasItems.length);
+    console.log('[handleSave] START - canvasItems:', canvasItems.length);
     console.log('[handleSave] editingOutfitId:', editingOutfitId);
 
-    if (!selectedStyle) {
-      Alert.alert('请选择风格', '请为搭配选择一个风格标签');
-      return;
-    }
     if (canvasItems.length === 0) {
       Alert.alert('请添加衣物', '请至少添加一件衣物到画板');
       return;
@@ -400,12 +391,16 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
     console.log('[handleSave] Final thumbnailUri:', thumbnailUri);
 
+    const groupId = (editingOutfitId && canvasItems.length > 0)
+      ? outfits.find(o => o.id === editingOutfitId)?.groupId || groupIdFromRoute || groups[0]?.id || 0
+      : groupIdFromRoute || groups[0]?.id || 0;
+
     const outfitData = {
-      name: `${selectedStyle}搭配`,
+      name: `${groups.find(g => g.id === groupId)?.name || '未分组'}搭配`,
       itemIds: canvasItems.map(i => i.clothingId),
       canvasData: canvasItems,
       canvasBackground,
-      style: selectedStyle,
+      groupId,
       thumbnailUri,
       createdAt: new Date().toISOString(),
     };
@@ -439,7 +434,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       console.error('[handleSave] Error saving outfit:', error?.message || error);
       Alert.alert('保存失败', error?.message || '请重试');
     }
-  }, [canvasItems, selectedStyle, editingOutfitId, navigation, addOutfit, updateOutfit, reset, exitEditor]);
+  }, [canvasItems, editingOutfitId, navigation, addOutfit, updateOutfit, reset, exitEditor, groupIdFromRoute, groups, outfits]);
   handleSaveRef.current = handleSave;
 
   const handleBackgroundPress = useCallback(() => {
@@ -507,9 +502,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
           </TouchableOpacity>
         </View>
       </View>
-
-      {/* 风格选择 */}
-      <StyleSelector selectedStyle={selectedStyle} onStyleChange={setSelectedStyle} />
 
       {/* 底部工具栏 */}
       <CanvasToolsBar
