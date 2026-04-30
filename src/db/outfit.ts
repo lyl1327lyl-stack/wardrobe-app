@@ -10,6 +10,7 @@ export interface OutfitRow {
   canvasData?: string;
   canvasBackground?: string;
   style?: string;
+  groupId?: number;
   thumbnailUri?: string;
   createdAt: string;
 }
@@ -26,16 +27,17 @@ export async function getAllOutfits(): Promise<Outfit[]> {
     canvasData: item.canvasData ? JSON.parse(item.canvasData) : undefined,
     canvasBackground: item.canvasBackground ? JSON.parse(item.canvasBackground) : undefined,
     style: item.style || '',
+    groupId: item.groupId || 0,
     thumbnailUri: item.thumbnailUri,
   }));
 }
 
 export async function addOutfit(
-  outfit: Omit<Outfit, 'id'> & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; thumbnailUri?: string }
+  outfit: Omit<Outfit, 'id'> & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; groupId: number; thumbnailUri?: string }
 ): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    'INSERT INTO outfits (name, itemIds, itemPositions, canvasData, canvasBackground, style, thumbnailUri, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO outfits (name, itemIds, itemPositions, canvasData, canvasBackground, style, groupId, thumbnailUri, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
@@ -44,6 +46,7 @@ export async function addOutfit(
       outfit.canvasData ? JSON.stringify(outfit.canvasData) : '{}',
       outfit.canvasBackground ? JSON.stringify(outfit.canvasBackground) : '{}',
       outfit.style || '',
+      outfit.groupId,
       outfit.thumbnailUri || '',
       outfit.createdAt,
     ]
@@ -57,11 +60,11 @@ export async function deleteOutfit(id: number): Promise<void> {
 }
 
 export async function updateOutfit(
-  outfit: Outfit & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; thumbnailUri?: string }
+  outfit: Outfit & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; groupId: number; thumbnailUri?: string }
 ): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    'UPDATE outfits SET name = ?, itemIds = ?, itemPositions = ?, canvasData = ?, canvasBackground = ?, style = ?, thumbnailUri = ? WHERE id = ?',
+    'UPDATE outfits SET name = ?, itemIds = ?, itemPositions = ?, canvasData = ?, canvasBackground = ?, style = ?, groupId = ?, thumbnailUri = ? WHERE id = ?',
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
@@ -70,6 +73,7 @@ export async function updateOutfit(
       outfit.canvasData ? JSON.stringify(outfit.canvasData) : '{}',
       outfit.canvasBackground ? JSON.stringify(outfit.canvasBackground) : '{}',
       outfit.style || '',
+      outfit.groupId,
       outfit.thumbnailUri || '',
       outfit.id,
     ]
