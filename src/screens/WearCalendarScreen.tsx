@@ -164,7 +164,6 @@ const makeStyles = (theme: Theme) =>
       width: Math.floor((CELL_SIZE - 10) / 2),
       height: Math.floor((CELL_SIZE - 10) / 2),
       borderRadius: 3, overflow: 'hidden',
-      backgroundColor: theme.colors.borderLight,
     },
     thumbnail: {
       width: '100%', height: '100%',
@@ -178,21 +177,13 @@ const makeStyles = (theme: Theme) =>
     overflowText: {
       fontSize: 9, color: theme.colors.white, fontWeight: '700',
     },
-    // 搭配缩略图占满格子
+    // 搭配缩略图（占满日期数字下方）
     cellOutfitThumb: {
-      ...StyleSheet.absoluteFillObject,
-      borderRadius: 10,
-    },
-    dayNumberOverlay: {
-      position: 'absolute', top: 3, left: 5,
-      flexDirection: 'row', alignItems: 'center',
-      backgroundColor: 'rgba(0,0,0,0.45)',
+      flex: 1,
       borderRadius: 6,
-      paddingHorizontal: 4,
-      paddingVertical: 1,
     },
     dayNumberOverlayText: {
-      fontSize: 10, fontWeight: '600', color: '#fff',
+      fontSize: 10, fontWeight: '600', color: theme.colors.text,
     },
     // 图例
     legend: {
@@ -393,18 +384,18 @@ export function WearCalendarScreen() {
             hasRecords && !isToday && !showOutfitThumb && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
             !isSunday && { marginRight: CELL_MARGIN },
             { marginBottom: CELL_MARGIN },
-            showOutfitThumb && { padding: 0, overflow: 'hidden' },
+            showOutfitThumb && { overflow: 'hidden' },
           ]}
           onPress={() => handleDayPress(dateStr)}
           activeOpacity={0.7}
         >
           {showOutfitThumb ? (
             <>
-              <Image source={{ uri: match.outfitThumb }} style={styles.cellOutfitThumb} resizeMode="cover" />
-              <View style={styles.dayNumberOverlay}>
+              <View style={styles.dayNumberRow}>
                 <Text style={styles.dayNumberOverlayText}>{day}</Text>
-                {isToday && <Ionicons name="star" size={12} color={theme.colors.primary} style={{ marginLeft: 2 }} />}
+                {isToday && <Ionicons name="star" size={11} color={theme.colors.primary} style={{ marginLeft: 2 }} />}
               </View>
+              <Image source={{ uri: match.outfitThumb }} style={styles.cellOutfitThumb} resizeMode="cover" />
             </>
           ) : (
             <>
