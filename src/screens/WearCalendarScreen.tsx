@@ -121,7 +121,7 @@ const makeStyles = (theme: Theme) =>
     },
     dayCell: {
       width: CELL_SIZE,
-      minHeight: CELL_SIZE + 22,
+      height: CELL_SIZE + 22,
       backgroundColor: theme.colors.background,
       borderRadius: 10,
       padding: 4,
@@ -178,27 +178,21 @@ const makeStyles = (theme: Theme) =>
     overflowText: {
       fontSize: 9, color: theme.colors.white, fontWeight: '700',
     },
-    // 搭配缩略图（日历格内）
-    outfitThumbWrap: {
-      width: CELL_SIZE - 8,
-      height: CELL_SIZE - 8,
+    // 搭配缩略图占满格子
+    cellOutfitThumb: {
+      ...StyleSheet.absoluteFillObject,
+      borderRadius: 10,
+    },
+    dayNumberOverlay: {
+      position: 'absolute', top: 3, left: 5,
+      flexDirection: 'row', alignItems: 'center',
+      backgroundColor: 'rgba(0,0,0,0.45)',
       borderRadius: 6,
-      overflow: 'hidden',
-      backgroundColor: theme.colors.borderLight,
-      alignSelf: 'center',
-    },
-    outfitThumb: {
-      width: '100%', height: '100%',
-    },
-    outfitMatchBadge: {
-      position: 'absolute', bottom: 1, left: 4, right: 4,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      borderRadius: 3,
+      paddingHorizontal: 4,
       paddingVertical: 1,
-      alignItems: 'center',
     },
-    outfitMatchText: {
-      fontSize: 7, color: theme.colors.white, fontWeight: '600',
+    dayNumberOverlayText: {
+      fontSize: 10, fontWeight: '600', color: '#fff',
     },
     // 图例
     legend: {
@@ -387,79 +381,64 @@ export function WearCalendarScreen() {
       // 周日 (每行第7格，index 6) 不需要右边距
       const weekIndex = (firstDay + day - 1) % 7;
       const isSunday = weekIndex === 6;
+      const match = outfitMatchMap[dateStr];
+      const showOutfitThumb = match && match.outfitThumb;
 
       cells.push(
         <TouchableOpacity
           key={dateStr}
           style={[
             styles.dayCell,
-            isToday && styles.dayCellToday,
-            hasRecords && !isToday && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
+            isToday && !showOutfitThumb && styles.dayCellToday,
+            hasRecords && !isToday && !showOutfitThumb && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
             !isSunday && { marginRight: CELL_MARGIN },
             { marginBottom: CELL_MARGIN },
+            showOutfitThumb && { padding: 0, overflow: 'hidden' },
           ]}
           onPress={() => handleDayPress(dateStr)}
           activeOpacity={0.7}
         >
-          <View style={styles.dayNumberRow}>
-            <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, hasRecords && !isToday && styles.dayNumberEmpty]}>
-              {day}
-            </Text>
-            {isToday && <Ionicons name="star" size={12} color={theme.colors.primary} style={styles.todayMarker} />}
-          </View>
-          {hasRecords && (() => {
-            const match = outfitMatchMap[dateStr];
-            if (match && match.outfitThumb) {
-              const extraItems = dayRecords.filter(i => match.extraItemIds.includes(i.id));
-              return (
+          {showOutfitThumb ? (
+            <>
+              <Image source={{ uri: match.outfitThumb }} style={styles.cellOutfitThumb} resizeMode="cover" />
+              <View style={styles.dayNumberOverlay}>
+                <Text style={styles.dayNumberOverlayText}>{day}</Text>
+                {isToday && <Ionicons name="star" size={12} color={theme.colors.primary} style={{ marginLeft: 2 }} />}
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.dayNumberRow}>
+                <Text style={[styles.dayNumber, isToday && styles.dayNumberToday, hasRecords && !isToday && styles.dayNumberEmpty]}>
+                  {day}
+                </Text>
+                {isToday && <Ionicons name="star" size={12} color={theme.colors.primary} style={styles.todayMarker} />}
+              </View>
+              {hasRecords && (
                 <View style={styles.thumbnailsGrid}>
-                  <View style={styles.outfitThumbWrap}>
-                    <Image source={{ uri: match.outfitThumb }} style={styles.outfitThumb} resizeMode="cover" />
-                    <View style={styles.outfitMatchBadge}>
-                      <Text style={styles.outfitMatchText} numberOfLines={1}>{match.outfitName}</Text>
-                    </View>
+                  <View style={styles.thumbnailRow}>
+                    {dayRecords.slice(0, 2).map((item) => (
+                      <View key={item.id} style={styles.thumbnailWrap}>
+                        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                      </View>
+                    ))}
                   </View>
-                  {extraItems.length > 0 && (
-                    <View style={styles.thumbnailRow}>
-                      {extraItems.slice(0, 2).map((item) => (
-                        <View key={item.id} style={styles.thumbnailWrap}>
-                          <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
-                        </View>
-                      ))}
-                      {extraItems.length > 2 && (
-                        <View style={styles.overflowBadge}>
-                          <Text style={styles.overflowText}>+{extraItems.length - 2}</Text>
-                        </View>
-                      )}
+                  <View style={styles.thumbnailRow}>
+                    {dayRecords.slice(2, 4).map((item) => (
+                      <View key={item.id} style={styles.thumbnailWrap}>
+                        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                      </View>
+                    ))}
+                  </View>
+                  {dayRecords.length > 4 && (
+                    <View style={styles.overflowBadge}>
+                      <Text style={styles.overflowText}>+{dayRecords.length - 4}</Text>
                     </View>
                   )}
                 </View>
-              );
-            }
-            return (
-              <View style={styles.thumbnailsGrid}>
-                <View style={styles.thumbnailRow}>
-                  {dayRecords.slice(0, 2).map((item) => (
-                    <View key={item.id} style={styles.thumbnailWrap}>
-                      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
-                    </View>
-                  ))}
-                </View>
-                <View style={styles.thumbnailRow}>
-                  {dayRecords.slice(2, 4).map((item) => (
-                    <View key={item.id} style={styles.thumbnailWrap}>
-                      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
-                    </View>
-                  ))}
-                </View>
-                {dayRecords.length > 4 && (
-                  <View style={styles.overflowBadge}>
-                    <Text style={styles.overflowText}>+{dayRecords.length - 4}</Text>
-                  </View>
-                )}
-              </View>
-            );
-          })()}
+              )}
+            </>
+          )}
         </TouchableOpacity>
       );
     }
