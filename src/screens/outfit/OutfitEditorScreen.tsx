@@ -15,6 +15,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   PanGestureHandler,
   PinchGestureHandler,
+  RotationGestureHandler,
   State,
 } from 'react-native-gesture-handler';
 import { generateOutfitThumbnail } from '../../utils/generateOutfitThumbnail';
@@ -26,7 +27,7 @@ import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
 import { BackgroundPicker } from '../../components/outfit/BackgroundPicker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CANVAS_PADDING = 16;
+const CANVAS_PADDING = 10;
 const CANVAS_WIDTH = SCREEN_WIDTH - CANVAS_PADDING * 2;
 const BASE_IMAGE_SIZE = 70;
 
@@ -37,8 +38,9 @@ type RootStackParamList = {
     outfitId?: number;
     mode?: 'create' | 'edit';
     groupId?: number;
-    exitTo?: { screen: string; tab: string };
+    exitTo?: { screen: string; tab?: string; groupId?: number; groupName?: string; outfitId?: number };
   };
+  OutfitDetail: { outfitId: number; groupId?: number; groupName?: string };
 };
 
 interface Props {
@@ -51,7 +53,6 @@ interface DraggableItemProps {
   canvasHeight: number;
   onUpdate: (clothingId: number, updates: Partial<CanvasItem>) => void;
   onDelete: (clothingId: number) => void;
-  onRotate: (clothingId: number) => void;
   isSelected: boolean;
   onSelect: () => void;
   styles: any;
@@ -64,25 +65,23 @@ function DraggableItem({
   canvasHeight,
   onUpdate,
   onDelete,
-  onRotate,
   isSelected,
   onSelect,
   styles,
   theme,
 }: DraggableItemProps) {
-  // 使用普通 state 管理位置和缩放
   const [position, setPosition] = useState({ x: item.x, y: item.y });
   const [scale, setScale] = useState(item.scale);
+  const [rotation, setRotation] = useState(item.rotation);
 
-  // 手势起始位置
   const panRef = useRef<any>(null);
   const pinchRef = useRef<any>(null);
+  const rotationRef = useRef<any>(null);
 
-  // 记录手势开始时的状态
   const startPosition = useRef({ x: 0, y: 0 });
   const startScale = useRef(1);
+  const startRotation = useRef(0);
 
-  // 当 item 的位置从外部更新时，同步到 state
   useEffect(() => {
     setPosition({ x: item.x, y: item.y });
   }, [item.x, item.y]);
@@ -91,9 +90,11 @@ function DraggableItem({
     setScale(item.scale);
   }, [item.scale]);
 
-  // 拖拽手势处理
+  useEffect(() => {
+    setRotation(item.rotation);
+  }, [item.rotation]);
+
   const onPanGestureEvent = useCallback((event: any) => {
-    // 持续更新位置
     const maxSize = BASE_IMAGE_SIZE * scale;
     const newX = Math.max(0, Math.min(canvasWidth - maxSize, startPosition.current.x + event.nativeEvent.translationX));
     const newY = Math.max(0, Math.min(canvasHeight - maxSize, startPosition.current.y + event.nativeEvent.translationY));
@@ -109,9 +110,7 @@ function DraggableItem({
     }
   }, [item.clothingId, position.x, position.y, onSelect, onUpdate]);
 
-  // 双指缩放手势处理
   const onPinchGestureEvent = useCallback((event: any) => {
-    // 持续更新缩放
     const newScale = Math.max(0.5, Math.min(3, startScale.current * event.nativeEvent.scale));
     setScale(newScale);
   }, []);
@@ -124,68 +123,116 @@ function DraggableItem({
     }
   }, [item.clothingId, scale, onUpdate]);
 
+  const onRotationGestureEvent = useCallback((event: any) => {
+    const deg = startRotation.current + (event.nativeEvent.rotation * 180 / Math.PI);
+    setRotation(((deg % 360) + 360) % 360);
+  }, []);
+
+  const onRotationHandlerStateChange = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.BEGAN) {
+      startRotation.current = rotation;
+    } else if (event.nativeEvent.state === State.END) {
+      onUpdate(item.clothingId, { rotation: ((rotation % 360) + 360) % 360 });
+    }
+  }, [item.clothingId, rotation, onUpdate]);
+
+  // Rotate handle — drag from bottom-right corner to rotate
+  const handlePanRef = useRef<any>(null);
+  const handleStartRotation = useRef(0);
+
+  const onHandlePanEvent = useCallback((event: any) => {
+    const half = (BASE_IMAGE_SIZE * scale) / 2;
+    const tx = half + event.nativeEvent.translationX;
+    const ty = half + event.nativeEvent.translationY;
+    const angle = Math.atan2(ty, tx) * 180 / Math.PI;
+    const deg = handleStartRotation.current + (angle - 45);
+    setRotation(((deg % 360) + 360) % 360);
+  }, [scale]);
+
+  const onHandlePanStateChange = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.BEGAN) {
+      onSelect();
+      handleStartRotation.current = rotation;
+    } else if (event.nativeEvent.state === State.END) {
+      onUpdate(item.clothingId, { rotation: ((rotation % 360) + 360) % 360 });
+    }
+  }, [item.clothingId, rotation, onSelect, onUpdate]);
+
   const imageSize = BASE_IMAGE_SIZE * scale;
 
   return (
-    <PinchGestureHandler
-      ref={pinchRef}
-      simultaneousHandlers={panRef}
-      onGestureEvent={onPinchGestureEvent}
-      onHandlerStateChange={onPinchHandlerStateChange}
+    <RotationGestureHandler
+      ref={rotationRef}
+      simultaneousHandlers={[panRef, pinchRef]}
+      onGestureEvent={onRotationGestureEvent}
+      onHandlerStateChange={onRotationHandlerStateChange}
     >
-      <PanGestureHandler
-        ref={panRef}
-        simultaneousHandlers={pinchRef}
-        onGestureEvent={onPanGestureEvent}
-        onHandlerStateChange={onPanHandlerStateChange}
-        minPointers={1}
-        avgTouches
+      <PinchGestureHandler
+        ref={pinchRef}
+        simultaneousHandlers={[panRef, rotationRef]}
+        onGestureEvent={onPinchGestureEvent}
+        onHandlerStateChange={onPinchHandlerStateChange}
       >
-        <View
-          style={[
-            styles.canvasItem,
-            {
-              left: position.x,
-              top: position.y,
-              zIndex: item.zIndex,
-              width: imageSize,
-              height: imageSize,
-              borderColor: isSelected ? theme.colors.primary : 'transparent',
-              borderWidth: isSelected ? 2 : 0,
-              borderStyle: (isSelected ? 'dashed' : 'solid') as any,
-            },
-          ]}
+        <PanGestureHandler
+          ref={panRef}
+          simultaneousHandlers={[pinchRef, rotationRef]}
+          onGestureEvent={onPanGestureEvent}
+          onHandlerStateChange={onPanHandlerStateChange}
+          minPointers={1}
+          avgTouches
         >
-          <TouchableOpacity
-            activeOpacity={0.9}
-            onPress={() => onSelect()}
-            style={{ flex: 1 }}
+          <View
+            style={[
+              styles.canvasItem,
+              {
+                left: position.x,
+                top: position.y,
+                zIndex: item.zIndex,
+                width: imageSize,
+                height: imageSize,
+                transform: [{ rotate: `${rotation}deg` }],
+                borderColor: isSelected ? theme.colors.primary : 'transparent',
+                borderWidth: isSelected ? 2 : 0,
+                borderStyle: (isSelected ? 'dashed' : 'solid') as any,
+              },
+            ]}
           >
-            <Image
-              source={{ uri: item.imageUri }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          {isSelected && (
-            <>
-              <TouchableOpacity
-                style={[styles.deleteButton, { top: -10, left: -10 }]}
-                onPress={() => onDelete(item.clothingId)}
-              >
-                <Text style={styles.deleteButtonText}>×</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.rotateButton, { bottom: -10, right: -10 }]}
-                onPress={() => onRotate(item.clothingId)}
-              >
-                <Text style={styles.rotateButtonText}>↻</Text>
-              </TouchableOpacity>
-            </>
-          )}
-        </View>
-      </PanGestureHandler>
-    </PinchGestureHandler>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => onSelect()}
+              style={{ flex: 1 }}
+            >
+              <Image
+                source={{ uri: item.imageUri }}
+                style={{ width: '100%', height: '100%' }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            {isSelected && (
+              <>
+                <TouchableOpacity
+                  style={[styles.deleteBtn, { backgroundColor: theme.colors.danger }]}
+                  onPress={() => onDelete(item.clothingId)}
+                >
+                  <Text style={styles.deleteBtnText}>×</Text>
+                </TouchableOpacity>
+                <PanGestureHandler
+                  ref={handlePanRef}
+                  onGestureEvent={onHandlePanEvent}
+                  onHandlerStateChange={onHandlePanStateChange}
+                  minPointers={1}
+                  avgTouches
+                >
+                  <View style={[styles.rotateHandle, { backgroundColor: theme.colors.primary }]}>
+                    <Text style={styles.rotateHandleText}>↻</Text>
+                  </View>
+                </PanGestureHandler>
+              </>
+            )}
+          </View>
+        </PanGestureHandler>
+      </PinchGestureHandler>
+    </RotationGestureHandler>
   );
 }
 
@@ -223,10 +270,11 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const { addOutfit, updateOutfit, outfits, groups } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: 300 });
+  const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
   const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const canvasRef = useRef<View>(null);
+  const captureTargetRef = useRef<View>(null);
 
   // Auto-dismiss tooltip when items are added or after 4 seconds
   useEffect(() => {
@@ -325,17 +373,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
     }
   }, [route.params]);
 
-  const handleRotate = useCallback(
-    (clothingId: number) => {
-      saveToHistory();
-      const item = canvasItems.find(i => i.clothingId === clothingId);
-      if (item) {
-        updateCanvasItem(clothingId, { rotation: (item.rotation + 15) % 360 });
-      }
-    },
-    [canvasItems, updateCanvasItem, saveToHistory]
-  );
-
   const handleDelete = useCallback(
     (clothingId: number) => {
       removeCanvasItem(clothingId);
@@ -348,21 +385,30 @@ export function OutfitEditorScreen({ onSave }: Props) {
     setSelectedItemId(id);
   }, []);
 
-  // 统一退出函数：不管从哪个入口进入，都回到目标 Tab
+  // 统一退出函数：不管从哪个入口进入，都回到目标页面
   const exitEditor = useCallback(() => {
     const exitTo = route.params?.exitTo;
     if (exitTo) {
-      navigation.reset({
-        index: 0,
-        routes: [
-          {
-            name: exitTo.screen as any,
-            params: {
-              screen: exitTo.tab,
-            },
-          },
-        ],
-      });
+      if (exitTo.screen === 'OutfitDetail') {
+        navigation.goBack();
+      } else if (exitTo.screen === 'GroupDetail' && exitTo.groupId) {
+        // 从 GroupDetail 进入：返回 GroupDetail 页面
+        navigation.reset({
+          index: 1,
+          routes: [
+            { name: 'Main' as any, params: { screen: '搭配' } },
+            { name: 'GroupDetail' as any, params: { groupId: exitTo.groupId, groupName: exitTo.groupName || '' } },
+          ],
+        });
+      } else if (exitTo.tab) {
+        // Tab 页面
+        navigation.reset({
+          index: 0,
+          routes: [{ name: exitTo.screen as any, params: { screen: exitTo.tab } }],
+        });
+      } else {
+        navigation.goBack();
+      }
     } else {
       navigation.goBack();
     }
@@ -377,12 +423,12 @@ export function OutfitEditorScreen({ onSave }: Props) {
       return;
     }
 
-    // Generate thumbnail by capturing canvas view
+    // Generate thumbnail from hidden clean canvas (no shadow, no border, no selection)
     const fallbackUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
     let thumbnailUri = fallbackUri;
     try {
-      console.log('[handleSave] Capturing canvas view...');
-      thumbnailUri = await generateOutfitThumbnail(canvasRef, fallbackUri);
+      console.log('[handleSave] Capturing thumbnail from clean canvas...');
+      thumbnailUri = await generateOutfitThumbnail(captureTargetRef, fallbackUri);
       console.log('[handleSave] Thumbnail generated:', thumbnailUri);
     } catch (e: any) {
       console.warn('[handleSave] Thumbnail generation failed:', e?.message || e);
@@ -431,6 +477,48 @@ export function OutfitEditorScreen({ onSave }: Props) {
         // Add new outfit
         const newId = await addOutfit(outfitData as any);
         console.log('[handleSave] Added new outfit with id:', newId);
+
+        // Reset outfit store
+        reset();
+
+        // 标记为保存退出，跳过 beforeRemove 拦截
+        isSaving.current = true;
+
+        // 新建搭配 → 询问用户是否编辑其他属性
+        const gName = groups.find(g => g.id === groupId)?.name || '';
+        Alert.alert(
+          '搭配已创建',
+          '是否需要编辑搭配的季节、风格、备注等属性？',
+          [
+            {
+              text: '返回分组',
+              style: 'cancel',
+              onPress: () => {
+                navigation.reset({
+                  index: 1,
+                  routes: [
+                    { name: 'Main' as any, params: { screen: '搭配' } },
+                    { name: 'GroupDetail' as any, params: { groupId, groupName: gName } },
+                  ],
+                });
+              },
+            },
+            {
+              text: '编辑属性',
+              onPress: () => {
+                navigation.reset({
+                  index: 2,
+                  routes: [
+                    { name: 'Main' as any, params: { screen: '搭配' } },
+                    { name: 'GroupDetail' as any, params: { groupId, groupName: gName } },
+                    { name: 'OutfitDetail' as any, params: { outfitId: newId, groupId, groupName: gName } },
+                  ],
+                });
+              },
+            },
+          ],
+        );
+        return;
       }
 
       console.log('[handleSave] Success, about to reset and navigate');
@@ -447,7 +535,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       console.error('[handleSave] Error saving outfit:', error?.message || error);
       Alert.alert('保存失败', error?.message || '请重试');
     }
-  }, [canvasItems, editingOutfitId, navigation, addOutfit, updateOutfit, reset, exitEditor, groupIdFromRoute, groups, outfits]);
+  }, [canvasItems, editingOutfitId, canvasBackground, navigation, addOutfit, updateOutfit, reset, exitEditor, groupIdFromRoute, groups, outfits]);
   handleSaveRef.current = handleSave;
 
   const handleBackgroundPress = useCallback(() => {
@@ -469,50 +557,71 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
       <View style={styles.content}>
         <View style={styles.canvasWrapper}>
-          <TouchableOpacity
-            ref={canvasRef}
-            onLayout={(e) => {
-              const { width, height } = e.nativeEvent.layout;
-              if (width > 0 && height > 0) {
-                setCanvasDims({ width, height });
-              }
-            }}
+            <TouchableOpacity
+              ref={canvasRef}
+              style={[
+                styles.canvas,
+                { width: CANVAS_WIDTH, height: CANVAS_WIDTH },
+                showGrid && styles.canvasGrid,
+                canvasBackground.type === 'color' && { backgroundColor: canvasBackground.value },
+              ]}
+              activeOpacity={1}
+              onPress={handleBackgroundPress}
+            >
+              {canvasItems.map(item => (
+                <DraggableItem
+                  key={item.clothingId}
+                  item={item}
+                  canvasWidth={canvasDims.width}
+                  canvasHeight={canvasDims.height}
+                  onUpdate={updateCanvasItem}
+                  onDelete={handleDelete}
+                  isSelected={selectedItemId === item.clothingId}
+                  onSelect={() => handleSelect(item.clothingId)}
+                  styles={styles}
+                  theme={theme}
+                />
+              ))}
+              {showTooltip && canvasItems.length === 0 && (
+                <View style={styles.tooltipBubble} pointerEvents="none">
+                  <Ionicons name="hand-left-outline" size={14} color={theme.colors.primary} />
+                  <Text style={styles.tooltipText}>拖拽移动 · 双指缩放 · 双指旋转</Text>
+                </View>
+              )}
+              {canvasItems.length === 0 && (
+                <View style={styles.canvasEmpty}>
+                  <Ionicons name="image-outline" size={48} color={theme.colors.textTertiary} />
+                  <Text style={styles.canvasEmptyText}>点击"+"添加衣物</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+        </View>
+
+        {/* Hidden canvas for clean thumbnail capture — no shadow, no border, no selection */}
+        <View style={styles.captureContainer} pointerEvents="none">
+          <View
+            ref={captureTargetRef}
             style={[
-              styles.canvas,
-              showGrid && styles.canvasGrid,
-              canvasBackground.type === 'color' && { backgroundColor: canvasBackground.value },
+              styles.captureCanvas,
+              { width: canvasDims.width, height: canvasDims.height, backgroundColor: 'transparent' },
             ]}
-            activeOpacity={1}
-            onPress={handleBackgroundPress}
           >
             {canvasItems.map(item => (
-              <DraggableItem
+              <Image
                 key={item.clothingId}
-                item={item}
-                canvasWidth={canvasDims.width}
-                canvasHeight={canvasDims.height}
-                onUpdate={updateCanvasItem}
-                onDelete={handleDelete}
-                onRotate={handleRotate}
-                isSelected={selectedItemId === item.clothingId}
-                onSelect={() => handleSelect(item.clothingId)}
-                styles={styles}
-                theme={theme}
+                source={{ uri: item.imageUri }}
+                style={{
+                  position: 'absolute',
+                  left: item.x,
+                  top: item.y,
+                  width: BASE_IMAGE_SIZE * item.scale,
+                  height: BASE_IMAGE_SIZE * item.scale,
+                  transform: [{ rotate: `${item.rotation}deg` }],
+                }}
+                resizeMode="contain"
               />
             ))}
-            {showTooltip && canvasItems.length === 0 && (
-              <View style={styles.tooltipBubble} pointerEvents="none">
-                <Ionicons name="hand-left-outline" size={14} color={theme.colors.primary} />
-                <Text style={styles.tooltipText}>长按拖拽 · 双指缩放</Text>
-              </View>
-            )}
-            {canvasItems.length === 0 && (
-              <View style={styles.canvasEmpty}>
-                <Ionicons name="image-outline" size={48} color={theme.colors.textTertiary} />
-                <Text style={styles.canvasEmptyText}>点击"+"添加衣物</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          </View>
         </View>
       </View>
 
@@ -579,20 +688,33 @@ const createStyles = (theme: any, insets: any) =>
     },
     content: {
       flex: 1,
+      backgroundColor: theme.colors.borderLight,
     },
     canvasWrapper: {
-      paddingHorizontal: CANVAS_PADDING,
       flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: CANVAS_PADDING,
     },
     canvas: {
-      flex: 1,
       backgroundColor: theme.colors.card,
       borderRadius: 16,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
       overflow: 'hidden',
       position: 'relative',
+      ...theme.shadows.md,
     },
     canvasGrid: {
       backgroundColor: '#fafafa',
+    },
+    captureContainer: {
+      position: 'absolute',
+      left: -9999,
+      top: 0,
+    },
+    captureCanvas: {
+      overflow: 'hidden',
     },
     canvasEmpty: {
       flex: 1,
@@ -627,31 +749,35 @@ const createStyles = (theme: any, insets: any) =>
     canvasItem: {
       position: 'absolute',
     },
-    rotateButton: {
+    deleteBtn: {
       position: 'absolute',
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      backgroundColor: theme.colors.primary,
+      top: -10,
+      left: -10,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
       alignItems: 'center',
       justifyContent: 'center',
+      zIndex: 20,
     },
-    rotateButtonText: {
-      color: '#fff',
-      fontSize: 12,
-    },
-    deleteButton: {
-      position: 'absolute',
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      backgroundColor: theme.colors.danger,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    deleteButtonText: {
+    deleteBtnText: {
       color: '#fff',
       fontSize: 14,
       fontWeight: 'bold',
+    },
+    rotateHandle: {
+      position: 'absolute',
+      bottom: -12,
+      right: -12,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 20,
+    },
+    rotateHandleText: {
+      color: '#fff',
+      fontSize: 15,
     },
   });

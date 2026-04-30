@@ -181,6 +181,7 @@ const makeStyles = (theme: Theme) =>
     cellOutfitThumb: {
       flex: 1,
       borderRadius: 6,
+      backgroundColor: 'transparent',
     },
     dayNumberOverlayText: {
       fontSize: 10, fontWeight: '600', color: theme.colors.text,
@@ -216,7 +217,6 @@ const makeStyles = (theme: Theme) =>
     recentThumbsScroll: { flex: 1 },
     recentThumb: {
       width: 36, height: 36, borderRadius: 8, marginRight: 6,
-      backgroundColor: theme.colors.borderLight,
     },
     recentEmpty: {
       fontSize: 13, flex: 1, color: theme.colors.textTertiary,
