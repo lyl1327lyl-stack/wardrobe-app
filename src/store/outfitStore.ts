@@ -29,11 +29,6 @@ export interface OutfitCanvasState {
   canvasBackground: CanvasBackground;
   // 当前编辑的outfit id（如果是重新编辑）
   editingOutfitId: number | null;
-  // 选中的风格
-  selectedStyle: string;
-  // 搭配主界面风格筛选
-  outfitFilter: string;
-
   // Actions
   setSelectedClothings: (items: ClothingItem[]) => void;
   addCanvasItem: (clothing: ClothingItem) => void;
@@ -49,11 +44,9 @@ export interface OutfitCanvasState {
   toggleGrid: () => void;
   setCanvasBackground: (background: CanvasBackground) => void;
   setEditingOutfitId: (id: number | null) => void;
-  setSelectedStyle: (style: string) => void;
-  setOutfitFilter: (filter: string) => void;
   reset: () => void;
   saveToHistory: () => void;
-  loadFromOutfit: (canvasData: CanvasItem[], style: string, outfitId: number, background?: CanvasBackground) => void;
+  loadFromOutfit: (canvasData: CanvasItem[], outfitId: number, background?: CanvasBackground) => void;
 }
 
 const initialState = {
@@ -64,8 +57,6 @@ const initialState = {
   showGrid: false,
   canvasBackground: { type: 'none', value: '' } as CanvasBackground,
   editingOutfitId: null,
-  selectedStyle: '',
-  outfitFilter: '全部',
 };
 
 export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
@@ -222,17 +213,8 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     set({ editingOutfitId: id });
   },
 
-  setSelectedStyle: (style) => {
-    set({ selectedStyle: style });
-  },
-
-  setOutfitFilter: (filter) => {
-    set({ outfitFilter: filter });
-  },
-
   reset: () => {
-    const filter = get().outfitFilter;
-    set({ ...initialState, outfitFilter: filter });
+    set({ ...initialState });
   },
 
   saveToHistory: () => {
@@ -246,10 +228,9 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     set({ history: newHistory, historyIndex: newHistory.length - 1 });
   },
 
-  loadFromOutfit: (canvasData, style, outfitId, background) => {
+  loadFromOutfit: (canvasData, outfitId, background) => {
     set({
       canvasItems: canvasData,
-      selectedStyle: style,
       editingOutfitId: outfitId,
       canvasBackground: background || { type: 'none', value: '' },
       history: [canvasData],
