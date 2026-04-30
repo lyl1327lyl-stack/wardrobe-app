@@ -20,8 +20,8 @@ import { useWardrobeStore } from '../../store/wardrobeStore';
 import { useOutfitStore } from '../../store/outfitStore';
 
 type RootStackParamList = {
-  ClothingSelection: { source?: 'Outfits' | 'Editor' } | undefined;
-  OutfitEditor: { selectedIds?: number[]; exitTo?: { screen: string; tab: string } };
+  ClothingSelection: { source?: 'Outfits' | 'Editor'; groupId?: number } | undefined;
+  OutfitEditor: { selectedIds?: number[]; exitTo?: { screen: string; tab: string }; groupId?: number };
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -45,6 +45,7 @@ export function ClothingSelectionScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'ClothingSelection'>>();
   const source = route.params?.source || 'Outfits';
+  const groupIdFromRoute = route.params?.groupId;
   const clothing = useWardrobeStore(state => state.clothing);
   const existingCanvasItems = useOutfitStore(state => state.canvasItems);
 
@@ -87,10 +88,11 @@ export function ClothingSelectionScreen() {
       setSelectedClothings(selectedItems);
       navigation.navigate('OutfitEditor', {
         selectedIds: [...selectedIds],
+        groupId: groupIdFromRoute,
         exitTo: { screen: 'Main', tab: '搭配' },
       });
     }
-  }, [selectedIds, clothing, existingIds, source, navigation, addCanvasItem, setSelectedClothings, resetOutfitStore]);
+  }, [selectedIds, clothing, existingIds, source, navigation, addCanvasItem, setSelectedClothings, resetOutfitStore, groupIdFromRoute]);
 
   // Reset outfitStore when entering to clear any previous state
   React.useEffect(() => {
