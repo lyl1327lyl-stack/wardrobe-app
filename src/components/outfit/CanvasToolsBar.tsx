@@ -1,15 +1,12 @@
 import React, { useMemo } from 'react';
-import { View, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../hooks/useTheme';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Props {
   onAdd: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
-  onBackground: () => void;
   hasSelection: boolean;
 }
 
@@ -17,65 +14,59 @@ export function CanvasToolsBar({
   onAdd,
   onMoveUp,
   onMoveDown,
-  onBackground,
   hasSelection,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity
-        style={[styles.toolButton, styles.addButton]}
-        onPress={onAdd}
-      >
-        <Ionicons name="add" size={24} color="#fff" />
-      </TouchableOpacity>
+    <View style={styles.wrapper}>
+      <View style={styles.container}>
+        <View style={styles.toolsSection}>
+          <TouchableOpacity
+            style={[styles.toolButton, styles.addButton]}
+            onPress={onAdd}
+          >
+            <Ionicons name="add" size={22} color="#fff" />
+          </TouchableOpacity>
 
-      <View style={styles.divider} />
+          <TouchableOpacity
+            style={[styles.toolButton, !hasSelection && styles.toolButtonDisabled]}
+            onPress={onMoveUp}
+            disabled={!hasSelection}
+          >
+            <Ionicons
+              name="arrow-up"
+              size={18}
+              color={hasSelection ? theme.colors.text : theme.colors.textTertiary}
+            />
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.toolButton, !hasSelection && styles.toolButtonDisabled]}
-        onPress={onMoveUp}
-        disabled={!hasSelection}
-      >
-        <Ionicons
-          name="arrow-up"
-          size={20}
-          color={hasSelection ? theme.colors.text : theme.colors.textTertiary}
-        />
-      </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.toolButton, !hasSelection && styles.toolButtonDisabled]}
+            onPress={onMoveDown}
+            disabled={!hasSelection}
+          >
+            <Ionicons
+              name="arrow-down"
+              size={18}
+              color={hasSelection ? theme.colors.text : theme.colors.textTertiary}
+            />
+          </TouchableOpacity>
 
-      <TouchableOpacity
-        style={[styles.toolButton, !hasSelection && styles.toolButtonDisabled]}
-        onPress={onMoveDown}
-        disabled={!hasSelection}
-      >
-        <Ionicons
-          name="arrow-down"
-          size={20}
-          color={hasSelection ? theme.colors.text : theme.colors.textTertiary}
-        />
-      </TouchableOpacity>
-
-      <View style={styles.divider} />
-
-      <TouchableOpacity
-        style={styles.toolButton}
-        onPress={onBackground}
-      >
-        <Ionicons
-          name="image-outline"
-          size={20}
-          color={theme.colors.text}
-        />
-      </TouchableOpacity>
+        </View>
+      </View>
     </View>
   );
 }
 
 const createStyles = (theme: any) =>
   StyleSheet.create({
+    wrapper: {
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      backgroundColor: theme.colors.borderLight,
+    },
     container: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -83,14 +74,18 @@ const createStyles = (theme: any) =>
       paddingHorizontal: 16,
       paddingVertical: 12,
       backgroundColor: theme.colors.card,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-      gap: 12,
+      borderRadius: theme.borderRadius.md,
+      ...theme.shadows.md,
+    },
+    toolsSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
     },
     toolButton: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: theme.colors.background,
       alignItems: 'center',
       justifyContent: 'center',
@@ -100,10 +95,5 @@ const createStyles = (theme: any) =>
     },
     addButton: {
       backgroundColor: theme.colors.primary,
-    },
-    divider: {
-      width: 1,
-      height: 24,
-      backgroundColor: theme.colors.border,
     },
   });

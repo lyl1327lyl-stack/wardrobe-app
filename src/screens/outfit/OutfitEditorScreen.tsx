@@ -24,7 +24,6 @@ import { useTheme } from '../../hooks/useTheme';
 import { useOutfitStore, CanvasItem, CanvasBackground } from '../../store/outfitStore';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
-import { BackgroundPicker } from '../../components/outfit/BackgroundPicker';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CANVAS_PADDING = 10;
@@ -258,7 +257,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
     toggleGrid,
     showGrid,
     canvasBackground,
-    setCanvasBackground,
     historyIndex,
     history,
     saveToHistory,
@@ -272,7 +270,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
-  const [showBackgroundPicker, setShowBackgroundPicker] = useState(false);
   const canvasRef = useRef<View>(null);
   const captureTargetRef = useRef<View>(null);
 
@@ -630,16 +627,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
         onAdd={() => navigation.navigate('ClothingSelection', { source: 'Editor' })}
         onMoveUp={() => selectedItemId && bringForward(selectedItemId)}
         onMoveDown={() => selectedItemId && sendBackward(selectedItemId)}
-        onBackground={() => setShowBackgroundPicker(true)}
         hasSelection={!!selectedItemId}
-      />
-
-      {/* 背景选择器 */}
-      <BackgroundPicker
-        visible={showBackgroundPicker}
-        onClose={() => setShowBackgroundPicker(false)}
-        currentBackground={canvasBackground}
-        onSelectBackground={setCanvasBackground}
       />
     </View>
   );
