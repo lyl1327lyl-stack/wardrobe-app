@@ -146,12 +146,27 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   await addColumnIfNotExists('outfits', 'style', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'thumbnailUri', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'canvasBackground', 'TEXT DEFAULT "{}"');
+  await addColumnIfNotExists('outfits', 'groupId', 'INTEGER');
   await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
   await addColumnIfNotExists('clothing_items', 'isDraft', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfNotExists('clothing_items', 'originalImageUri', 'TEXT DEFAULT ""');
 
   // 确保 wardrobes 表存在
   await ensureWardrobesTable(dbInstance!);
+
+  // 创建分组表
+  await execSQL(dbInstance, `
+    CREATE TABLE IF NOT EXISTS outfit_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      sortOrder INTEGER DEFAULT 0,
+      createdAt TEXT NOT NULL
+    )
+  `);
+
+  // 数据迁移：style → group
+  await migrateStyleToGroup(dbInstance!);
 
   // 确保默认衣橱存在
   await ensureDefaultWardrobe(dbInstance!);
@@ -196,6 +211,61 @@ async function ensureDefaultWardrobe(db: SQLite.SQLiteDatabase): Promise<void> {
       'INSERT INTO wardrobes (name, icon, isDefault, createdAt) VALUES (?, ?, ?, ?)',
       ['我的衣橱', 'grid-outline', 1, localDateString()]
     );
+  }
+}
+
+// 数据迁移：将现有搭配的 style 字符串迁移为 groupId
+async function migrateStyleToGroup(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    // 检查是否已有分组数据（避免重复迁移）
+    const groupCount = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM outfit_groups'
+    );
+    if (groupCount && groupCount.count > 0) return;
+
+    // 检查 groupId 列是否存在
+    const hasGroupId = await columnExists(db, 'outfits', 'groupId');
+    if (!hasGroupId) return;
+
+    // 检查是否有已设置 groupId 的搭配（迁移完成标志）
+    const migrated = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM outfits WHERE groupId IS NOT NULL'
+    );
+    if (migrated && migrated.count > 0) return;
+
+    // 读取所有搭配的 style 值
+    const hasStyle = await columnExists(db, 'outfits', 'style');
+    const rows = await db.getAllAsync<{ id: number; style: string }>(
+      'SELECT id, style FROM outfits'
+    );
+
+    // 收集去重的 style 并创建分组
+    const styles = [...new Set(rows.map(r => r.style || '').filter(s => s.trim() !== ''))];
+    const groupMap: Record<string, number> = {};
+
+    for (const style of styles) {
+      const result = await db.runAsync(
+        'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
+        [style, '', 0, localDateString()]
+      );
+      groupMap[style] = result.lastInsertRowId;
+    }
+
+    // 创建"未分组"默认分组
+    const defaultResult = await db.runAsync(
+      'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
+      ['未分组', '', 999, localDateString()]
+    );
+    const defaultGroupId = defaultResult.lastInsertRowId;
+
+    // 更新搭配的 groupId
+    for (const row of rows) {
+      const style = row.style || '';
+      const groupId = groupMap[style] || defaultGroupId;
+      await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [groupId, row.id]);
+    }
+  } catch (e) {
+    console.error('[DB Migration] migrateStyleToGroup error:', e);
   }
 }
 
