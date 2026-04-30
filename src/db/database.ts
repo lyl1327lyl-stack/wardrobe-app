@@ -235,34 +235,43 @@ async function migrateStyleToGroup(db: SQLite.SQLiteDatabase): Promise<void> {
 
     // 读取所有搭配的 style 值
     const hasStyle = await columnExists(db, 'outfits', 'style');
+    if (!hasStyle) return;
     const rows = await db.getAllAsync<{ id: number; style: string }>(
       'SELECT id, style FROM outfits'
     );
 
-    // 收集去重的 style 并创建分组
-    const styles = [...new Set(rows.map(r => r.style || '').filter(s => s.trim() !== ''))];
-    const groupMap: Record<string, number> = {};
+    await db.runAsync('BEGIN TRANSACTION');
+    try {
+      // 收集去重的 style 并创建分组
+      const styles = [...new Set(rows.map(r => r.style || '').filter(s => s.trim() !== ''))];
+      const groupMap: Record<string, number> = {};
 
-    for (const style of styles) {
-      const result = await db.runAsync(
+      for (const style of styles) {
+        const result = await db.runAsync(
+          'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
+          [style, '', 0, new Date().toISOString()]
+        );
+        groupMap[style] = result.lastInsertRowId;
+      }
+
+      // 创建"未分组"默认分组
+      const defaultResult = await db.runAsync(
         'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
-        [style, '', 0, localDateString()]
+        ['未分组', '', 999, new Date().toISOString()]
       );
-      groupMap[style] = result.lastInsertRowId;
-    }
+      const defaultGroupId = defaultResult.lastInsertRowId;
 
-    // 创建"未分组"默认分组
-    const defaultResult = await db.runAsync(
-      'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
-      ['未分组', '', 999, localDateString()]
-    );
-    const defaultGroupId = defaultResult.lastInsertRowId;
+      // 更新搭配的 groupId
+      for (const row of rows) {
+        const style = row.style || '';
+        const groupId = groupMap[style] || defaultGroupId;
+        await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [groupId, row.id]);
+      }
 
-    // 更新搭配的 groupId
-    for (const row of rows) {
-      const style = row.style || '';
-      const groupId = groupMap[style] || defaultGroupId;
-      await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [groupId, row.id]);
+      await db.runAsync('COMMIT');
+    } catch (innerErr) {
+      await db.runAsync('ROLLBACK');
+      throw innerErr;
     }
   } catch (e) {
     console.error('[DB Migration] migrateStyleToGroup error:', e);
