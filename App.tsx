@@ -12,7 +12,8 @@ import { WardrobeScreen } from './src/screens/WardrobeScreen';
 import { AddClothingScreen } from './src/screens/AddClothingScreen';
 import { ClothingDetailScreen } from './src/screens/ClothingDetailScreen';
 import { CategoryDetailScreen } from './src/screens/CategoryDetailScreen';
-import { OutfitsScreen } from './src/screens/OutfitsScreen';
+import { GroupListScreen } from './src/screens/outfit/GroupListScreen';
+import { GroupDetailScreen } from './src/screens/outfit/GroupDetailScreen';
 import { ClothingSelectionScreen } from './src/screens/outfit/ClothingSelectionScreen';
 import { OutfitEditorScreen } from './src/screens/outfit/OutfitEditorScreen';
 import { StatsScreen } from './src/screens/StatsScreen';
@@ -113,7 +114,7 @@ function MainTabs() {
       })}
     >
       <Tab.Screen name="衣橱" component={WardrobeStackScreen} />
-      <Tab.Screen name="搭配" component={OutfitsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="搭配" component={GroupListScreen} options={{ headerShown: false }} />
       <Tab.Screen name="统计" component={StatsScreen} options={{ headerShown: false }} />
       <Tab.Screen name="个人中心" component={PersonalCenterScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
@@ -277,6 +278,14 @@ function AppNavigator() {
         <RootStack.Screen
           name="ClothingSelection"
           component={ClothingSelectionScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="GroupDetail"
+          component={GroupDetailScreen}
           options={{
             headerShown: false,
             presentation: 'card',
