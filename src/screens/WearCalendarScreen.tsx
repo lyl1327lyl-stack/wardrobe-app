@@ -121,7 +121,7 @@ const makeStyles = (theme: Theme) =>
     },
     dayCell: {
       width: CELL_SIZE,
-      height: CELL_SIZE + 22,
+      height: CELL_SIZE + 14,
       backgroundColor: theme.colors.background,
       borderRadius: 10,
       padding: 4,
