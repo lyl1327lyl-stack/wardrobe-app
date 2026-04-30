@@ -53,6 +53,17 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   if (dbInstance) {
     // 即使数据库已打开，也确保所有列存在（迁移）
     await ensureOutfitsColumns(dbInstance);
+    // 确保分组表和迁移在缓存命中也执行
+    await execSQL(dbInstance, `
+      CREATE TABLE IF NOT EXISTS outfit_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        sortOrder INTEGER DEFAULT 0,
+        createdAt TEXT NOT NULL
+      )
+    `);
+    await migrateStyleToGroup(dbInstance);
     return dbInstance;
   }
 
