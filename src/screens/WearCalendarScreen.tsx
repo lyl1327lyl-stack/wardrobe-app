@@ -380,11 +380,11 @@ export function WearCalendarScreen() {
           key={dateStr}
           style={[
             styles.dayCell,
-            isToday && !showOutfitThumb && styles.dayCellToday,
-            hasRecords && !isToday && !showOutfitThumb && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
+            isToday && styles.dayCellToday,
+            hasRecords && !isToday && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
             !isSunday && { marginRight: CELL_MARGIN },
             { marginBottom: CELL_MARGIN },
-            showOutfitThumb && { overflow: 'hidden', backgroundColor: 'transparent' },
+            showOutfitThumb && { overflow: 'hidden' },
           ]}
           onPress={() => handleDayPress(dateStr)}
           activeOpacity={0.7}
