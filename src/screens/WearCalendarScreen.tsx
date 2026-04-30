@@ -18,9 +18,13 @@ import * as wearRecordsDb from '../db/wearRecords';
 import { WearCalendarSheet } from '../components/WearCalendarSheet';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-// 7列等分：左右各留16padding，6个间距(每行6个gap)
-const CELL_SIZE = Math.floor((SCREEN_WIDTH - 32 - 24) / 7);
+const CARD_HORIZONTAL = 20;
+const CARD_PADDING = 18;
+const CARD_GAP = 4;
 const CELL_MARGIN = 4;
+// 7列：卡片内可用宽度 = 屏幕 - 卡片margin*2 - 卡片padding*2 - 6个间距
+const CARD_INNER = SCREEN_WIDTH - CARD_HORIZONTAL * 2 - CARD_PADDING * 2;
+const CELL_SIZE = Math.floor((CARD_INNER - CELL_MARGIN * 6) / 7);
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
@@ -33,9 +37,7 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 16,
       paddingTop: 56,
       paddingBottom: 12,
-      backgroundColor: theme.colors.card,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
     },
     headerRow: {
       flexDirection: 'row',
@@ -43,65 +45,65 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'space-between',
     },
     backBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: theme.colors.background,
+      width: 36, height: 36, borderRadius: 18,
+      justifyContent: 'center', alignItems: 'center',
+      backgroundColor: theme.colors.card,
+      ...theme.shadows.sm,
     },
     headerTitleRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
+      flexDirection: 'row', alignItems: 'center', gap: 8,
     },
     headerTitleIcon: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 28, height: 28, borderRadius: 14,
       backgroundColor: theme.colors.primary + '15',
-      justifyContent: 'center',
-      alignItems: 'center',
+      justifyContent: 'center', alignItems: 'center',
     },
     headerTitle: {
-      fontSize: 18,
-      fontWeight: '700',
-      color: theme.colors.text,
+      fontSize: 17, fontWeight: '600', color: theme.colors.text, letterSpacing: 0.3,
     },
-    headerRight: {
-      width: 36,
+    headerRight: { width: 36 },
+
+    // Card
+    card: {
+      marginHorizontal: CARD_HORIZONTAL,
+      marginTop: 16,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: CARD_PADDING,
+      ...theme.shadows.sm,
     },
+    cardHeader: {
+      flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14,
+    },
+    cardDot: {
+      width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary,
+    },
+    cardTitle: {
+      fontSize: 14, fontWeight: '600', color: theme.colors.text,
+    },
+
     // 月份导航
     monthNav: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      marginBottom: 14,
     },
     monthBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      justifyContent: 'center',
-      alignItems: 'center',
+      width: 36, height: 36, borderRadius: 18,
+      justifyContent: 'center', alignItems: 'center',
+      backgroundColor: theme.colors.background,
     },
     monthText: {
-      fontSize: 17,
-      fontWeight: '600',
-      color: theme.colors.text,
+      fontSize: 16, fontWeight: '600', color: theme.colors.text,
     },
     // 星期标题
     weekDaysRow: {
       flexDirection: 'row',
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      marginBottom: 4,
       backgroundColor: theme.colors.background,
       borderRadius: 8,
-      marginHorizontal: 16,
+      paddingVertical: 8,
+      marginBottom: 6,
     },
     weekDay: {
       width: CELL_SIZE,
@@ -111,128 +113,135 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.textTertiary,
       marginRight: CELL_MARGIN,
     },
-    weekDayLast: {
-      marginRight: 0,
-    },
-    // 日历网格 - 手动marginRight控制间距
+    weekDayLast: { marginRight: 0 },
+    // 日历网格
     calendarGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      paddingHorizontal: 16,
     },
     dayCell: {
       width: CELL_SIZE,
-      height: CELL_SIZE + 22,
-      backgroundColor: theme.colors.card,
+      minHeight: CELL_SIZE + 22,
+      backgroundColor: theme.colors.background,
       borderRadius: 10,
       padding: 4,
     },
     dayCellToday: {
-      backgroundColor: theme.colors.primary + '35',
+      backgroundColor: theme.colors.primary + '25',
     },
     dayCellEmpty: {
       backgroundColor: 'transparent',
     },
     dayCellHasRecords: {
-      backgroundColor: theme.colors.primary + '10', // 10% opacity primary
+      backgroundColor: theme.colors.primary + '10',
     },
-    // 未来计划穿着 - 用另一种颜色区分
     dayCellPlanned: {
-      backgroundColor: theme.colors.accent + '25',
+      backgroundColor: theme.colors.accent + '20',
     },
     dayNumber: {
-      fontSize: 10,
-      fontWeight: '600',
-      color: theme.colors.text,
+      fontSize: 10, fontWeight: '600', color: theme.colors.text,
     },
     dayNumberRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 1,
-      position: 'relative',
+      flexDirection: 'row', alignItems: 'center', marginBottom: 1, position: 'relative',
     },
     dayNumberToday: {
-      color: theme.colors.primary,
-      fontWeight: '700',
+      color: theme.colors.primary, fontWeight: '700',
     },
     todayMarker: {
-      position: 'absolute',
-      top: 1,
-      right: 1,
+      position: 'absolute', top: 1, right: 1,
     },
     dayNumberEmpty: {
       color: theme.colors.textTertiary,
     },
-    // 缩略图网格 - 固定2行2列，每格四等分
+    // 缩略图
     thumbnailsGrid: {
-      flexDirection: 'column',
-      gap: 2,
+      flexDirection: 'column', gap: 2,
     },
     thumbnailRow: {
-      flexDirection: 'row',
-      gap: 2,
+      flexDirection: 'row', gap: 2,
     },
     thumbnailWrap: {
-      // 四等分：格子宽度 - padding - gap， 除2
       width: Math.floor((CELL_SIZE - 10) / 2),
       height: Math.floor((CELL_SIZE - 10) / 2),
-      borderRadius: 3,
-      overflow: 'hidden',
+      borderRadius: 3, overflow: 'hidden',
       backgroundColor: theme.colors.borderLight,
     },
     thumbnail: {
-      width: '100%',
-      height: '100%',
+      width: '100%', height: '100%',
     },
     overflowBadge: {
-      position: 'absolute',
-      top: 2,
-      right: 2,
+      position: 'absolute', top: 2, right: 2,
       backgroundColor: theme.colors.primary,
-      borderRadius: 8,
-      paddingHorizontal: 5,
-      paddingVertical: 2,
-      minWidth: 18,
-      alignItems: 'center',
+      borderRadius: 8, paddingHorizontal: 5, paddingVertical: 2,
+      minWidth: 18, alignItems: 'center',
     },
     overflowText: {
-      fontSize: 9,
-      color: theme.colors.white,
-      fontWeight: '700',
+      fontSize: 9, color: theme.colors.white, fontWeight: '700',
     },
-    // 图例说明
-    legend: {
-      flexDirection: 'row',
+    // 搭配缩略图（日历格内）
+    outfitThumbWrap: {
+      width: CELL_SIZE - 8,
+      height: CELL_SIZE - 8,
+      borderRadius: 6,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.borderLight,
+      alignSelf: 'center',
+    },
+    outfitThumb: {
+      width: '100%', height: '100%',
+    },
+    outfitMatchBadge: {
+      position: 'absolute', bottom: 1, left: 4, right: 4,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      borderRadius: 3,
+      paddingVertical: 1,
       alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 12,
-      gap: 20,
+    },
+    outfitMatchText: {
+      fontSize: 7, color: theme.colors.white, fontWeight: '600',
+    },
+    // 图例
+    legend: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+      marginTop: 14, paddingTop: 14, gap: 20,
+      borderTopWidth: 1, borderTopColor: theme.colors.border,
     },
     legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
+      flexDirection: 'row', alignItems: 'center', gap: 6,
     },
     legendDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 3,
-      backgroundColor: theme.colors.primary,
+      width: 8, height: 8, borderRadius: 4,
     },
     legendText: {
-      fontSize: 12,
-      color: theme.colors.textTertiary,
+      fontSize: 12, color: theme.colors.textTertiary,
     },
-    // 空状态
-    emptyHint: {
-      paddingHorizontal: 16,
-      paddingVertical: 16,
+
+    // 最近一周
+    recentRow: {
+      flexDirection: 'row', alignItems: 'center',
+      paddingVertical: 10, paddingHorizontal: 12,
+      borderRadius: 12,
+      marginBottom: 6, gap: 10, height: 56,
+      backgroundColor: theme.colors.background,
     },
-    emptyHintText: {
-      fontSize: 14,
-      color: theme.colors.textTertiary,
-      textAlign: 'center',
-      lineHeight: 20,
+    recentDateCol: { minWidth: 72 },
+    recentDateLabel: {
+      fontSize: 13, fontWeight: '600', color: theme.colors.text,
+    },
+    recentThumbsScroll: { flex: 1 },
+    recentThumb: {
+      width: 36, height: 36, borderRadius: 8, marginRight: 6,
+      backgroundColor: theme.colors.borderLight,
+    },
+    recentEmpty: {
+      fontSize: 13, flex: 1, color: theme.colors.textTertiary,
+    },
+    recentCount: {
+      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+      backgroundColor: theme.colors.borderLight,
+    },
+    recentCountText: {
+      fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary,
     },
   });
 
@@ -240,11 +249,12 @@ export function WearCalendarScreen() {
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { clothing, addWearRecords, deleteWearRecord } = useWardrobeStore();
+  const { clothing, outfits, addWearRecords, deleteWearRecord } = useWardrobeStore();
 
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [wearData, setWearData] = useState<Record<string, ClothingItem[]>>({});
+  const [recentWeek, setRecentWeek] = useState<{ date: string; items: ClothingItem[] }[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showSheet, setShowSheet] = useState(false);
 
@@ -252,6 +262,28 @@ export function WearCalendarScreen() {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, []);
+
+  // 为每天找到匹配的搭配（搭配所有衣物都在当天记录中）
+  const outfitMatchMap = useMemo(() => {
+    const map: Record<string, { outfitId: number; outfitName: string; outfitThumb: string; extraItemIds: number[] }> = {};
+    for (const [dateStr, items] of Object.entries(wearData)) {
+      const itemIds = new Set(items.map(i => i.id));
+      for (const outfit of outfits) {
+        if (outfit.itemIds.length === 0) continue;
+        if (outfit.itemIds.every(cid => itemIds.has(cid))) {
+          const extraItemIds = items.filter(i => !outfit.itemIds.includes(i.id)).map(i => i.id);
+          map[dateStr] = {
+            outfitId: outfit.id,
+            outfitName: outfit.name,
+            outfitThumb: outfit.thumbnailUri || '',
+            extraItemIds,
+          };
+          break; // 每日期只取第一个匹配的搭配
+        }
+      }
+    }
+    return map;
+  }, [wearData, outfits]);
 
   const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -280,9 +312,26 @@ export function WearCalendarScreen() {
     setWearData(newData);
   }, [currentYear, currentMonth, clothing]);
 
+  const loadRecentWeek = useCallback(async () => {
+    const result: { date: string; items: ClothingItem[] }[] = [];
+    const now = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
+      const items = records
+        .map(r => clothing.find(c => c.id === r.clothingId))
+        .filter((c): c is ClothingItem => c !== undefined);
+      result.push({ date: dateStr, items });
+    }
+    setRecentWeek(result);
+  }, [clothing]);
+
   useEffect(() => {
     loadMonthData();
-  }, [loadMonthData]);
+    loadRecentWeek();
+  }, [loadMonthData, loadRecentWeek]);
 
   const goToPrevMonth = () => {
     if (currentMonth === 1) {
@@ -358,37 +407,59 @@ export function WearCalendarScreen() {
             </Text>
             {isToday && <Ionicons name="star" size={12} color={theme.colors.primary} style={styles.todayMarker} />}
           </View>
-          {hasRecords && (
-            <View style={styles.thumbnailsGrid}>
-              <View style={styles.thumbnailRow}>
-                {dayRecords.slice(0, 2).map((item) => (
-                  <View key={item.id} style={styles.thumbnailWrap}>
-                    <Image
-                      source={{ uri: item.thumbnailUri || item.imageUri }}
-                      style={styles.thumbnail}
-                      resizeMode="cover"
-                    />
+          {hasRecords && (() => {
+            const match = outfitMatchMap[dateStr];
+            if (match && match.outfitThumb) {
+              const extraItems = dayRecords.filter(i => match.extraItemIds.includes(i.id));
+              return (
+                <View style={styles.thumbnailsGrid}>
+                  <View style={styles.outfitThumbWrap}>
+                    <Image source={{ uri: match.outfitThumb }} style={styles.outfitThumb} resizeMode="cover" />
+                    <View style={styles.outfitMatchBadge}>
+                      <Text style={styles.outfitMatchText} numberOfLines={1}>{match.outfitName}</Text>
+                    </View>
                   </View>
-                ))}
-              </View>
-              <View style={styles.thumbnailRow}>
-                {dayRecords.slice(2, 4).map((item) => (
-                  <View key={item.id} style={styles.thumbnailWrap}>
-                    <Image
-                      source={{ uri: item.thumbnailUri || item.imageUri }}
-                      style={styles.thumbnail}
-                      resizeMode="cover"
-                    />
-                  </View>
-                ))}
-              </View>
-              {dayRecords.length > 4 && (
-                <View style={styles.overflowBadge}>
-                  <Text style={styles.overflowText}>+{dayRecords.length - 4}</Text>
+                  {extraItems.length > 0 && (
+                    <View style={styles.thumbnailRow}>
+                      {extraItems.slice(0, 2).map((item) => (
+                        <View key={item.id} style={styles.thumbnailWrap}>
+                          <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                        </View>
+                      ))}
+                      {extraItems.length > 2 && (
+                        <View style={styles.overflowBadge}>
+                          <Text style={styles.overflowText}>+{extraItems.length - 2}</Text>
+                        </View>
+                      )}
+                    </View>
+                  )}
                 </View>
-              )}
-            </View>
-          )}
+              );
+            }
+            return (
+              <View style={styles.thumbnailsGrid}>
+                <View style={styles.thumbnailRow}>
+                  {dayRecords.slice(0, 2).map((item) => (
+                    <View key={item.id} style={styles.thumbnailWrap}>
+                      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.thumbnailRow}>
+                  {dayRecords.slice(2, 4).map((item) => (
+                    <View key={item.id} style={styles.thumbnailWrap}>
+                      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                    </View>
+                  ))}
+                </View>
+                {dayRecords.length > 4 && (
+                  <View style={styles.overflowBadge}>
+                    <Text style={styles.overflowText}>+{dayRecords.length - 4}</Text>
+                  </View>
+                )}
+              </View>
+            );
+          })()}
         </TouchableOpacity>
       );
     }
@@ -397,6 +468,19 @@ export function WearCalendarScreen() {
   };
 
   const formatMonthYear = () => `${currentYear}年${currentMonth}月`;
+
+  const getDayLabel = (dateStr: string) => {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if (dateStr === todayStr) return '今天';
+    if (dateStr === yesterdayStr) return '昨天';
+    const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+    return `${d.getMonth() + 1}/${d.getDate()} ${weekDays[d.getDay()]}`;
+  };
 
   return (
     <View style={styles.container}>
@@ -417,48 +501,85 @@ export function WearCalendarScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* 月份导航 */}
-        <View style={styles.monthNav}>
-          <TouchableOpacity style={styles.monthBtn} onPress={goToPrevMonth} activeOpacity={0.7}>
-            <Ionicons name="chevron-back-circle" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.monthText}>{formatMonthYear()}</Text>
-          <TouchableOpacity style={styles.monthBtn} onPress={goToNextMonth} activeOpacity={0.7}>
-            <Ionicons name="chevron-forward-circle" size={24} color={theme.colors.text} />
-          </TouchableOpacity>
+        {/* Calendar Card */}
+        <View style={styles.card}>
+          {/* 月份导航 */}
+          <View style={styles.monthNav}>
+            <TouchableOpacity style={styles.monthBtn} onPress={goToPrevMonth} activeOpacity={0.7}>
+              <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+            <Text style={styles.monthText}>{formatMonthYear()}</Text>
+            <TouchableOpacity style={styles.monthBtn} onPress={goToNextMonth} activeOpacity={0.7}>
+              <Ionicons name="chevron-forward" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* 星期标题 */}
+          <View style={styles.weekDaysRow}>
+            {weekDays.map((day, idx) => (
+              <Text key={day} style={[styles.weekDay, idx === 6 && styles.weekDayLast]}>{day}</Text>
+            ))}
+          </View>
+
+          {/* 日历网格 */}
+          <View style={styles.calendarGrid}>
+            {renderCalendarDays()}
+          </View>
+
+          {/* 图例 */}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: theme.colors.primary + '40' }]} />
+              <Text style={styles.legendText}>已穿着</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendDot, { backgroundColor: theme.colors.accent + '50' }]} />
+              <Text style={styles.legendText}>计划穿着</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <Ionicons name="star" size={12} color={theme.colors.primary} />
+              <Text style={styles.legendText}>今天</Text>
+            </View>
+          </View>
         </View>
 
-        {/* 星期标题 */}
-        <View style={styles.weekDaysRow}>
-          {weekDays.map((day, idx) => (
-            <Text key={day} style={[styles.weekDay, idx === 6 && styles.weekDayLast]}>{day}</Text>
+        {/* Recent Week Card */}
+        <View style={styles.card}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardDot} />
+            <Text style={styles.cardTitle}>最近一周</Text>
+          </View>
+          {recentWeek.map(({ date: dateStr, items }) => (
+            <TouchableOpacity
+              key={dateStr}
+              style={styles.recentRow}
+              onPress={() => handleDayPress(dateStr)}
+              activeOpacity={0.7}
+            >
+              <View style={styles.recentDateCol}>
+                <Text style={styles.recentDateLabel}>{getDayLabel(dateStr)}</Text>
+              </View>
+              {items.length > 0 ? (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentThumbsScroll}>
+                  {items.map(item => (
+                    <Image
+                      key={item.id}
+                      source={{ uri: item.thumbnailUri || item.imageUri }}
+                      style={styles.recentThumb}
+                      resizeMode="cover"
+                    />
+                  ))}
+                </ScrollView>
+              ) : (
+                <Text style={styles.recentEmpty}>无记录</Text>
+              )}
+              {items.length > 0 && (
+                <View style={styles.recentCount}>
+                  <Text style={styles.recentCountText}>{items.length}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           ))}
-        </View>
-
-        {/* 日历网格 */}
-        <View style={styles.calendarGrid}>
-          {renderCalendarDays()}
-        </View>
-
-        {/* 图例 */}
-        <View style={styles.legend}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.colors.primary + '30' }]} />
-            <Text style={styles.legendText}>已穿着</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: theme.colors.accent + '40' }]} />
-            <Text style={styles.legendText}>计划穿着</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <Ionicons name="star" size={12} color={theme.colors.primary} />
-            <Text style={styles.legendText}>今天</Text>
-          </View>
-        </View>
-
-        {/* 提示 */}
-        <View style={styles.emptyHint}>
-          <Text style={styles.emptyHintText}>点击日期查看或编辑当天穿着记录</Text>
         </View>
       </ScrollView>
 

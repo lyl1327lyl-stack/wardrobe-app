@@ -11,10 +11,11 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { ClothingItem } from '../types';
+import { ClothingItem, Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
 import * as wearRecordsDb from '../db/wearRecords';
 
 interface WearCalendarSheetProps {
@@ -40,7 +41,7 @@ const makeStyles = (theme: Theme) =>
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingBottom: 50,
-      maxHeight: '70%',
+      maxHeight: '85%',
     },
     handle: {
       width: 36,
@@ -210,10 +211,14 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 12,
       overflow: 'hidden',
       backgroundColor: theme.colors.borderLight,
+      borderWidth: 3,
+      borderColor: 'transparent',
     },
     clothingGridItemSelected: {
-      borderWidth: 3,
       borderColor: theme.colors.primary,
+    },
+    clothingGridItemRecorded: {
+      opacity: 0.6,
     },
     clothingGridImage: {
       width: '100%',
@@ -230,6 +235,9 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    clothingGridCheckRecorded: {
+      backgroundColor: theme.colors.success,
+    },
     clothingGridOverlay: {
       position: 'absolute',
       bottom: 0,
@@ -244,6 +252,71 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.white,
       fontWeight: '500',
     },
+    clothingGridCount: {
+      fontSize: 10,
+      color: theme.colors.white,
+      opacity: 0.8,
+    },
+    // Mode tabs
+    modeTabs: {
+      flexDirection: 'row',
+      backgroundColor: theme.colors.background,
+      borderRadius: 10,
+      padding: 3,
+      marginBottom: 14,
+    },
+    modeTab: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    modeTabActive: {
+      backgroundColor: theme.colors.card,
+      ...theme.shadows.sm,
+    },
+    modeTabText: {
+      fontSize: 14,
+      fontWeight: '500',
+      color: theme.colors.textTertiary,
+    },
+    modeTabTextActive: {
+      color: theme.colors.text,
+      fontWeight: '600',
+    },
+    // Filter chips
+    filterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 10,
+      gap: 6,
+    },
+    filterLabel: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+      fontWeight: '500',
+      marginRight: 2,
+    },
+    filterChip: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    filterChipActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    filterChipText: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
+    },
+    filterChipTextActive: {
+      color: theme.colors.white,
+      fontWeight: '500',
+    },
   });
 
 export function WearCalendarSheet({
@@ -255,11 +328,17 @@ export function WearCalendarSheet({
 }: WearCalendarSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { clothing, addWearRecords } = useWardrobeStore();
+  const { clothing, outfits, addWearRecords } = useWardrobeStore();
+  const customSeasons = useCustomOptionsStore(s => s.seasons);
+  const customStyles = useCustomOptionsStore(s => s.styles);
   const [records, setRecords] = useState<ClothingItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddPicker, setShowAddPicker] = useState(false);
+  const [pickerMode, setPickerMode] = useState<'items' | 'outfits'>('items');
   const [selectedAddIds, setSelectedAddIds] = useState<number[]>([]);
+  const [selectedOutfitIds, setSelectedOutfitIds] = useState<number[]>([]);
+  const [filterSeason, setFilterSeason] = useState<string>('全部');
+  const [filterStyle, setFilterStyle] = useState<string>('全部');
 
   useEffect(() => {
     if (visible && date) {
@@ -270,6 +349,10 @@ export function WearCalendarSheet({
   useEffect(() => {
     if (!showAddPicker) {
       setSelectedAddIds([]);
+      setSelectedOutfitIds([]);
+      setPickerMode('items');
+      setFilterSeason('全部');
+      setFilterStyle('全部');
     }
   }, [showAddPicker]);
 
@@ -313,11 +396,33 @@ export function WearCalendarSheet({
     );
   };
 
-  // 获取可选的衣服（排除已记录的）
-  const availableClothing = useMemo(() => {
-    const recordedIds = records.map(r => r.id);
-    return clothing.filter(c => !recordedIds.includes(c.id));
-  }, [clothing, records]);
+  // 已记录的单品 ID 集合
+  const recordedIds = useMemo(() => new Set(records.map(r => r.id)), [records]);
+
+  // 已记录的搭配 ID 集合：搭配中所有衣物都已记录则为已记录
+  const recordedOutfitIds = useMemo(() => {
+    return new Set(
+      outfits
+        .filter(o => o.itemIds.length > 0 && o.itemIds.every(cid => recordedIds.has(cid)))
+        .map(o => o.id)
+    );
+  }, [outfits, recordedIds]);
+
+  const filteredClothing = useMemo(() => {
+    return clothing.filter(item => {
+      if (filterSeason !== '全部' && !item.seasons?.includes(filterSeason)) return false;
+      if (filterStyle !== '全部' && !item.styles?.includes(filterStyle)) return false;
+      return true;
+    });
+  }, [clothing, filterSeason, filterStyle]);
+
+  const filteredOutfits = useMemo(() => {
+    return outfits.filter(outfit => {
+      if (filterSeason !== '全部' && !outfit.seasons?.includes(filterSeason)) return false;
+      if (filterStyle !== '全部' && !outfit.styles?.includes(filterStyle)) return false;
+      return true;
+    });
+  }, [outfits, filterSeason, filterStyle]);
 
   const toggleAddSelect = (id: number) => {
     setSelectedAddIds(prev =>
@@ -326,11 +431,30 @@ export function WearCalendarSheet({
   };
 
   const handleConfirmAdd = async () => {
-    if (selectedAddIds.length === 0) return;
+    let clothingIds: number[];
+
+    if (pickerMode === 'outfits') {
+      if (selectedOutfitIds.length === 0) return;
+      // 从选中的搭配中收集所有衣物ID，去重
+      const idSet = new Set<number>();
+      for (const oid of selectedOutfitIds) {
+        const outfit = outfits.find(o => o.id === oid);
+        if (outfit) {
+          for (const cid of outfit.itemIds) {
+            idSet.add(cid);
+          }
+        }
+      }
+      clothingIds = [...idSet];
+    } else {
+      if (selectedAddIds.length === 0) return;
+      clothingIds = selectedAddIds;
+    }
+
     try {
-      // 使用 store 的 addWearRecords，它会更新内存中的 wearCount
-      await addWearRecords(selectedAddIds, date);
+      await addWearRecords(clothingIds, date);
       setSelectedAddIds([]);
+      setSelectedOutfitIds([]);
       setShowAddPicker(false);
       loadRecords();
       onAddRecord?.();
@@ -374,59 +498,174 @@ export function WearCalendarSheet({
     return dateStr;
   };
 
+  const hasSelection = pickerMode === 'outfits' ? selectedOutfitIds.length > 0 : selectedAddIds.length > 0;
+  const selectionCount = pickerMode === 'outfits' ? selectedOutfitIds.length : selectedAddIds.length;
+
   const renderAddPicker = () => (
     <View style={styles.addClothingSection}>
-      <Text style={styles.addClothingTitle}>添加衣服</Text>
-      {availableClothing.length === 0 ? (
-        <Text style={styles.emptyText}>没有可添加的衣服</Text>
-      ) : (
-        <ScrollView style={{ height: 320 }} showsVerticalScrollIndicator={false}>
-          <View style={styles.clothingGrid}>
-            {availableClothing.map(item => {
-              const isSelected = selectedAddIds.includes(item.id);
-              const imageUri = item.thumbnailUri || item.imageUri;
-              return (
-                <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.clothingGridItem,
-                  isSelected && styles.clothingGridItemSelected
-                ]}
-                onPress={() => toggleAddSelect(item.id)}
-                activeOpacity={0.7}
-              >
-                <Image
-                  source={{ uri: imageUri }}
-                  style={styles.clothingGridImage}
-                  resizeMode="cover"
-                />
-                {isSelected && (
-                  <View style={styles.clothingGridCheck}>
-                    <Ionicons name="checkmark" size={16} color={theme.colors.white} />
+      {/* Filter chips */}
+      <View style={styles.filterRow}>
+        <Text style={styles.filterLabel}>季节</Text>
+        {['全部', ...customSeasons].map(s => (
+          <TouchableOpacity
+            key={s}
+            style={[styles.filterChip, filterSeason === s && styles.filterChipActive]}
+            onPress={() => setFilterSeason(s)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.filterChipText, filterSeason === s && styles.filterChipTextActive]}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <View style={styles.filterRow}>
+        <Text style={styles.filterLabel}>风格</Text>
+        {['全部', ...customStyles].map(s => (
+          <TouchableOpacity
+            key={s}
+            style={[styles.filterChip, filterStyle === s && styles.filterChipActive]}
+            onPress={() => setFilterStyle(s)}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.filterChipText, filterStyle === s && styles.filterChipTextActive]}>{s}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Mode tabs */}
+      <View style={styles.modeTabs}>
+        <TouchableOpacity
+          style={[styles.modeTab, pickerMode === 'items' && styles.modeTabActive]}
+          onPress={() => setPickerMode('items')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.modeTabText, pickerMode === 'items' && styles.modeTabTextActive]}>单品</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, pickerMode === 'outfits' && styles.modeTabActive]}
+          onPress={() => setPickerMode('outfits')}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.modeTabText, pickerMode === 'outfits' && styles.modeTabTextActive]}>搭配</Text>
+        </TouchableOpacity>
+      </View>
+
+      {pickerMode === 'items' ? (
+        filteredClothing.length === 0 ? (
+          <Text style={styles.emptyText}>没有可添加的衣服</Text>
+        ) : (
+          <ScrollView style={{ height: 280 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.clothingGrid}>
+              {filteredClothing.map(item => {
+                const isRecorded = recordedIds.has(item.id);
+                const isSelected = selectedAddIds.includes(item.id);
+                const imageUri = item.thumbnailUri || item.imageUri;
+                return (
+                  <TouchableOpacity
+                  key={item.id}
+                  style={[
+                    styles.clothingGridItem,
+                    isSelected && styles.clothingGridItemSelected,
+                    isRecorded && styles.clothingGridItemRecorded,
+                  ]}
+                  onPress={() => {
+                    if (isRecorded) return;
+                    toggleAddSelect(item.id);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Image
+                    source={{ uri: imageUri }}
+                    style={styles.clothingGridImage}
+                    resizeMode="cover"
+                  />
+                  {(isSelected || isRecorded) && (
+                    <View style={[
+                      styles.clothingGridCheck,
+                      isRecorded && !isSelected && styles.clothingGridCheckRecorded,
+                    ]}>
+                      <Ionicons name="checkmark" size={16} color={theme.colors.white} />
+                    </View>
+                  )}
+                  <View style={styles.clothingGridOverlay}>
+                    <Text style={styles.clothingGridText} numberOfLines={1}>
+                      {item.type}
+                    </Text>
                   </View>
-                )}
-                <View style={styles.clothingGridOverlay}>
-                  <Text style={styles.clothingGridText} numberOfLines={1}>
-                    {item.type}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            );
-            })}
-          </View>
-        </ScrollView>
+                </TouchableOpacity>
+              );
+              })}
+            </View>
+          </ScrollView>
+        )
+      ) : (
+        filteredOutfits.length === 0 ? (
+          <Text style={styles.emptyText}>还没有搭配，请先创建搭配</Text>
+        ) : (
+          <ScrollView style={{ height: 280 }} showsVerticalScrollIndicator={false}>
+            <View style={styles.clothingGrid}>
+              {filteredOutfits.map(outfit => {
+                const isRecorded = recordedOutfitIds.has(outfit.id);
+                const isSelected = selectedOutfitIds.includes(outfit.id);
+                return (
+                  <TouchableOpacity
+                    key={outfit.id}
+                    style={[
+                      styles.clothingGridItem,
+                      isSelected && styles.clothingGridItemSelected,
+                      isRecorded && styles.clothingGridItemRecorded,
+                    ]}
+                    onPress={() => {
+                      if (isRecorded) return;
+                      setSelectedOutfitIds(prev =>
+                        prev.includes(outfit.id) ? prev.filter(id => id !== outfit.id) : [...prev, outfit.id]
+                      );
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    {outfit.thumbnailUri ? (
+                      <Image
+                        source={{ uri: outfit.thumbnailUri }}
+                        style={styles.clothingGridImage}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={[styles.clothingGridImage, { justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="shirt-outline" size={24} color={theme.colors.textTertiary} />
+                      </View>
+                    )}
+                    {(isSelected || isRecorded) && (
+                      <View style={[
+                        styles.clothingGridCheck,
+                        isRecorded && !isSelected && styles.clothingGridCheckRecorded,
+                      ]}>
+                        <Ionicons name="checkmark" size={16} color={theme.colors.white} />
+                      </View>
+                    )}
+                    <View style={styles.clothingGridOverlay}>
+                      <Text style={styles.clothingGridText} numberOfLines={1}>
+                        {outfit.name}
+                      </Text>
+                      <Text style={styles.clothingGridCount}>{outfit.itemIds?.length || 0}件</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </ScrollView>
+        )
       )}
+
       <TouchableOpacity
         style={[
           styles.confirmAddBtn,
-          selectedAddIds.length === 0 && styles.confirmAddBtnDisabled
+          !hasSelection && styles.confirmAddBtnDisabled
         ]}
         onPress={handleConfirmAdd}
-        disabled={selectedAddIds.length === 0}
+        disabled={!hasSelection}
         activeOpacity={0.8}
       >
         <Text style={styles.confirmAddBtnText}>
-          添加 {selectedAddIds.length > 0 ? `${selectedAddIds.length} 件` : ''}
+          添加 {selectionCount > 0 ? `${selectionCount} ${pickerMode === 'outfits' ? '套搭配' : '件'}` : ''}
         </Text>
       </TouchableOpacity>
       <TouchableOpacity
