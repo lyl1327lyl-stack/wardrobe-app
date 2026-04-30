@@ -6,6 +6,7 @@ const DB_VERSION_KEY = 'db_version';
 const CURRENT_DB_VERSION = 2; // 递增以触发迁移
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
+let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
 // 检查列是否存在
 async function columnExists(db: SQLite.SQLiteDatabase, table: string, column: string): Promise<boolean> {
@@ -21,16 +22,14 @@ async function columnExists(db: SQLite.SQLiteDatabase, table: string, column: st
 async function ensureOutfitsColumns(db: SQLite.SQLiteDatabase): Promise<void> {
   const addColumnIfNotExists = async (table: string, column: string, definition: string) => {
     const exists = await columnExists(db, table, column);
-    console.log(`[DB Migration] Checking ${table}.${column}, exists: ${exists}`);
     if (!exists) {
       try {
         await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-        console.log(`[DB Migration] Added column ${column} to ${table}`);
       } catch (e: any) {
+        // 重复列名表明并发添加已成功，忽略
+        if (e?.message && e.message.includes('duplicate column name')) return;
         console.error(`[DB Migration] Failed to add column ${column} to ${table}:`, e?.message || e);
       }
-    } else {
-      console.log(`[DB Migration] Column ${table}.${column} already exists`);
     }
   };
 
@@ -38,6 +37,8 @@ async function ensureOutfitsColumns(db: SQLite.SQLiteDatabase): Promise<void> {
   await addColumnIfNotExists('outfits', 'canvasData', 'TEXT DEFAULT "{}"');
   await addColumnIfNotExists('outfits', 'style', 'TEXT DEFAULT ""');
   await addColumnIfNotExists('outfits', 'thumbnailUri', 'TEXT DEFAULT ""');
+  await addColumnIfNotExists('outfits', 'seasons', 'TEXT DEFAULT "[]"');
+  await addColumnIfNotExists('outfits', 'styles', 'TEXT DEFAULT "[]"');
 }
 
 // 执行 SQL，忽略错误（用于 CREATE TABLE IF NOT EXISTS）
@@ -50,10 +51,9 @@ async function execSQL(db: SQLite.SQLiteDatabase, sql: string): Promise<void> {
 }
 
 export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
+  // 已初始化完成，直接返回
   if (dbInstance) {
-    // 即使数据库已打开，也确保所有列存在（迁移）
     await ensureOutfitsColumns(dbInstance);
-    // 确保分组表和迁移在缓存命中也执行
     await execSQL(dbInstance, `
       CREATE TABLE IF NOT EXISTS outfit_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -67,122 +67,140 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     return dbInstance;
   }
 
-  dbInstance = SQLite.openDatabaseSync('wardrobe.db');
+  // 正在初始化中，等待同一个 promise
+  if (dbInitPromise) {
+    return dbInitPromise;
+  }
 
-  await dbInstance.execAsync(`
-    PRAGMA journal_mode = WAL;
-    PRAGMA foreign_keys = ON;
-  `);
+  // 创建初始化 promise，防止并发初始化
+  dbInitPromise = (async () => {
+    const db = SQLite.openDatabaseSync('wardrobe.db');
 
-  // 创建衣服表（最新完整 schema）
-  await execSQL(dbInstance, `
-    CREATE TABLE IF NOT EXISTS clothing_items (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      imageUri TEXT NOT NULL,
-      thumbnailUri TEXT NOT NULL,
-      type TEXT NOT NULL,
-      color TEXT NOT NULL,
-      brand TEXT DEFAULT '',
-      size TEXT DEFAULT '',
-      remarks TEXT DEFAULT '',
-      seasons TEXT DEFAULT '[]',
-      occasions TEXT DEFAULT '[]',
-      purchaseDate TEXT,
-      price REAL DEFAULT 0,
-      wearCount INTEGER DEFAULT 0,
-      lastWornAt TEXT,
-      createdAt TEXT NOT NULL,
-      deletedAt TEXT,
-      discardReason TEXT DEFAULT ''
-    )
-  `);
+    await db.execAsync(`
+      PRAGMA journal_mode = WAL;
+      PRAGMA foreign_keys = ON;
+    `);
 
-  // 创建搭配表
-  await execSQL(dbInstance, `
-    CREATE TABLE IF NOT EXISTS outfits (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      itemIds TEXT NOT NULL,
-      createdAt TEXT NOT NULL
-    )
-  `);
+    // 创建衣服表（最新完整 schema）
+    await execSQL(db, `
+      CREATE TABLE IF NOT EXISTS clothing_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        imageUri TEXT NOT NULL,
+        thumbnailUri TEXT NOT NULL,
+        type TEXT NOT NULL,
+        color TEXT NOT NULL,
+        brand TEXT DEFAULT '',
+        size TEXT DEFAULT '',
+        remarks TEXT DEFAULT '',
+        seasons TEXT DEFAULT '[]',
+        occasions TEXT DEFAULT '[]',
+        purchaseDate TEXT,
+        price REAL DEFAULT 0,
+        wearCount INTEGER DEFAULT 0,
+        lastWornAt TEXT,
+        createdAt TEXT NOT NULL,
+        deletedAt TEXT,
+        discardReason TEXT DEFAULT ''
+      )
+    `);
 
-  // 创建衣橱表
-  await execSQL(dbInstance, `
-    CREATE TABLE IF NOT EXISTS wardrobes (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      icon TEXT NOT NULL DEFAULT '👗',
-      isDefault INTEGER NOT NULL DEFAULT 0,
-      createdAt TEXT NOT NULL
-    )
-  `);
+    // 创建搭配表
+    await execSQL(db, `
+      CREATE TABLE IF NOT EXISTS outfits (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        itemIds TEXT NOT NULL,
+        createdAt TEXT NOT NULL
+      )
+    `);
 
-  // 创建穿着记录表
-  await execSQL(dbInstance, `
-    CREATE TABLE IF NOT EXISTS wear_records (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      clothingId INTEGER NOT NULL,
-      wornDate TEXT NOT NULL,
-      createdAt TEXT NOT NULL,
-      FOREIGN KEY (clothingId) REFERENCES clothing_items(id) ON DELETE CASCADE
-    )
-  `);
+    // 创建衣橱表
+    await execSQL(db, `
+      CREATE TABLE IF NOT EXISTS wardrobes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT '👗',
+        isDefault INTEGER NOT NULL DEFAULT 0,
+        createdAt TEXT NOT NULL
+      )
+    `);
 
-  // 创建穿着记录表索引
-  await execSQL(dbInstance, `CREATE INDEX IF NOT EXISTS idx_wear_records_clothing ON wear_records(clothingId)`);
-  await execSQL(dbInstance, `CREATE INDEX IF NOT EXISTS idx_wear_records_date ON wear_records(wornDate)`);
+    // 创建穿着记录表
+    await execSQL(db, `
+      CREATE TABLE IF NOT EXISTS wear_records (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        clothingId INTEGER NOT NULL,
+        wornDate TEXT NOT NULL,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (clothingId) REFERENCES clothing_items(id) ON DELETE CASCADE
+      )
+    `);
 
-  // 迁移：确保所有必要列存在
-  const addColumnIfNotExists = async (table: string, column: string, definition: string) => {
-    if (!(await columnExists(dbInstance!, table, column))) {
-      try {
-        await dbInstance!.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-      } catch (e) {
-        console.warn(`Failed to add column ${column} to ${table}:`, e);
+    // 创建穿着记录表索引
+    await execSQL(db, `CREATE INDEX IF NOT EXISTS idx_wear_records_clothing ON wear_records(clothingId)`);
+    await execSQL(db, `CREATE INDEX IF NOT EXISTS idx_wear_records_date ON wear_records(wornDate)`);
+
+    // 迁移：确保所有必要列存在
+    const addColumnIfNotExists = async (table: string, column: string, definition: string) => {
+      if (!(await columnExists(db, table, column))) {
+        try {
+          await db.runAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+        } catch (e: any) {
+          // 重复列名表明并发添加已成功，忽略
+          if (e?.message && e.message.includes('duplicate column name')) return;
+          console.warn(`Failed to add column ${column} to ${table}:`, e);
+        }
       }
-    }
-  };
+    };
 
-  await addColumnIfNotExists('clothing_items', 'remarks', 'TEXT DEFAULT ""');
-  await addColumnIfNotExists('clothing_items', 'deletedAt', 'TEXT');
-  await addColumnIfNotExists('clothing_items', 'discardReason', 'TEXT DEFAULT ""');
-  await addColumnIfNotExists('clothing_items', 'soldAt', 'TEXT');
-  await addColumnIfNotExists('clothing_items', 'soldPrice', 'REAL');
-  await addColumnIfNotExists('clothing_items', 'soldPlatform', 'TEXT');
-  await addColumnIfNotExists('clothing_items', 'styles', 'TEXT DEFAULT "[]"');
-  await addColumnIfNotExists('clothing_items', 'parentType', 'TEXT DEFAULT ""');
-  await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
-  await addColumnIfNotExists('outfits', 'canvasData', 'TEXT DEFAULT "{}"');
-  await addColumnIfNotExists('outfits', 'style', 'TEXT DEFAULT ""');
-  await addColumnIfNotExists('outfits', 'thumbnailUri', 'TEXT DEFAULT ""');
-  await addColumnIfNotExists('outfits', 'canvasBackground', 'TEXT DEFAULT "{}"');
-  await addColumnIfNotExists('outfits', 'groupId', 'INTEGER');
-  await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
-  await addColumnIfNotExists('clothing_items', 'isDraft', 'INTEGER NOT NULL DEFAULT 0');
-  await addColumnIfNotExists('clothing_items', 'originalImageUri', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('clothing_items', 'remarks', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('clothing_items', 'deletedAt', 'TEXT');
+    await addColumnIfNotExists('clothing_items', 'discardReason', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('clothing_items', 'soldAt', 'TEXT');
+    await addColumnIfNotExists('clothing_items', 'soldPrice', 'REAL');
+    await addColumnIfNotExists('clothing_items', 'soldPlatform', 'TEXT');
+    await addColumnIfNotExists('clothing_items', 'styles', 'TEXT DEFAULT "[]"');
+    await addColumnIfNotExists('clothing_items', 'parentType', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('outfits', 'itemPositions', 'TEXT DEFAULT "{}"');
+    await addColumnIfNotExists('outfits', 'canvasData', 'TEXT DEFAULT "{}"');
+    await addColumnIfNotExists('outfits', 'style', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('outfits', 'thumbnailUri', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('outfits', 'canvasBackground', 'TEXT DEFAULT "{}"');
+    await addColumnIfNotExists('outfits', 'groupId', 'INTEGER');
+    await addColumnIfNotExists('clothing_items', 'wardrobeId', 'INTEGER NOT NULL DEFAULT 1');
+    await addColumnIfNotExists('clothing_items', 'isDraft', 'INTEGER NOT NULL DEFAULT 0');
+    await addColumnIfNotExists('clothing_items', 'originalImageUri', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('outfits', 'notes', 'TEXT DEFAULT ""');
+    await addColumnIfNotExists('outfits', 'seasons', 'TEXT DEFAULT "[]"');
+    await addColumnIfNotExists('outfits', 'styles', 'TEXT DEFAULT "[]"');
 
-  // 确保 wardrobes 表存在
-  await ensureWardrobesTable(dbInstance!);
+    // 确保 wardrobes 表存在
+    await ensureWardrobesTable(db);
 
-  // 创建分组表
-  await execSQL(dbInstance, `
-    CREATE TABLE IF NOT EXISTS outfit_groups (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL,
-      description TEXT DEFAULT '',
-      sortOrder INTEGER DEFAULT 0,
-      createdAt TEXT NOT NULL
-    )
-  `);
+    // 创建分组表
+    await execSQL(db, `
+      CREATE TABLE IF NOT EXISTS outfit_groups (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT NOT NULL,
+        description TEXT DEFAULT '',
+        sortOrder INTEGER DEFAULT 0,
+        createdAt TEXT NOT NULL
+      )
+    `);
 
-  // 数据迁移：style → group
-  await migrateStyleToGroup(dbInstance!);
+    // 数据迁移：style → group
+    await migrateStyleToGroup(db);
 
-  // 确保默认衣橱存在
-  await ensureDefaultWardrobe(dbInstance!);
+    // 确保默认衣橱存在
+    await ensureDefaultWardrobe(db);
 
-  return dbInstance;
+    // 只在所有迁移完成后才设置 dbInstance
+    dbInstance = db;
+    dbInitPromise = null;
+    return db;
+  })();
+
+  return dbInitPromise;
 }
 
 export async function closeDatabase() {
@@ -251,38 +269,30 @@ async function migrateStyleToGroup(db: SQLite.SQLiteDatabase): Promise<void> {
       'SELECT id, style FROM outfits'
     );
 
-    await db.runAsync('BEGIN TRANSACTION');
-    try {
-      // 收集去重的 style 并创建分组
-      const styles = [...new Set(rows.map(r => r.style || '').filter(s => s.trim() !== ''))];
-      const groupMap: Record<string, number> = {};
+    // 收集去重的 style 并创建分组
+    const styles = [...new Set(rows.map(r => r.style || '').filter(s => s.trim() !== ''))];
+    const groupMap: Record<string, number> = {};
 
-      for (const style of styles) {
-        const result = await db.runAsync(
-          'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
-          [style, '', 0, new Date().toISOString()]
-        );
-        groupMap[style] = result.lastInsertRowId;
-      }
-
-      // 创建"未分组"默认分组
-      const defaultResult = await db.runAsync(
+    for (const style of styles) {
+      const result = await db.runAsync(
         'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
-        ['未分组', '', 999, new Date().toISOString()]
+        [style, '', 0, new Date().toISOString()]
       );
-      const defaultGroupId = defaultResult.lastInsertRowId;
+      groupMap[style] = result.lastInsertRowId;
+    }
 
-      // 更新搭配的 groupId
-      for (const row of rows) {
-        const style = row.style || '';
-        const groupId = groupMap[style] || defaultGroupId;
-        await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [groupId, row.id]);
-      }
+    // 创建"未分组"默认分组
+    const defaultResult = await db.runAsync(
+      'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
+      ['未分组', '', 999, new Date().toISOString()]
+    );
+    const defaultGroupId = defaultResult.lastInsertRowId;
 
-      await db.runAsync('COMMIT');
-    } catch (innerErr) {
-      await db.runAsync('ROLLBACK');
-      throw innerErr;
+    // 更新搭配的 groupId
+    for (const row of rows) {
+      const style = row.style || '';
+      const groupId = groupMap[style] || defaultGroupId;
+      await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [groupId, row.id]);
     }
   } catch (e) {
     console.error('[DB Migration] migrateStyleToGroup error:', e);

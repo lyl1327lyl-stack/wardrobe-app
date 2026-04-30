@@ -384,7 +384,7 @@ export function WearCalendarScreen() {
             hasRecords && !isToday && !showOutfitThumb && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
             !isSunday && { marginRight: CELL_MARGIN },
             { marginBottom: CELL_MARGIN },
-            showOutfitThumb && { overflow: 'hidden' },
+            showOutfitThumb && { overflow: 'hidden', backgroundColor: 'transparent' },
           ]}
           onPress={() => handleDayPress(dateStr)}
           activeOpacity={0.7}
