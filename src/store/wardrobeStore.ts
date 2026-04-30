@@ -336,14 +336,8 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   addGroup: async (name, description) => {
     const id = await groupDb.addGroup(name, description);
-    const newGroup: OutfitGroup = {
-      id,
-      name,
-      description,
-      sortOrder: 0,
-      createdAt: new Date().toISOString(),
-    };
-    set(state => ({ groups: [...state.groups, newGroup] }));
+    const groups = await groupDb.getAllGroups();
+    set({ groups });
     return id;
   },
 
@@ -371,8 +365,8 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     set(state => ({
       groups: state.groups.filter(g => g.id !== id),
       outfits: action === 'delete_outfits'
-        ? state.outfits.filter(o => (o as any).groupId !== id)
-        : state.outfits,
+        ? state.outfits.filter(o => o.groupId !== id)
+        : state.outfits.map(o => o.groupId === id ? { ...o, groupId: defaultGroupId } : o),
     }));
   },
 
