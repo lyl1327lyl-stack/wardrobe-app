@@ -461,8 +461,6 @@ export function ClothingDetailScreen() {
   const [showWearCalendar, setShowWearCalendar] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [wearDates, setWearDates] = useState<string[]>([]);
-  // 动态穿着次数（只统计截至今天的记录）
-  const [dynamicWearCount, setDynamicWearCount] = useState<number>(0);
   const [dynamicLastWorn, setDynamicLastWorn] = useState<string | null>(null);
   const [currentMonth, setCurrentMonth] = useState(() => {
     const now = new Date();
@@ -494,30 +492,27 @@ export function ClothingDetailScreen() {
     }
   }, [item, currentMonth, isTrash, isSold, isDraft]);
 
-  // 动态加载穿着次数（只统计截至今天的记录）
-  const loadDynamicWearStats = useCallback(async () => {
+  const loadLastWornDate = useCallback(async () => {
     if (item && !isTrash && !isSold && !isDraft) {
       try {
-        const count = await wearRecordsDb.getWearCountFromRecords(item.id);
         const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
-        setDynamicWearCount(count);
         setDynamicLastWorn(lastDate);
       } catch (error) {
-        console.error('Failed to load wear stats:', error);
+        console.error('Failed to load last worn date:', error);
       }
     }
   }, [item, isTrash, isSold, isDraft]);
 
   useEffect(() => {
     loadWearDates();
-    loadDynamicWearStats();
-  }, [loadWearDates, loadDynamicWearStats]);
+    loadLastWornDate();
+  }, [loadWearDates, loadLastWornDate]);
 
-  // 每次屏幕进入焦点时重新加载穿着统计（处理日期变化的情况）
+  // 每次屏幕进入焦点时重新加载穿着统计
   useFocusEffect(
     useCallback(() => {
-      loadDynamicWearStats();
-    }, [loadDynamicWearStats])
+      loadLastWornDate();
+    }, [loadLastWornDate])
   );
 
   // 月份切换
@@ -843,7 +838,7 @@ export function ClothingDetailScreen() {
     );
   };
 
-  const costPerWear = calcCostPerWear(item.price || 0, dynamicWearCount);
+  const costPerWear = calcCostPerWear(item.price || 0, item.wearCount || 0);
 
   return (
     <View style={styles.container}>
@@ -967,7 +962,7 @@ export function ClothingDetailScreen() {
         <View style={styles.card}>
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
-              <Text style={styles.statValue}>{dynamicWearCount}</Text>
+              <Text style={styles.statValue}>{item?.wearCount || 0}</Text>
               <Text style={styles.statLabel}>穿着次数</Text>
             </View>
             <View style={styles.statDivider} />

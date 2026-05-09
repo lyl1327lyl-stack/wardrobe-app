@@ -5,16 +5,14 @@ import { useTheme } from '../../hooks/useTheme';
 
 interface Props {
   onAdd: () => void;
-  onMoveUp: () => void;
-  onMoveDown: () => void;
-  hasSelection: boolean;
+  selectedGroupName?: string;
+  onSelectGroup: () => void;
 }
 
 export function CanvasToolsBar({
   onAdd,
-  onMoveUp,
-  onMoveDown,
-  hasSelection,
+  selectedGroupName,
+  onSelectGroup,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -22,39 +20,36 @@ export function CanvasToolsBar({
   return (
     <View style={styles.wrapper}>
       <View style={styles.container}>
-        <View style={styles.toolsSection}>
-          <TouchableOpacity
-            style={[styles.toolButton, styles.addButton]}
-            onPress={onAdd}
+        <TouchableOpacity
+          style={[styles.groupPill, { backgroundColor: theme.colors.background }]}
+          onPress={onSelectGroup}
+          activeOpacity={0.7}
+        >
+          <Ionicons
+            name="folder-outline"
+            size={16}
+            color={selectedGroupName ? theme.colors.primary : theme.colors.textTertiary}
+          />
+          <Text
+            style={[styles.groupText, { color: selectedGroupName ? theme.colors.text : theme.colors.textTertiary }]}
+            numberOfLines={1}
           >
-            <Ionicons name="add" size={22} color="#fff" />
-          </TouchableOpacity>
+            {selectedGroupName || '选择分组'}
+          </Text>
+          <Ionicons
+            name="chevron-down"
+            size={12}
+            color={theme.colors.textTertiary}
+          />
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.toolButton, !hasSelection && styles.toolButtonDisabled]}
-            onPress={onMoveUp}
-            disabled={!hasSelection}
-          >
-            <Ionicons
-              name="arrow-up"
-              size={18}
-              color={hasSelection ? theme.colors.text : theme.colors.textTertiary}
-            />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.toolButton, !hasSelection && styles.toolButtonDisabled]}
-            onPress={onMoveDown}
-            disabled={!hasSelection}
-          >
-            <Ionicons
-              name="arrow-down"
-              size={18}
-              color={hasSelection ? theme.colors.text : theme.colors.textTertiary}
-            />
-          </TouchableOpacity>
-
-        </View>
+        <TouchableOpacity
+          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+          onPress={onAdd}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -70,30 +65,35 @@ const createStyles = (theme: any) =>
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
+      justifyContent: 'space-between',
+      paddingHorizontal: 14,
+      paddingVertical: 10,
       backgroundColor: theme.colors.card,
       borderRadius: theme.borderRadius.md,
       ...theme.shadows.md,
     },
-    toolsSection: {
+    groupPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: 12,
+      gap: 6,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      flex: 1,
+      marginRight: 12,
     },
-    toolButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.background,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    toolButtonDisabled: {
-      opacity: 0.4,
+    groupText: {
+      fontSize: 14,
+      fontWeight: '500',
+      flexShrink: 1,
     },
     addButton: {
-      backgroundColor: theme.colors.primary,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });

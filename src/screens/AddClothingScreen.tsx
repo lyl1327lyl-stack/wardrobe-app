@@ -1266,7 +1266,7 @@ export function AddClothingScreen() {
                 </View>
               </View>
               <View style={[styles.inputField, { flex: 1 }]}>
-                <Text style={styles.formLabel}>穿着次数</Text>
+                <Text style={styles.formLabel}>{isEditing ? '穿着次数' : '初始穿着次数'}</Text>
                 <TextInput
                   style={styles.wearCountInput}
                   value={wearCount === 0 ? '' : String(wearCount)}

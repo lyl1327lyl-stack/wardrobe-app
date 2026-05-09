@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '../hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeId, themes } from '../utils/theme';
 import { Theme } from '../utils/theme';
 import { OPTIONS_STORAGE_KEY } from '../utils/customOptions';
@@ -72,11 +73,15 @@ const makeStyles = (theme: Theme) =>
     },
     header: {
       paddingHorizontal: 16,
-      paddingTop: 56,
-      paddingBottom: 16,
+      paddingBottom: 12,
       backgroundColor: theme.colors.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
+    },
+    headerInner: {
+      height: 36,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     headerTitle: {
       fontSize: 18,
@@ -164,6 +169,7 @@ const makeStyles = (theme: Theme) =>
 export function PersonalCenterScreen() {
   const navigation = useNavigation();
   const { theme, themeId, setTheme } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const handleThemeChange = async (newThemeId: ThemeId) => {
@@ -236,8 +242,10 @@ export function PersonalCenterScreen() {
   return (
     <View style={styles.container}>
       {/* 统一顶栏 */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>个人中心</Text>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerInner}>
+          <Text style={styles.headerTitle}>个人中心</Text>
+        </View>
       </View>
       <ScrollView
         style={styles.content}

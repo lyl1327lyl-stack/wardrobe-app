@@ -7,6 +7,8 @@ import {
   Image,
   Dimensions,
   Alert,
+  Modal,
+  FlatList,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -242,6 +244,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const route = useRoute<RouteProp<RootStackParamList, 'OutfitEditor'>>();
 
   const groupIdFromRoute = route.params?.groupId;
+  const [selectedGroupId, setSelectedGroupId] = useState<number | null>(groupIdFromRoute ?? null);
+  const [showGroupModal, setShowGroupModal] = useState(false);
 
   const {
     canvasItems,
@@ -355,6 +359,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       // Editing existing outfit
       const outfit = outfits.find(o => o.id === outfitId);
       if (outfit) {
+        setSelectedGroupId(outfit.groupId ?? null);
         const canvasData = (outfit as any).canvasData;
         const background = (outfit as any).canvasBackground;
         if (canvasData && canvasData.length > 0) {
@@ -446,9 +451,9 @@ export function OutfitEditorScreen({ onSave }: Props) {
     let groupId: number;
     if (editingOutfitId) {
       const existingOutfit = outfits.find(o => o.id === editingOutfitId);
-      groupId = existingOutfit?.groupId || groupIdFromRoute || getDefaultGroupId();
+      groupId = selectedGroupId ?? existingOutfit?.groupId ?? getDefaultGroupId();
     } else {
-      groupId = groupIdFromRoute || getDefaultGroupId();
+      groupId = selectedGroupId ?? getDefaultGroupId();
     }
 
     const outfitData = {
@@ -532,7 +537,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       console.error('[handleSave] Error saving outfit:', error?.message || error);
       Alert.alert('保存失败', error?.message || '请重试');
     }
-  }, [canvasItems, editingOutfitId, canvasBackground, navigation, addOutfit, updateOutfit, reset, exitEditor, groupIdFromRoute, groups, outfits]);
+  }, [canvasItems, editingOutfitId, canvasBackground, navigation, addOutfit, updateOutfit, reset, exitEditor, selectedGroupId, groups, outfits]);
   handleSaveRef.current = handleSave;
 
   const handleBackgroundPress = useCallback(() => {
@@ -553,46 +558,95 @@ export function OutfitEditorScreen({ onSave }: Props) {
       </View>
 
       <View style={styles.content}>
-        <View style={styles.canvasWrapper}>
-            <TouchableOpacity
-              ref={canvasRef}
-              style={[
-                styles.canvas,
-                { width: CANVAS_WIDTH, height: CANVAS_WIDTH },
-                showGrid && styles.canvasGrid,
-                canvasBackground.type === 'color' && { backgroundColor: canvasBackground.value },
-              ]}
-              activeOpacity={1}
-              onPress={handleBackgroundPress}
-            >
-              {canvasItems.map(item => (
-                <DraggableItem
-                  key={item.clothingId}
-                  item={item}
-                  canvasWidth={canvasDims.width}
-                  canvasHeight={canvasDims.height}
-                  onUpdate={updateCanvasItem}
-                  onDelete={handleDelete}
-                  isSelected={selectedItemId === item.clothingId}
-                  onSelect={() => handleSelect(item.clothingId)}
-                  styles={styles}
-                  theme={theme}
-                />
-              ))}
-              {showTooltip && canvasItems.length === 0 && (
-                <View style={styles.tooltipBubble} pointerEvents="none">
-                  <Ionicons name="hand-left-outline" size={14} color={theme.colors.primary} />
-                  <Text style={styles.tooltipText}>拖拽移动 · 双指缩放 · 双指旋转</Text>
-                </View>
-              )}
-              {canvasItems.length === 0 && (
-                <View style={styles.canvasEmpty}>
-                  <Ionicons name="image-outline" size={48} color={theme.colors.textTertiary} />
-                  <Text style={styles.canvasEmptyText}>点击"+"添加衣物</Text>
-                </View>
-              )}
-            </TouchableOpacity>
+        <View style={styles.canvasCentered}>
+          <TouchableOpacity
+            ref={canvasRef}
+            style={[
+              styles.canvas,
+              { width: CANVAS_WIDTH, height: CANVAS_WIDTH },
+              showGrid && styles.canvasGrid,
+              canvasBackground.type === 'color' && { backgroundColor: canvasBackground.value },
+            ]}
+            activeOpacity={1}
+            onPress={handleBackgroundPress}
+          >
+            {canvasItems.map(item => (
+              <DraggableItem
+                key={item.clothingId}
+                item={item}
+                canvasWidth={canvasDims.width}
+                canvasHeight={canvasDims.height}
+                onUpdate={updateCanvasItem}
+                onDelete={handleDelete}
+                isSelected={selectedItemId === item.clothingId}
+                onSelect={() => handleSelect(item.clothingId)}
+                styles={styles}
+                theme={theme}
+              />
+            ))}
+            {showTooltip && canvasItems.length === 0 && (
+              <View style={styles.tooltipBubble} pointerEvents="none">
+                <Ionicons name="hand-left-outline" size={14} color={theme.colors.primary} />
+                <Text style={styles.tooltipText}>拖拽移动 · 双指缩放 · 双指旋转</Text>
+              </View>
+            )}
+            {canvasItems.length === 0 && (
+              <View style={styles.canvasEmpty}>
+                <Ionicons name="image-outline" size={48} color={theme.colors.textTertiary} />
+                <Text style={styles.canvasEmptyText}>点击"+"添加衣物</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+
+          {/* Legend */}
+          <View style={styles.legend}>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendIcon, { backgroundColor: theme.colors.danger }]}>
+                <Text style={styles.legendIconText}>×</Text>
+              </View>
+              <Text style={[styles.legendText, { color: theme.colors.textTertiary }]}>删除</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendIcon, { backgroundColor: theme.colors.primary }]}>
+                <Text style={styles.legendIconText}>↻</Text>
+              </View>
+              <Text style={[styles.legendText, { color: theme.colors.textTertiary }]}>旋转</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendIcon, { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }]}>
+                <Ionicons name="chevron-up" size={12} color={theme.colors.textSecondary} />
+              </View>
+              <Text style={[styles.legendText, { color: theme.colors.textTertiary }]}>上一层</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendIcon, { backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border }]}>
+                <Ionicons name="chevron-down" size={12} color={theme.colors.textSecondary} />
+              </View>
+              <Text style={[styles.legendText, { color: theme.colors.textTertiary }]}>下一层</Text>
+            </View>
+          </View>
         </View>
+
+        {/* Floating layer controls — visible when an item is selected */}
+        {selectedItemId && (
+          <View style={styles.layerControls}>
+            <TouchableOpacity
+              style={[styles.layerBtn, { backgroundColor: theme.colors.card }]}
+              onPress={() => bringForward(selectedItemId)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-up" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+            <View style={[styles.layerDivider, { backgroundColor: theme.colors.border }]} />
+            <TouchableOpacity
+              style={[styles.layerBtn, { backgroundColor: theme.colors.card }]}
+              onPress={() => sendBackward(selectedItemId)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="chevron-down" size={20} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Hidden canvas for clean thumbnail capture — no shadow, no border, no selection */}
         <View style={styles.captureContainer} pointerEvents="none">
@@ -622,12 +676,45 @@ export function OutfitEditorScreen({ onSave }: Props) {
         </View>
       </View>
 
+      {/* 分组选择 Modal */}
+      <Modal visible={showGroupModal} animationType="slide" transparent>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowGroupModal(false)}>
+          <View style={[styles.groupSheet, { backgroundColor: theme.colors.card, paddingBottom: insets.bottom + 20 }]}>
+            <View style={styles.groupSheetHandle} />
+            <Text style={[styles.groupSheetTitle, { color: theme.colors.text }]}>选择分组</Text>
+            <FlatList
+              data={groups}
+              keyExtractor={item => item.id.toString()}
+              style={styles.groupList}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.groupItem,
+                    { backgroundColor: theme.colors.background },
+                    selectedGroupId === item.id && { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary },
+                  ]}
+                  onPress={() => {
+                    setSelectedGroupId(item.id);
+                    setShowGroupModal(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.groupItemText, { color: theme.colors.text }]}>{item.name}</Text>
+                  {selectedGroupId === item.id && (
+                    <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
+                  )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* 底部工具栏 */}
       <CanvasToolsBar
         onAdd={() => navigation.navigate('ClothingSelection', { source: 'Editor' })}
-        onMoveUp={() => selectedItemId && bringForward(selectedItemId)}
-        onMoveDown={() => selectedItemId && sendBackward(selectedItemId)}
-        hasSelection={!!selectedItemId}
+        selectedGroupName={groups.find(g => g.id === selectedGroupId)?.name}
+        onSelectGroup={() => setShowGroupModal(true)}
       />
     </View>
   );
@@ -678,11 +765,39 @@ const createStyles = (theme: any, insets: any) =>
       flex: 1,
       backgroundColor: theme.colors.borderLight,
     },
-    canvasWrapper: {
+    canvasCentered: {
       flex: 1,
       alignItems: 'center',
       justifyContent: 'center',
       paddingHorizontal: CANVAS_PADDING,
+    },
+    legend: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: 14,
+      gap: 16,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+    },
+    legendIcon: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    legendIconText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: 'bold',
+    },
+    legendText: {
+      fontSize: 11,
+      fontWeight: '500',
     },
     canvas: {
       backgroundColor: theme.colors.card,
@@ -767,5 +882,44 @@ const createStyles = (theme: any, insets: any) =>
     rotateHandleText: {
       color: '#fff',
       fontSize: 15,
+    },
+    modalOverlay: {
+      flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end',
+    },
+    groupSheet: {
+      borderTopLeftRadius: 20, borderTopRightRadius: 20,
+      paddingHorizontal: 20, maxHeight: '50%',
+    },
+    groupSheetHandle: {
+      width: 40, height: 4, borderRadius: 2,
+      backgroundColor: '#ddd', alignSelf: 'center',
+      marginTop: 12, marginBottom: 16,
+    },
+    groupSheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
+    groupList: { marginBottom: 8 },
+    groupItem: {
+      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+      paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12, marginBottom: 8,
+      borderWidth: 2, borderColor: 'transparent',
+    },
+    groupItemText: { fontSize: 15, fontWeight: '500' },
+    layerControls: {
+      position: 'absolute',
+      right: CANVAS_PADDING + 8,
+      top: '50%',
+      transform: [{ translateY: -44 }],
+      borderRadius: 12,
+      overflow: 'hidden',
+      ...theme.shadows.md,
+    },
+    layerBtn: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    layerDivider: {
+      height: 1,
+      marginHorizontal: 8,
     },
   });

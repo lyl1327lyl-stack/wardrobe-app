@@ -62,6 +62,15 @@ export async function moveOutfitsToGroup(fromGroupId: number, toGroupId: number)
   );
 }
 
+export async function moveOutfitIdsToGroup(outfitIds: number[], toGroupId: number): Promise<void> {
+  const db = await getDatabase();
+  const placeholders = outfitIds.map(() => '?').join(',');
+  await db.runAsync(
+    `UPDATE outfits SET groupId = ? WHERE id IN (${placeholders})`,
+    [toGroupId, ...outfitIds]
+  );
+}
+
 export async function deleteOutfitsByGroup(groupId: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('DELETE FROM outfits WHERE groupId = ?', [groupId]);

@@ -29,6 +29,8 @@ interface WardrobeState {
   addGroup: (name: string, description: string) => Promise<number>;
   updateGroup: (id: number, name: string, description: string) => Promise<void>;
   deleteGroupWithAction: (id: number, action: 'move' | 'delete_outfits') => Promise<void>;
+  moveGroupOutfits: (fromGroupId: number, toGroupId: number) => Promise<void>;
+  moveOutfits: (outfitIds: number[], toGroupId: number) => Promise<void>;
 
   // 穿着记录相关
   wearRecords: WearRecord[];
@@ -151,17 +153,15 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     }
   },
 
-  // 重新计算所有衣物的穿着次数（只统计截至今天的记录）
+  // 修复所有衣物的 lastWornAt（从穿着记录重新计算）
   recalculateAllWearCounts: async () => {
     const { clothing } = get();
 
     for (const item of clothing) {
-      const count = await wearRecordsDb.getWearCountFromRecords(item.id);
       const lastDate = await wearRecordsDb.getLastWornDateFromRecords(item.id);
 
-      // 只在数值变化时更新
-      if (item.wearCount !== count || item.lastWornAt !== lastDate) {
-        await clothingDb.updateClothing({ ...item, wearCount: count, lastWornAt: lastDate });
+      if (item.lastWornAt !== lastDate) {
+        await clothingDb.updateClothing({ ...item, lastWornAt: lastDate });
       }
     }
 
@@ -367,6 +367,25 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       outfits: action === 'delete_outfits'
         ? state.outfits.filter(o => o.groupId !== id)
         : state.outfits.map(o => o.groupId === id ? { ...o, groupId: defaultGroupId } : o),
+    }));
+  },
+
+  moveGroupOutfits: async (fromGroupId, toGroupId) => {
+    await groupDb.moveOutfitsToGroup(fromGroupId, toGroupId);
+    set(state => ({
+      outfits: state.outfits.map(o =>
+        o.groupId === fromGroupId ? { ...o, groupId: toGroupId } : o
+      ),
+    }));
+  },
+
+  moveOutfits: async (outfitIds, toGroupId) => {
+    await groupDb.moveOutfitIdsToGroup(outfitIds, toGroupId);
+    const idSet = new Set(outfitIds);
+    set(state => ({
+      outfits: state.outfits.map(o =>
+        idSet.has(o.id) ? { ...o, groupId: toGroupId } : o
+      ),
     }));
   },
 
@@ -800,14 +819,11 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       ? pastRecords.reduce((a, b) => a.wornDate > b.wornDate ? a : b).wornDate
       : null;
 
-    // 计算剩余的穿着次数（只统计截至今天的记录）
-    const wearCount = pastRecords.length;
-
-    // 更新内存状态
+    // 更新内存状态（只递减 1，保留初始穿着次数）
     set(state => ({
       clothing: state.clothing.map(c =>
         c.id === clothingId
-          ? { ...c, wearCount, lastWornAt: lastDate || c.lastWornAt }
+          ? { ...c, wearCount: isFuture ? c.wearCount : Math.max(0, c.wearCount - 1), lastWornAt: lastDate || c.lastWornAt }
           : c
       ),
     }));

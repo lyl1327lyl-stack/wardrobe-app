@@ -94,6 +94,9 @@ export interface Outfit {
   canvasData?: CanvasItemData[];
   canvasBackground?: CanvasBackgroundData;
   thumbnailUri?: string;
+  notes?: string;
+  seasons: string[];
+  styles: string[];
   createdAt: string;
 }
 

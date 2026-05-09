@@ -21,7 +21,7 @@ import { useOutfitStore } from '../../store/outfitStore';
 
 type RootStackParamList = {
   ClothingSelection: { source?: 'Outfits' | 'Editor'; groupId?: number } | undefined;
-  OutfitEditor: { selectedIds?: number[]; exitTo?: { screen: string; tab: string }; groupId?: number };
+  OutfitEditor: { selectedIds?: number[]; exitTo?: { screen: string; tab?: string; groupId?: number; groupName?: string }; groupId?: number };
 };
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -47,6 +47,7 @@ export function ClothingSelectionScreen() {
   const source = route.params?.source || 'Outfits';
   const groupIdFromRoute = route.params?.groupId;
   const clothing = useWardrobeStore(state => state.clothing);
+  const groups = useWardrobeStore(state => state.groups);
   const existingCanvasItems = useOutfitStore(state => state.canvasItems);
 
   // 已在画板上的衣物ID
@@ -86,13 +87,16 @@ export function ClothingSelectionScreen() {
       // 从搭配主界面进入：先重置再创建新搭配，清除可能残留的旧数据
       resetOutfitStore();
       setSelectedClothings(selectedItems);
+      const exitTo = groupIdFromRoute
+        ? { screen: 'GroupDetail' as const, groupId: groupIdFromRoute, groupName: groups.find(g => g.id === groupIdFromRoute)?.name || '' }
+        : { screen: 'Main' as const, tab: '搭配' };
       navigation.navigate('OutfitEditor', {
         selectedIds: [...selectedIds],
         groupId: groupIdFromRoute,
-        exitTo: { screen: 'Main', tab: '搭配' },
+        exitTo,
       });
     }
-  }, [selectedIds, clothing, existingIds, source, navigation, addCanvasItem, setSelectedClothings, resetOutfitStore, groupIdFromRoute]);
+  }, [selectedIds, clothing, existingIds, source, navigation, addCanvasItem, setSelectedClothings, resetOutfitStore, groupIdFromRoute, groups]);
 
   // Reset outfitStore when entering to clear any previous state
   React.useEffect(() => {
@@ -103,13 +107,19 @@ export function ClothingSelectionScreen() {
 
   const renderItem = ({ item }: { item: ClothingItem }) => {
     const isSelected = selectedIds.includes(item.id);
+    const isOnCanvas = existingIds.includes(item.id);
     return (
       <TouchableOpacity
-        style={[styles.item, isSelected && styles.itemSelected]}
-        onPress={() => toggleSelection(item.id)}
-        activeOpacity={0.7}
+        style={[styles.item, isSelected && styles.itemSelected, isOnCanvas && styles.itemOnCanvas]}
+        onPress={() => !isOnCanvas && toggleSelection(item.id)}
+        activeOpacity={isOnCanvas ? 1 : 0.7}
       >
         <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />
+        {isOnCanvas && (
+          <View style={styles.onCanvasBadge}>
+            <Ionicons name="checkmark-circle" size={16} color={theme.colors.primary} />
+          </View>
+        )}
         {isSelected && (
           <View style={styles.checkMark}>
             <Ionicons name="checkmark" size={14} color="#fff" />
@@ -126,7 +136,7 @@ export function ClothingSelectionScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>创建搭配</Text>
+        <Text style={styles.headerTitle}>{source === 'Editor' ? '添加衣服' : '创建搭配'}</Text>
         <View style={{ width: 50 }} />
       </View>
 
@@ -174,7 +184,7 @@ export function ClothingSelectionScreen() {
           disabled={selectedIds.length === 0}
         >
           <Text style={styles.nextButtonText}>
-            下一步 ({selectedIds.length})
+            {source === 'Editor' ? `确认添加 (${selectedIds.length})` : `下一步 (${selectedIds.length})`}
           </Text>
         </TouchableOpacity>
       </View>
@@ -263,10 +273,25 @@ const createStyles = (theme: any, insets: any) =>
     itemSelected: {
       borderColor: theme.colors.primary,
     },
+    itemOnCanvas: {
+      opacity: 0.5,
+      borderColor: theme.colors.border,
+    },
     itemImage: {
       width: '100%',
       height: '100%',
       objectFit: 'cover',
+    },
+    onCanvasBadge: {
+      position: 'absolute',
+      top: 6,
+      left: 6,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: 'rgba(255,255,255,0.9)',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     checkMark: {
       position: 'absolute',

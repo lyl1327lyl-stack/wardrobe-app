@@ -346,6 +346,8 @@ export function OutfitPickerModal({ visible, onClose, clothingItem }: Props) {
         itemIds: [clothingItem.id],
         itemPositions: { [clothingItem.id]: defaultPos },
         groupId: 0,
+        seasons: [],
+        styles: [],
         createdAt: new Date().toISOString(),
       });
       setNewOutfitName('');

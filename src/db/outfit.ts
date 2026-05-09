@@ -12,6 +12,9 @@ export interface OutfitRow {
   style?: string;
   groupId?: number;
   thumbnailUri?: string;
+  notes?: string;
+  seasons: string;
+  styles: string;
   createdAt: string;
 }
 
@@ -29,6 +32,9 @@ export async function getAllOutfits(): Promise<Outfit[]> {
     style: item.style || '',
     groupId: item.groupId || 0,
     thumbnailUri: item.thumbnailUri,
+    notes: item.notes || '',
+    seasons: JSON.parse(item.seasons || '[]'),
+    styles: JSON.parse(item.styles || '[]'),
   }));
 }
 
@@ -37,7 +43,7 @@ export async function addOutfit(
 ): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    'INSERT INTO outfits (name, itemIds, itemPositions, canvasData, canvasBackground, style, groupId, thumbnailUri, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    'INSERT INTO outfits (name, itemIds, itemPositions, canvasData, canvasBackground, style, groupId, thumbnailUri, notes, seasons, styles, createdAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
@@ -48,6 +54,9 @@ export async function addOutfit(
       outfit.style || '',
       outfit.groupId,
       outfit.thumbnailUri || '',
+      (outfit as any).notes || '',
+      (outfit as any).seasons ? JSON.stringify((outfit as any).seasons) : '[]',
+      (outfit as any).styles ? JSON.stringify((outfit as any).styles) : '[]',
       outfit.createdAt,
     ]
   );
@@ -64,7 +73,7 @@ export async function updateOutfit(
 ): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
-    'UPDATE outfits SET name = ?, itemIds = ?, itemPositions = ?, canvasData = ?, canvasBackground = ?, style = ?, groupId = ?, thumbnailUri = ? WHERE id = ?',
+    'UPDATE outfits SET name = ?, itemIds = ?, itemPositions = ?, canvasData = ?, canvasBackground = ?, style = ?, groupId = ?, thumbnailUri = ?, notes = ?, seasons = ?, styles = ? WHERE id = ?',
     [
       outfit.name,
       JSON.stringify(outfit.itemIds),
@@ -75,6 +84,9 @@ export async function updateOutfit(
       outfit.style || '',
       outfit.groupId,
       outfit.thumbnailUri || '',
+      (outfit as any).notes || '',
+      (outfit as any).seasons ? JSON.stringify((outfit as any).seasons) : '[]',
+      (outfit as any).styles ? JSON.stringify((outfit as any).styles) : '[]',
       outfit.id,
     ]
   );

@@ -15,12 +15,20 @@ import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { DEFAULT_OPTIONS, getAllChildren } from '../utils/customOptions';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../utils/theme';
 import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
 import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
 import * as wearRecordsDb from '../db/wearRecords';
 
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
+
+const SORT_OPTIONS = [
+  { key: 'createdAt' as const, label: '创建时间', icon: 'time-outline' as const },
+  { key: 'type' as const, label: '类型', icon: 'shirt-outline' as const },
+  { key: 'price' as const, label: '价格', icon: 'cash-outline' as const },
+  { key: 'color' as const, label: '颜色', icon: 'color-palette-outline' as const },
+];
 
 const SEASON_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
   '全部': { name: 'grid', color: '#6B7FD7' },
@@ -50,11 +58,14 @@ const makeStyles = (theme: Theme) =>
     // 统一顶栏
     header: {
       paddingHorizontal: 16,
-      paddingTop: 56,
       paddingBottom: 12,
       backgroundColor: theme.colors.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
+    },
+    headerInner: {
+      height: 36,
+      justifyContent: 'center',
     },
     headerRow: {
       flexDirection: 'row',
@@ -252,18 +263,18 @@ const makeStyles = (theme: Theme) =>
       width: '100%',
       height: '100%',
     },
-    // 网格视图价格标签 - 只在右下角显示价格
-    gridPriceBadge: {
+    // 网格视图右下角单次穿着价格
+    gridCostBadge: {
       position: 'absolute',
       bottom: 6,
       right: 6,
       backgroundColor: 'rgba(0,0,0,0.55)',
-      paddingHorizontal: 6,
-      paddingVertical: 3,
-      borderRadius: 6,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+      borderRadius: 4,
     },
-    gridPriceText: {
-      fontSize: 10,
+    gridCostText: {
+      fontSize: 9,
       color: theme.colors.white,
       fontWeight: '600',
     },
@@ -426,6 +437,39 @@ const makeStyles = (theme: Theme) =>
     seasonPillTextActive: {
       color: theme.colors.white,
     },
+    // 排序选项条
+    sortSection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+    },
+    sortContent: {
+      gap: 8,
+    },
+    sortPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 16,
+      backgroundColor: theme.colors.card,
+      gap: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    sortPillActive: {
+      backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
+    },
+    sortPillText: {
+      fontSize: 12,
+      fontWeight: '500',
+      color: theme.colors.textSecondary,
+    },
+    sortPillTextActive: {
+      color: theme.colors.white,
+    },
     batchActionBar: {
       position: 'absolute',
       bottom: 0,
@@ -532,13 +576,22 @@ export function WardrobeScreen() {
     getCurrentWardrobe,
   } = useWardrobeStore();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const categories = useCustomOptionsStore(state => state.categories);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
   const seasons = useCustomOptionsStore(state => state.seasons);
+  const customStyles = useCustomOptionsStore(state => state.styles);
   const load = useCustomOptionsStore(state => state.load);
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
+  const styleOptions = useMemo(() => {
+    return customStyles && customStyles.length > 0 ? customStyles : DEFAULT_OPTIONS.styles;
+  }, [customStyles]);
+
   const [selectedSeasons, setSelectedSeasons] = useState<('全部' | Season)[]>(['全部']);
+  const [selectedStyles, setSelectedStyles] = useState<string[]>(['全部']);
+  const [sortBy, setSortBy] = useState<string>('createdAt');
+  const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
@@ -588,8 +641,36 @@ export function WardrobeScreen() {
         item.seasons.some(season => selectedSeasons.includes(season))
       );
     }
+    // 按风格筛选
+    if (!selectedStyles.includes('全部') && selectedStyles.length > 0) {
+      result = result.filter(item =>
+        item.styles.some(style => selectedStyles.includes(style))
+      );
+    }
+    // 排序：网格视图使用选择的排序方式，列表视图默认按创建时间
+    const sortKey = viewMode === 'grid' ? sortBy : 'createdAt';
+    const ascending = viewMode === 'grid' ? sortAsc : false;
+    result = [...result].sort((a, b) => {
+      let cmp = 0;
+      switch (sortKey) {
+        case 'createdAt':
+          cmp = (a.createdAt || '').localeCompare(b.createdAt || '');
+          break;
+        case 'price':
+          cmp = (a.price || 0) - (b.price || 0);
+          break;
+        case 'type':
+          cmp = (a.parentType || a.type || '').localeCompare(b.parentType || b.type || '')
+            || (a.type || '').localeCompare(b.type || '');
+          break;
+        case 'color':
+          cmp = (a.color || '').localeCompare(b.color || '');
+          break;
+      }
+      return ascending ? cmp : -cmp;
+    });
     return result;
-  }, [selectedSeasons, clothing, currentWardrobeId]);
+  }, [selectedSeasons, selectedStyles, sortBy, sortAsc, viewMode, clothing, currentWardrobeId]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -716,7 +797,8 @@ export function WardrobeScreen() {
   return (
     <View style={styles.container}>
       {/* 统一顶栏 */}
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerInner}>
         {isSelecting ? (
           <View style={styles.headerRow}>
             <TouchableOpacity style={styles.wardrobeSelector} onPress={cancelSelection} activeOpacity={0.7}>
@@ -775,6 +857,7 @@ export function WardrobeScreen() {
             </View>
           </View>
         )}
+        </View>
       </View>
 
       {/* 季节筛选按钮 */}
@@ -814,6 +897,85 @@ export function WardrobeScreen() {
           );
         })}
       </View>
+
+      {/* 风格筛选按钮 */}
+      <View style={styles.filterSection}>
+        {['全部', ...styleOptions].map((style) => {
+          const isSelected = selectedStyles.includes(style);
+          const handlePress = () => {
+            if (style === '全部') {
+              setSelectedStyles(['全部']);
+            } else {
+              const newStyles = selectedStyles.filter(s => s !== '全部');
+              if (isSelected) {
+                const filtered = newStyles.filter(s => s !== style);
+                setSelectedStyles(filtered.length === 0 ? ['全部'] : filtered);
+              } else {
+                setSelectedStyles([...newStyles, style]);
+              }
+            }
+          };
+          return (
+            <TouchableOpacity
+              key={style}
+              style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
+              onPress={handlePress}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
+                {style}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* 排序选项 - 仅网格视图 */}
+      {viewMode === 'grid' && (
+        <View style={styles.sortSection}>
+          <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.textTertiary} style={{ marginRight: 6 }} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.sortContent}
+          >
+          {SORT_OPTIONS.map((opt) => {
+            const isActive = sortBy === opt.key;
+            return (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.sortPill, isActive && styles.sortPillActive]}
+                onPress={() => {
+                  if (sortBy === opt.key) {
+                    setSortAsc(!sortAsc);
+                  } else {
+                    setSortBy(opt.key);
+                    setSortAsc(false);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={opt.icon}
+                  size={13}
+                  color={isActive ? theme.colors.white : theme.colors.textTertiary}
+                />
+                <Text style={[styles.sortPillText, isActive && styles.sortPillTextActive]}>
+                  {opt.label}
+                </Text>
+                {isActive && (
+                  <Ionicons
+                    name={sortAsc ? 'arrow-up' : 'arrow-down'}
+                    size={11}
+                    color={theme.colors.white}
+                  />
+                )}
+              </TouchableOpacity>
+            );
+          })}
+          </ScrollView>
+        </View>
+      )}
 
       {/* 内容区域 */}
       {isEmpty ? (
@@ -863,9 +1025,9 @@ export function WardrobeScreen() {
                       <Ionicons name="checkmark" size={14} color={theme.colors.white} />
                     </View>
                   )}
-                  {!isSelecting && item.price > 0 && (
-                    <View style={styles.gridPriceBadge}>
-                      <Text style={styles.gridPriceText}>{item.price}元</Text>
+                  {!isSelecting && item.price > 0 && item.wearCount > 0 && (
+                    <View style={styles.gridCostBadge}>
+                      <Text style={styles.gridCostText}>{Math.round(item.price / item.wearCount)}元/次</Text>
                     </View>
                   )}
                 </TouchableOpacity>

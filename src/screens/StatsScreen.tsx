@@ -6,6 +6,7 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../utils/theme';
 
 const SEASON_CONFIG = [
@@ -24,10 +25,14 @@ const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
     header: {
-      paddingHorizontal: 16, paddingTop: 56, paddingBottom: 16,
+      paddingHorizontal: 16, paddingBottom: 12,
       backgroundColor: theme.colors.card,
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
+    },
+    headerInner: {
+      height: 36,
+      justifyContent: 'center',
     },
     headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     headerAccent: { width: 4, height: 24, borderRadius: 2, backgroundColor: theme.colors.primary, marginRight: 10 },
@@ -200,6 +205,7 @@ export function StatsScreen() {
   const categories = useCustomOptionsStore(state => state.categories);
   const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [statsTab, setStatsTab] = useState<'efficiency' | 'frequency' | 'warn' | 'companion'>('efficiency');
   const [warnDays, setWarnDays] = useState(30);
@@ -395,7 +401,8 @@ export function StatsScreen() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+        <View style={styles.headerInner}>
         <View style={styles.headerTop}>
           <View style={styles.titleRow}>
             <View style={styles.headerAccent} />
@@ -404,6 +411,7 @@ export function StatsScreen() {
           <View style={styles.headerIcon}>
             <Ionicons name="analytics-outline" size={20} color={theme.colors.primary} />
           </View>
+        </View>
         </View>
       </View>
 

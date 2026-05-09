@@ -1,6 +1,54 @@
 import { create } from 'zustand';
 import { ClothingItem } from '../types';
 
+const BASE_IMAGE_SIZE = 70;
+
+interface LayoutResult {
+  x: number;
+  y: number;
+  scale: number;
+}
+
+function computeItemLayout(itemCount: number, canvasSize: number = 340): LayoutResult[] {
+  // 根据件数自适应列数和缩放，确保全部在画板内
+  let cols: number;
+  let scale: number;
+
+  if (itemCount <= 1) {
+    cols = 1; scale = 2.4;
+  } else if (itemCount <= 2) {
+    cols = 2; scale = 2;
+  } else if (itemCount <= 4) {
+    cols = 2; scale = 1.8;
+  } else if (itemCount <= 6) {
+    cols = 2; scale = 1.5;
+  } else {
+    cols = 3; scale = 1.2;
+  }
+
+  const itemSize = BASE_IMAGE_SIZE * scale;
+  const gap = 12;
+  const cellSize = itemSize + gap;
+  const totalRows = Math.ceil(itemCount / cols);
+
+  const gridW = cols * cellSize;
+  const gridH = totalRows * cellSize;
+  const startX = (canvasSize - gridW) / 2;
+  const startY = (canvasSize - gridH) / 2;
+
+  const result: LayoutResult[] = [];
+  for (let i = 0; i < itemCount; i++) {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    result.push({
+      x: startX + col * cellSize,
+      y: startY + row * cellSize,
+      scale,
+    });
+  }
+  return result;
+}
+
 export interface CanvasItem {
   clothingId: number;
   imageUri: string;
@@ -64,17 +112,15 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
 
   setSelectedClothings: (items) => {
     set({ selectedClothings: items });
-    // 只在画板为空时创建新的canvas items
     const currentItems = get().canvasItems;
     if (currentItems.length === 0) {
-      const itemsPerRow = 2;
-      const cellSize = 160; // BASE_IMAGE_SIZE(70) * scale(2) + 间距(20)
+      const layout = computeItemLayout(items.length);
       const canvasItems: CanvasItem[] = items.map((item, index) => ({
         clothingId: item.id,
         imageUri: item.imageUri,
-        x: 20 + (index % itemsPerRow) * cellSize,
-        y: 20 + Math.floor(index / itemsPerRow) * cellSize,
-        scale: 2,
+        x: layout[index].x,
+        y: layout[index].y,
+        scale: layout[index].scale,
         rotation: 0,
         zIndex: index,
       }));
@@ -87,15 +133,16 @@ export const useOutfitStore = create<OutfitCanvasState>((set, get) => ({
     const maxZIndex = state.canvasItems.length > 0
       ? Math.max(...state.canvasItems.map(i => i.zIndex))
       : 0;
-    const itemsPerRow = 2;
-    const cellSize = 160;
-    const count = state.canvasItems.length;
+    // 使用自适应布局，取新加入项的坐标（总件数 = 已有 + 1）
+    const newCount = state.canvasItems.length + 1;
+    const layout = computeItemLayout(newCount);
+    const last = layout[layout.length - 1];
     const newItem: CanvasItem = {
       clothingId: clothing.id,
       imageUri: clothing.imageUri,
-      x: 30 + (count % itemsPerRow) * cellSize,
-      y: 30 + Math.floor(count / itemsPerRow) * cellSize,
-      scale: 2,
+      x: last.x,
+      y: last.y,
+      scale: last.scale,
       rotation: 0,
       zIndex: maxZIndex + 1,
     };
