@@ -3,7 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Wardrobe } from '../types';
 
 const DB_VERSION_KEY = 'db_version';
-const CURRENT_DB_VERSION = 2; // 递增以触发迁移
+const CURRENT_DB_VERSION = 4; // 递增以触发迁移（v4: 强制重建 wear_records 移除 CASCADE）
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 let dbInitPromise: Promise<SQLite.SQLiteDatabase> | null = null;
@@ -41,6 +41,21 @@ async function ensureOutfitsColumns(db: SQLite.SQLiteDatabase): Promise<void> {
   await addColumnIfNotExists('outfits', 'styles', 'TEXT DEFAULT "[]"');
 }
 
+// 确保 wear_records 表的列存在
+async function ensureWearRecordsColumns(db: SQLite.SQLiteDatabase): Promise<void> {
+  const add = async (column: string, definition: string) => {
+    if (await columnExists(db, 'wear_records', column)) return;
+    try {
+      await db.runAsync(`ALTER TABLE wear_records ADD COLUMN ${column} ${definition}`);
+    } catch (e: any) {
+      if (e?.message && e.message.includes('duplicate column name')) return;
+      console.error(`[DB Migration] Failed to add column ${column} to wear_records:`, e?.message || e);
+    }
+  };
+  await add('clothingThumbnailUri', 'TEXT DEFAULT ""');
+  await add('clothingType', 'TEXT DEFAULT ""');
+}
+
 // 执行 SQL，忽略错误（用于 CREATE TABLE IF NOT EXISTS）
 async function execSQL(db: SQLite.SQLiteDatabase, sql: string): Promise<void> {
   try {
@@ -54,6 +69,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
   // 已初始化完成，直接返回
   if (dbInstance) {
     await ensureOutfitsColumns(dbInstance);
+    await ensureWearRecordsColumns(dbInstance);
     await execSQL(dbInstance, `
       CREATE TABLE IF NOT EXISTS outfit_groups (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,6 +80,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       )
     `);
     await migrateStyleToGroup(dbInstance);
+    await migrateWearRecordsNoCascade(dbInstance);
     return dbInstance;
   }
 
@@ -125,14 +142,15 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
       )
     `);
 
-    // 创建穿着记录表
+    // 创建穿着记录表（不使用外键级联删除，保留已删除单品的穿着历史）
     await execSQL(db, `
       CREATE TABLE IF NOT EXISTS wear_records (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         clothingId INTEGER NOT NULL,
         wornDate TEXT NOT NULL,
         createdAt TEXT NOT NULL,
-        FOREIGN KEY (clothingId) REFERENCES clothing_items(id) ON DELETE CASCADE
+        clothingThumbnailUri TEXT DEFAULT '',
+        clothingType TEXT DEFAULT ''
       )
     `);
 
@@ -173,6 +191,7 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
     await addColumnIfNotExists('outfits', 'notes', 'TEXT DEFAULT ""');
     await addColumnIfNotExists('outfits', 'seasons', 'TEXT DEFAULT "[]"');
     await addColumnIfNotExists('outfits', 'styles', 'TEXT DEFAULT "[]"');
+    // wear_records 列由 migrateWearRecordsNoCascade 处理（首次）或 ensureWearRecordsColumns（缓存路径）
 
     // 确保 wardrobes 表存在
     await ensureWardrobesTable(db);
@@ -193,6 +212,9 @@ export async function getDatabase(): Promise<SQLite.SQLiteDatabase> {
 
     // 确保默认衣橱存在
     await ensureDefaultWardrobe(db);
+
+    // 迁移：移除 wear_records 的外键级联删除
+    await migrateWearRecordsNoCascade(db);
 
     // 只在所有迁移完成后才设置 dbInstance
     dbInstance = db;
@@ -276,7 +298,7 @@ async function migrateStyleToGroup(db: SQLite.SQLiteDatabase): Promise<void> {
     for (const style of styles) {
       const result = await db.runAsync(
         'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
-        [style, '', 0, new Date().toISOString()]
+        [style, '', String(0), new Date().toISOString()]
       );
       groupMap[style] = result.lastInsertRowId;
     }
@@ -284,7 +306,7 @@ async function migrateStyleToGroup(db: SQLite.SQLiteDatabase): Promise<void> {
     // 创建"未分组"默认分组
     const defaultResult = await db.runAsync(
       'INSERT INTO outfit_groups (name, description, sortOrder, createdAt) VALUES (?, ?, ?, ?)',
-      ['未分组', '', 999, new Date().toISOString()]
+      ['未分组', '', String(999), new Date().toISOString()]
     );
     const defaultGroupId = defaultResult.lastInsertRowId;
 
@@ -292,10 +314,68 @@ async function migrateStyleToGroup(db: SQLite.SQLiteDatabase): Promise<void> {
     for (const row of rows) {
       const style = row.style || '';
       const groupId = groupMap[style] || defaultGroupId;
-      await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [groupId, row.id]);
+      await db.runAsync('UPDATE outfits SET groupId = ? WHERE id = ?', [String(groupId), String(row.id)]);
     }
   } catch (e) {
     console.error('[DB Migration] migrateStyleToGroup error:', e);
+  }
+}
+
+// 迁移：移除 wear_records 表的外键级联删除，保留已删除单品的穿着历史
+async function migrateWearRecordsNoCascade(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const storedVersion = await AsyncStorage.getItem(DB_VERSION_KEY);
+    const currentVersion = storedVersion ? parseInt(storedVersion, 10) : 1;
+
+    if (currentVersion < 4) {
+      // 重建表：移除 CASCADE 约束 + 添加缩略图/类型冗余列
+      await db.runAsync('PRAGMA foreign_keys = OFF');
+      await db.runAsync('DROP TABLE IF EXISTS wear_records_new');
+
+      await db.runAsync(
+        `CREATE TABLE IF NOT EXISTS wear_records_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          clothingId INTEGER NOT NULL,
+          wornDate TEXT NOT NULL,
+          createdAt TEXT NOT NULL,
+          clothingThumbnailUri TEXT DEFAULT '',
+          clothingType TEXT DEFAULT ''
+        )`
+      );
+
+      await db.runAsync(
+        `INSERT INTO wear_records_new (id, clothingId, wornDate, createdAt)
+         SELECT id, clothingId, wornDate, createdAt FROM wear_records`
+      );
+
+      await db.runAsync('DROP TABLE wear_records');
+      await db.runAsync('ALTER TABLE wear_records_new RENAME TO wear_records');
+      await db.runAsync('CREATE INDEX IF NOT EXISTS idx_wear_records_clothing ON wear_records(clothingId)');
+      await db.runAsync('CREATE INDEX IF NOT EXISTS idx_wear_records_date ON wear_records(wornDate)');
+
+      await db.runAsync('PRAGMA foreign_keys = ON');
+
+      // 回填已有记录的缩略图和类型（仅首次迁移时执行）
+      await db.runAsync(
+        `UPDATE wear_records SET
+          clothingThumbnailUri = COALESCE(
+            (SELECT thumbnailUri FROM clothing_items WHERE id = wear_records.clothingId),
+            (SELECT imageUri FROM clothing_items WHERE id = wear_records.clothingId),
+            clothingThumbnailUri
+          ),
+          clothingType = COALESCE(
+            (SELECT type FROM clothing_items WHERE id = wear_records.clothingId),
+            clothingType
+          )
+         WHERE clothingThumbnailUri = '' OR clothingType = ''`
+      );
+
+      await AsyncStorage.setItem(DB_VERSION_KEY, String(CURRENT_DB_VERSION));
+      console.log('[DB Migration] wear_records migration v4 complete');
+    }
+  } catch (e) {
+    console.error('[DB Migration] migrateWearRecordsNoCascade error:', e);
+    try { await db.runAsync('PRAGMA foreign_keys = ON'); } catch (_) {}
   }
 }
 

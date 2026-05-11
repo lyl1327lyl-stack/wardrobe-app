@@ -952,7 +952,7 @@ export function AddClothingScreen() {
       const currentOriginalUri = originalImageUri || existingItem?.originalImageUri || currentImageUri;
 
       // 只要 imageUri 发生变化，就必须重新处理
-      const imageChanged = currentImageUri && existingItem && currentImageUri !== existingItem.imageUri;
+      const imageChanged = currentImageUri && (!existingItem || currentImageUri !== existingItem.imageUri);
       if (!asDraft && imageChanged) {
         const result = await processImage(currentImageUri, removeBackground, currentOriginalUri);
         processedUri = result.imageUri || existingItem?.imageUri || currentImageUri;

@@ -731,12 +731,19 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   },
 
   addWearRecord: async (clothingId, date) => {
-    const id = await wearRecordsDb.addWearRecord(clothingId, date);
+    // 查找衣物以获取缩略图和类型（保存到记录中，防止单品删除后丢失）
+    const { clothing, trashClothing, soldClothing } = get();
+    const item = clothing.find(c => c.id === clothingId)
+      || trashClothing.find(c => c.id === clothingId)
+      || soldClothing.find(c => c.id === clothingId);
+    const id = await wearRecordsDb.addWearRecord(
+      clothingId, date,
+      item?.thumbnailUri || item?.imageUri,
+      item?.type
+    );
     // 持久化 wearCount 到数据库（这样应用重启后仍能正确恢复）
     await clothingDb.incrementWearCount(clothingId, date);
     // 更新内存状态
-    const { clothing } = get();
-    const item = clothing.find(c => c.id === clothingId);
     if (item) {
       const newCount = (item.wearCount || 0) + 1;
       set(state => ({
@@ -762,7 +769,14 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     const today = localDateString();
     const isFuture = date > today;
 
-    await wearRecordsDb.addWearRecords(toRecord, date);
+    // 查找衣物以保存缩略图到穿着记录
+    const { clothing, trashClothing, soldClothing } = get();
+    const allClothing = [...clothing, ...trashClothing, ...soldClothing];
+    const clothingMap = new Map(allClothing.map(c => [c.id, c]));
+    await wearRecordsDb.addWearRecords(toRecord, date, (cid) => {
+      const item = clothingMap.get(cid);
+      return { thumbnailUri: item?.thumbnailUri || item?.imageUri, type: item?.type };
+    });
 
     // 只有截至今天的记录才计入穿着次数
     if (!isFuture) {

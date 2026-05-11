@@ -132,9 +132,15 @@ export async function processImage(uri: string, removeBg: boolean = false, origi
   }
 }
 
-export async function deleteImage(imageUri: string, thumbnailUri: string) {
+export async function deleteImage(imageUri: string, thumbnailUri: string, clothingId?: number) {
   try {
     await deleteAsync(imageUri, { idempotent: true });
+    // 如果有穿着记录，保留缩略图（穿着记录需要显示该缩略图）
+    if (clothingId) {
+      const { getWearRecordsByClothing } = require('../db/wearRecords');
+      const records = await getWearRecordsByClothing(clothingId);
+      if (records.length > 0) return;
+    }
     await deleteAsync(thumbnailUri, { idempotent: true });
   } catch (error) {
     console.error('Failed to delete images:', error);

@@ -345,7 +345,7 @@ export function SoldItemsScreen() {
           onPress: async () => {
             try {
               for (const item of soldClothing.filter(c => selectedIds.includes(Number(c.id)))) {
-                await deleteImage(item.imageUri, item.thumbnailUri);
+                await deleteImage(item.imageUri, item.thumbnailUri, item.id);
               }
               await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
               cancelSelection();
@@ -383,7 +383,7 @@ export function SoldItemsScreen() {
           text: '删除',
           style: 'destructive',
           onPress: async () => {
-            await deleteImage(item.imageUri, item.thumbnailUri);
+            await deleteImage(item.imageUri, item.thumbnailUri, item.id);
             await permanentDelete(item.id);
           },
         },
@@ -403,7 +403,7 @@ export function SoldItemsScreen() {
           style: 'destructive',
           onPress: async () => {
             for (const item of soldClothing) {
-              await deleteImage(item.imageUri, item.thumbnailUri);
+              await deleteImage(item.imageUri, item.thumbnailUri, item.id);
             }
             await emptySold();
           },

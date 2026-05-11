@@ -104,6 +104,22 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 8,
       backgroundColor: theme.colors.borderLight,
     },
+    itemImageDeletedOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      paddingVertical: 3,
+      alignItems: 'center',
+      borderBottomLeftRadius: 8,
+      borderBottomRightRadius: 8,
+    },
+    itemImageDeletedText: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: theme.colors.white,
+    },
     itemInfo: {
       flex: 1,
       marginLeft: 12,
@@ -337,9 +353,27 @@ export function WearCalendarSheet({
 }: WearCalendarSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { clothing, outfits, addWearRecords } = useWardrobeStore();
+  const clothing = useWardrobeStore(s => s.clothing);
+  const trashClothing = useWardrobeStore(s => s.trashClothing);
+  const soldClothing = useWardrobeStore(s => s.soldClothing);
+  const outfits = useWardrobeStore(s => s.outfits);
+  const { addWearRecords } = useWardrobeStore();
   const customSeasons = useCustomOptionsStore(s => s.seasons);
   const customStyles = useCustomOptionsStore(s => s.styles);
+
+  // 合并所有衣物来源，用于查找穿着记录关联的衣物
+  const allClothingMap = useMemo(() => {
+    const map = new Map<number, ClothingItem>();
+    for (const c of clothing) map.set(c.id, c);
+    for (const c of trashClothing) map.set(c.id, c);
+    for (const c of soldClothing) map.set(c.id, c);
+    return map;
+  }, [clothing, trashClothing, soldClothing]);
+
+  const activeIds = useMemo(() => new Set(clothing.map(c => c.id)), [clothing]);
+  const trashIds = useMemo(() => new Set(trashClothing.map(c => c.id)), [trashClothing]);
+  const soldIds = useMemo(() => new Set(soldClothing.map(c => c.id)), [soldClothing]);
+
   const [records, setRecords] = useState<ClothingItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddPicker, setShowAddPicker] = useState(false);
@@ -371,8 +405,27 @@ export function WearCalendarSheet({
     try {
       const wearRecords = await wearRecordsDb.getWearRecordsByDate(date);
       const clothingItems = wearRecords
-        .map(r => clothing.find(c => c.id === r.clothingId))
-        .filter((c): c is ClothingItem => c !== undefined);
+        .map(r => allClothingMap.get(r.clothingId) || {
+          id: r.clothingId,
+          imageUri: r.clothingThumbnailUri || '',
+          thumbnailUri: r.clothingThumbnailUri || '',
+          originalImageUri: '',
+          type: r.clothingType || '已删除',
+          parentType: '',
+          color: '',
+          brand: '',
+          size: '',
+          remarks: '',
+          seasons: [],
+          occasions: [],
+          styles: [],
+          purchaseDate: '',
+          price: 0,
+          wearCount: 0,
+          lastWornAt: null,
+          createdAt: '',
+          wardrobeId: 0,
+        } as ClothingItem);
       setRecords(clothingItems);
     } catch (error) {
       console.error('Failed to load wear records:', error);
@@ -476,26 +529,59 @@ export function WearCalendarSheet({
 
   const renderItem = ({ item }: { item: ClothingItem }) => {
     const imageUri = item.thumbnailUri || item.imageUri;
+    const isActive = activeIds.has(item.id);
+    const isTrash = trashIds.has(item.id);
+    const isSold = soldIds.has(item.id);
+    const isDeleted = !isActive;
+    const deleteLabel = isTrash ? '已删除' : isSold ? '已售出' : '已删除';
+    const deleteHint = isTrash ? '该单品在废衣篓中' : isSold ? '该单品已售出' : '该单品已被彻底删除';
     return (
-      <View style={styles.itemCard}>
-        <Image
-          source={{ uri: imageUri }}
-          style={styles.itemImage}
-          resizeMode="cover"
-        />
+      <View style={[styles.itemCard, isDeleted && { opacity: 0.75 }]}>
+        <View style={{ overflow: 'hidden', borderRadius: 8 }}>
+          {imageUri ? (
+            <Image
+              source={{ uri: imageUri }}
+              style={styles.itemImage}
+              resizeMode="cover"
+            />
+          ) : isDeleted ? (
+            <View style={[styles.itemImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.borderLight }]}>
+              <Ionicons name={isTrash ? 'trash-outline' : isSold ? 'card-outline' : 'trash-outline'} size={22} color={theme.colors.textTertiary} />
+              <Text style={{ fontSize: 9, color: theme.colors.textTertiary, marginTop: 2 }}>{deleteLabel}</Text>
+            </View>
+          ) : (
+            <View style={[styles.itemImage, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.borderLight }]}>
+              <Ionicons name="shirt-outline" size={24} color={theme.colors.border} />
+            </View>
+          )}
+          {isDeleted && imageUri ? (
+            <View style={styles.itemImageDeletedOverlay}>
+              <Text style={styles.itemImageDeletedText}>{deleteLabel}</Text>
+            </View>
+          ) : null}
+        </View>
         <View style={styles.itemInfo}>
-          <Text style={styles.itemType}>{item.type}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={[styles.itemType, isDeleted && { color: theme.colors.textTertiary }]}>{item.type}</Text>
+            {isDeleted && (
+              <View style={{ backgroundColor: theme.colors.danger, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ fontSize: 9, fontWeight: '700', color: theme.colors.white }}>{deleteLabel}</Text>
+              </View>
+            )}
+          </View>
           <Text style={styles.itemMeta}>
-            {item.brand || item.color || '无品牌'}
+            {isDeleted ? deleteHint : (item.brand || item.color || '无品牌')}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => handleDelete(item.id)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="remove-circle-outline" size={22} color={theme.colors.warning} />
-        </TouchableOpacity>
+        {!isDeleted && (
+          <TouchableOpacity
+            style={styles.deleteBtn}
+            onPress={() => handleDelete(item.id)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="remove-circle-outline" size={22} color={theme.colors.warning} />
+          </TouchableOpacity>
+        )}
       </View>
     );
   };

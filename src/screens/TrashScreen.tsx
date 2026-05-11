@@ -332,7 +332,7 @@ export function TrashScreen() {
           onPress: async () => {
             try {
               for (const item of trashClothing.filter(c => selectedIds.includes(Number(c.id)))) {
-                await deleteImage(item.imageUri, item.thumbnailUri);
+                await deleteImage(item.imageUri, item.thumbnailUri, item.id);
               }
               await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
               cancelSelection();
@@ -376,7 +376,7 @@ export function TrashScreen() {
           text: '删除',
           style: 'destructive',
           onPress: () => {
-            deleteImage(item.imageUri, item.thumbnailUri)
+            deleteImage(item.imageUri, item.thumbnailUri, item.id)
               .then(() => permanentDelete(item.id))
               .catch(e => {
                 console.error('永久删除失败:', e);
@@ -401,7 +401,7 @@ export function TrashScreen() {
           onPress: async () => {
             try {
               for (const item of trashClothing) {
-                await deleteImage(item.imageUri, item.thumbnailUri);
+                await deleteImage(item.imageUri, item.thumbnailUri, item.id);
               }
               await emptyTrash();
             } catch (e) {

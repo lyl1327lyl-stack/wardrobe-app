@@ -589,7 +589,7 @@ export function WardrobeScreen() {
   }, [customStyles]);
 
   const [selectedSeasons, setSelectedSeasons] = useState<('全部' | Season)[]>(['全部']);
-  const [selectedStyles, setSelectedStyles] = useState<string[]>(['全部']);
+  const [selectedStyle, setSelectedStyle] = useState<string>('全部');
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
@@ -642,9 +642,9 @@ export function WardrobeScreen() {
       );
     }
     // 按风格筛选
-    if (!selectedStyles.includes('全部') && selectedStyles.length > 0) {
+    if (selectedStyle !== '全部') {
       result = result.filter(item =>
-        item.styles.some(style => selectedStyles.includes(style))
+        item.styles.includes(selectedStyle)
       );
     }
     // 排序：网格视图使用选择的排序方式，列表视图默认按创建时间
@@ -670,7 +670,7 @@ export function WardrobeScreen() {
       return ascending ? cmp : -cmp;
     });
     return result;
-  }, [selectedSeasons, selectedStyles, sortBy, sortAsc, viewMode, clothing, currentWardrobeId]);
+  }, [selectedSeasons, selectedStyle, sortBy, sortAsc, viewMode, clothing, currentWardrobeId]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -898,22 +898,12 @@ export function WardrobeScreen() {
         })}
       </View>
 
-      {/* 风格筛选按钮 */}
+      {/* 风格筛选按钮 - 单选 */}
       <View style={styles.filterSection}>
         {['全部', ...styleOptions].map((style) => {
-          const isSelected = selectedStyles.includes(style);
+          const isSelected = selectedStyle === style;
           const handlePress = () => {
-            if (style === '全部') {
-              setSelectedStyles(['全部']);
-            } else {
-              const newStyles = selectedStyles.filter(s => s !== '全部');
-              if (isSelected) {
-                const filtered = newStyles.filter(s => s !== style);
-                setSelectedStyles(filtered.length === 0 ? ['全部'] : filtered);
-              } else {
-                setSelectedStyles([...newStyles, style]);
-              }
-            }
+            setSelectedStyle(style);
           };
           return (
             <TouchableOpacity

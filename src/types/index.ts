@@ -127,4 +127,6 @@ export interface WearRecord {
   clothingId: number;
   wornDate: string;  // YYYY-MM-DD
   createdAt: string;
+  clothingThumbnailUri: string;
+  clothingType: string;
 }

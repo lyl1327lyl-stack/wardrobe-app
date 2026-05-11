@@ -234,7 +234,20 @@ export function WearCalendarScreen() {
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { clothing, outfits, addWearRecords, deleteWearRecord } = useWardrobeStore();
+  const clothing = useWardrobeStore(s => s.clothing);
+  const trashClothing = useWardrobeStore(s => s.trashClothing);
+  const soldClothing = useWardrobeStore(s => s.soldClothing);
+  const outfits = useWardrobeStore(s => s.outfits);
+  const { addWearRecords, deleteWearRecord, loadData } = useWardrobeStore();
+
+  // 合并所有衣物来源（衣柜 + 废衣篓 + 已卖出），用于日历中查找穿着记录
+  const allClothingMap = useMemo(() => {
+    const map = new Map<number, ClothingItem>();
+    for (const c of clothing) map.set(c.id, c);
+    for (const c of trashClothing) map.set(c.id, c);
+    for (const c of soldClothing) map.set(c.id, c);
+    return map;
+  }, [clothing, trashClothing, soldClothing]);
 
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
@@ -287,7 +300,27 @@ export function WearCalendarScreen() {
       const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
       const items = records
-        .map(r => clothing.find(c => c.id === r.clothingId))
+        .map(r => allClothingMap.get(r.clothingId) || {
+          id: r.clothingId,
+          imageUri: r.clothingThumbnailUri || '',
+          thumbnailUri: r.clothingThumbnailUri || '',
+          originalImageUri: '',
+          type: r.clothingType || '已删除',
+          parentType: '',
+          color: '',
+          brand: '',
+          size: '',
+          remarks: '',
+          seasons: [],
+          occasions: [],
+          styles: [],
+          purchaseDate: '',
+          price: 0,
+          wearCount: 0,
+          lastWornAt: null,
+          createdAt: '',
+          wardrobeId: 0,
+        } as ClothingItem)
         .filter((c): c is ClothingItem => c !== undefined);
       if (items.length > 0) {
         newData[dateStr] = items;
@@ -295,7 +328,7 @@ export function WearCalendarScreen() {
     }
 
     setWearData(newData);
-  }, [currentYear, currentMonth, clothing]);
+  }, [currentYear, currentMonth, allClothingMap]);
 
   const loadRecentWeek = useCallback(async () => {
     const result: { date: string; items: ClothingItem[] }[] = [];
@@ -306,12 +339,35 @@ export function WearCalendarScreen() {
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
       const items = records
-        .map(r => clothing.find(c => c.id === r.clothingId))
-        .filter((c): c is ClothingItem => c !== undefined);
+        .map(r => allClothingMap.get(r.clothingId) || {
+          id: r.clothingId,
+          imageUri: r.clothingThumbnailUri || '',
+          thumbnailUri: r.clothingThumbnailUri || '',
+          originalImageUri: '',
+          type: r.clothingType || '已删除',
+          parentType: '',
+          color: '',
+          brand: '',
+          size: '',
+          remarks: '',
+          seasons: [],
+          occasions: [],
+          styles: [],
+          purchaseDate: '',
+          price: 0,
+          wearCount: 0,
+          lastWornAt: null,
+          createdAt: '',
+          wardrobeId: 0,
+        } as ClothingItem);
       result.push({ date: dateStr, items });
     }
     setRecentWeek(result);
-  }, [clothing]);
+  }, [allClothingMap]);
+
+  useEffect(() => {
+    loadData();
+  }, []);
 
   useEffect(() => {
     loadMonthData();
@@ -410,14 +466,26 @@ export function WearCalendarScreen() {
                   <View style={styles.thumbnailRow}>
                     {dayRecords.slice(0, 2).map((item) => (
                       <View key={item.id} style={styles.thumbnailWrap}>
-                        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                        {(item.thumbnailUri || item.imageUri) ? (
+                          <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                        ) : (
+                          <View style={[styles.thumbnail, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.borderLight }]}>
+                            <Ionicons name="image-outline" size={8} color={theme.colors.textTertiary} />
+                          </View>
+                        )}
                       </View>
                     ))}
                   </View>
                   <View style={styles.thumbnailRow}>
                     {dayRecords.slice(2, 4).map((item) => (
                       <View key={item.id} style={styles.thumbnailWrap}>
-                        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                        {(item.thumbnailUri || item.imageUri) ? (
+                          <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.thumbnail} resizeMode="cover" />
+                        ) : (
+                          <View style={[styles.thumbnail, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.borderLight }]}>
+                            <Ionicons name="image-outline" size={8} color={theme.colors.textTertiary} />
+                          </View>
+                        )}
                       </View>
                     ))}
                   </View>
@@ -532,12 +600,18 @@ export function WearCalendarScreen() {
               {items.length > 0 ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentThumbsScroll}>
                   {items.map(item => (
-                    <Image
-                      key={item.id}
-                      source={{ uri: item.thumbnailUri || item.imageUri }}
-                      style={styles.recentThumb}
-                      resizeMode="cover"
-                    />
+                    (item.thumbnailUri || item.imageUri) ? (
+                      <Image
+                        key={item.id}
+                        source={{ uri: item.thumbnailUri || item.imageUri }}
+                        style={styles.recentThumb}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View key={item.id} style={[styles.recentThumb, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.borderLight }]}>
+                        <Ionicons name="image-outline" size={14} color={theme.colors.textTertiary} />
+                      </View>
+                    )
                   ))}
                 </ScrollView>
               ) : (

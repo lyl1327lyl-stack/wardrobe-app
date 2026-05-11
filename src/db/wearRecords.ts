@@ -1,8 +1,22 @@
 import { getDatabase } from './database';
 import { WearRecord } from '../types';
 
-// 添加单条穿着记录
-export async function addWearRecord(clothingId: number, date: string): Promise<number> {
+// expo-sqlite 新架构可能返回字符串类型的整数列，统一转为数字
+function parseWearRecordRow(row: any): WearRecord {
+  return {
+    ...row,
+    id: Number(row.id),
+    clothingId: Number(row.clothingId),
+  };
+}
+
+// 添加单条穿着记录（可选保存缩略图和类型，用于单品删除后仍可显示）
+export async function addWearRecord(
+  clothingId: number,
+  date: string,
+  thumbnailUri?: string,
+  clothingType?: string
+): Promise<number> {
   const db = await getDatabase();
   // 检查是否已存在同一天的记录
   const existing = await db.getFirstAsync<{ id: number }>(
@@ -10,21 +24,33 @@ export async function addWearRecord(clothingId: number, date: string): Promise<n
     [clothingId, date]
   );
   if (existing) {
-    return existing.id; // 已存在，返回现有记录ID
+    // 已有记录时仍然更新缩略图和类型（用于补充历史数据）
+    if (thumbnailUri || clothingType) {
+      await db.runAsync(
+        'UPDATE wear_records SET clothingThumbnailUri = ?, clothingType = ? WHERE id = ?',
+        [thumbnailUri || '', clothingType || '', existing.id]
+      );
+    }
+    return Number(existing.id);
   }
   const result = await db.runAsync(
-    'INSERT INTO wear_records (clothingId, wornDate, createdAt) VALUES (?, ?, ?)',
-    [clothingId, date, localDateString()]
+    'INSERT INTO wear_records (clothingId, wornDate, createdAt, clothingThumbnailUri, clothingType) VALUES (?, ?, ?, ?, ?)',
+    [clothingId, date, localDateString(), thumbnailUri || '', clothingType || '']
   );
   return result.lastInsertRowId;
 }
 
 // 批量添加穿着记录（多件衣服同一天）
 // 返回实际新增记录数量（不含已存在的）
-export async function addWearRecords(clothingIds: number[], date: string): Promise<number> {
+export async function addWearRecords(
+  clothingIds: number[],
+  date: string,
+  getThumbnail?: (clothingId: number) => { thumbnailUri?: string; type?: string }
+): Promise<number> {
   let newCount = 0;
   for (const clothingId of clothingIds) {
-    const id = await addWearRecord(clothingId, date);
+    const info = getThumbnail?.(clothingId);
+    const id = await addWearRecord(clothingId, date, info?.thumbnailUri, info?.type);
     if (id) newCount++;
   }
   return newCount;
@@ -37,7 +63,7 @@ export async function getWearRecordsByClothing(clothingId: number): Promise<Wear
     'SELECT * FROM wear_records WHERE clothingId = ? ORDER BY wornDate DESC',
     [clothingId]
   );
-  return result;
+  return result.map(parseWearRecordRow);
 }
 
 // 获取某日期的所有穿着记录
@@ -47,7 +73,7 @@ export async function getWearRecordsByDate(date: string): Promise<WearRecord[]> 
     'SELECT * FROM wear_records WHERE wornDate = ? ORDER BY createdAt DESC',
     [date]
   );
-  return result;
+  return result.map(parseWearRecordRow);
 }
 
 // 获取某件衣物在某年某月的所有穿着日期
@@ -72,7 +98,7 @@ export async function getWearRecordById(id: number): Promise<WearRecord | null> 
     'SELECT * FROM wear_records WHERE id = ?',
     [id]
   );
-  return result || null;
+  return result ? parseWearRecordRow(result) : null;
 }
 
 // 删除单条穿着记录

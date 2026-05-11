@@ -350,6 +350,82 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
       lineHeight: 22,
     },
+    // 相关搭配
+    relatedSection: {
+      marginHorizontal: 20,
+      marginTop: 16,
+    },
+    relatedHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: 12,
+    },
+    relatedTitle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    relatedTitleText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    relatedCount: {
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+    },
+    relatedScroll: {
+      gap: 12,
+    },
+    relatedCard: {
+      width: 148,
+      backgroundColor: theme.colors.card,
+      borderRadius: 14,
+      overflow: 'hidden',
+      ...theme.shadows.sm,
+    },
+    relatedImageWrap: {
+      width: '100%',
+      aspectRatio: 1,
+      backgroundColor: theme.colors.borderLight,
+    },
+    relatedImage: {
+      width: '100%',
+      height: '100%',
+    },
+    relatedCardBody: {
+      padding: 10,
+    },
+    relatedCardName: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    relatedCardGroup: {
+      fontSize: 11,
+      color: theme.colors.textTertiary,
+      marginTop: 2,
+    },
+    relatedCardCount: {
+      fontSize: 11,
+      color: theme.colors.primary,
+      marginTop: 2,
+      fontWeight: '500',
+    },
+    relatedEmptyCard: {
+      width: 148,
+      height: 148,
+      backgroundColor: theme.colors.borderLight,
+      borderRadius: 14,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 6,
+    },
+    relatedEmptyText: {
+      fontSize: 12,
+      color: theme.colors.textTertiary,
+    },
     bottomPadding: {
       height: 100,
     },
@@ -448,12 +524,26 @@ export function ClothingDetailScreen() {
   const allClothing = useWardrobeStore(s => s.clothing);
   const allTrashClothing = useWardrobeStore(s => s.trashClothing);
   const allSoldClothing = useWardrobeStore(s => s.soldClothing);
+  const outfits = useWardrobeStore(s => s.outfits);
+  const groups = useWardrobeStore(s => s.groups);
 
   const item = useMemo(() => {
     return allClothing.find(c => c.id === route.params.id) ||
       allTrashClothing.find(c => c.id === route.params.id) ||
       allSoldClothing.find(c => c.id === route.params.id) || null;
   }, [allClothing, allTrashClothing, allSoldClothing, route.params.id]);
+
+  // 相关搭配
+  const relatedOutfits = useMemo(() => {
+    if (!item) return [];
+    return outfits
+      .filter(o => o.itemIds.includes(item.id))
+      .map(o => ({
+        ...o,
+        groupName: groups.find(g => g.id === o.groupId)?.name || '未分组',
+      }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [item, outfits, groups]);
 
   const [showDiscardSheet, setShowDiscardSheet] = useState(false);
   const [showSellSheet, setShowSellSheet] = useState(false);
@@ -768,7 +858,7 @@ export function ClothingDetailScreen() {
   };
 
   const handleDiscardPermanentDelete = () => {
-    deleteImage(item.imageUri, item.thumbnailUri)
+    deleteImage(item.imageUri, item.thumbnailUri, item.id)
       .then(() => permanentDelete(item.id))
       .then(() => {
         setShowDiscardSheet(false);
@@ -1085,6 +1175,68 @@ export function ClothingDetailScreen() {
           </View>
         )}
 
+        {/* 相关搭配 */}
+        {!isTrash && !isSold && !isDraft && (
+          <View style={styles.relatedSection}>
+            <View style={styles.relatedHeader}>
+              <View style={styles.relatedTitle}>
+                <Ionicons name="shirt-outline" size={18} color={theme.colors.accent} />
+                <Text style={styles.relatedTitleText}>相关搭配</Text>
+                <Text style={styles.relatedCount}>{relatedOutfits.length}</Text>
+              </View>
+              {relatedOutfits.length > 3 && (
+                <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} />
+              )}
+            </View>
+            {relatedOutfits.length === 0 ? (
+              <View style={styles.relatedEmptyCard}>
+                <Ionicons name="grid-outline" size={28} color={theme.colors.border} />
+                <Text style={styles.relatedEmptyText}>暂无相关搭配</Text>
+              </View>
+            ) : (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.relatedScroll}
+              >
+                {relatedOutfits.map(outfit => (
+                  <TouchableOpacity
+                    key={outfit.id}
+                    style={styles.relatedCard}
+                    onPress={() => navigation.navigate('OutfitDetail', { id: outfit.id })}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.relatedImageWrap}>
+                      {outfit.thumbnailUri ? (
+                        <Image
+                          source={{ uri: outfit.thumbnailUri }}
+                          style={styles.relatedImage}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={[styles.relatedImageWrap, { justifyContent: 'center', alignItems: 'center' }]}>
+                          <Ionicons name="shirt-outline" size={32} color={theme.colors.border} />
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.relatedCardBody}>
+                      <Text style={styles.relatedCardName} numberOfLines={1}>
+                        {outfit.name || '未命名搭配'}
+                      </Text>
+                      <Text style={styles.relatedCardGroup} numberOfLines={1}>
+                        {outfit.groupName}
+                      </Text>
+                      <Text style={styles.relatedCardCount}>
+                        {outfit.itemIds.length} 件衣物
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            )}
+          </View>
+        )}
+
         <View style={styles.bottomPadding} />
       </ScrollView>
 
@@ -1118,7 +1270,7 @@ export function ClothingDetailScreen() {
                     text: '彻底删除',
                     style: 'destructive',
                     onPress: () => {
-                      deleteImage(item.imageUri, item.thumbnailUri)
+                      deleteImage(item.imageUri, item.thumbnailUri, item.id)
                         .then(() => permanentDelete(item.id))
                         .then(() => navigation.goBack())
                         .catch(e => {
