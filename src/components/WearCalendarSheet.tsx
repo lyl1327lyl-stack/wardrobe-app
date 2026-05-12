@@ -359,7 +359,7 @@ export function WearCalendarSheet({
   const outfits = useWardrobeStore(s => s.outfits);
   const { addWearRecords } = useWardrobeStore();
   const customSeasons = useCustomOptionsStore(s => s.seasons);
-  const customStyles = useCustomOptionsStore(s => s.styles);
+  const customTags = useCustomOptionsStore(s => s.tags);
 
   // 合并所有衣物来源，用于查找穿着记录关联的衣物
   const allClothingMap = useMemo(() => {
@@ -381,7 +381,14 @@ export function WearCalendarSheet({
   const [selectedAddIds, setSelectedAddIds] = useState<number[]>([]);
   const [selectedOutfitIds, setSelectedOutfitIds] = useState<number[]>([]);
   const [filterSeason, setFilterSeason] = useState<string>('全部');
-  const [filterStyle, setFilterStyle] = useState<string>('全部');
+  const [filterTag, setFilterTag] = useState<string>('全部');
+  const [filterType, setFilterType] = useState<string>('全部');
+
+  const clothingTypes = useMemo(() => {
+    const types = [...new Set(clothing.map(c => c.parentType || c.type))].filter(Boolean);
+    types.sort();
+    return types;
+  }, [clothing]);
 
   useEffect(() => {
     if (visible && date) {
@@ -396,7 +403,8 @@ export function WearCalendarSheet({
       setSelectedOutfitIds([]);
       setPickerMode('items');
       setFilterSeason('全部');
-      setFilterStyle('全部');
+      setFilterTag('全部');
+      setFilterType('全部');
     }
   }, [showAddPicker]);
 
@@ -417,8 +425,9 @@ export function WearCalendarSheet({
           size: '',
           remarks: '',
           seasons: [],
-          occasions: [],
-          styles: [],
+          tags: [],
+          fit: '',
+          thickness: '',
           purchaseDate: '',
           price: 0,
           wearCount: 0,
@@ -474,18 +483,19 @@ export function WearCalendarSheet({
   const filteredClothing = useMemo(() => {
     return clothing.filter(item => {
       if (filterSeason !== '全部' && !item.seasons?.includes(filterSeason)) return false;
-      if (filterStyle !== '全部' && !item.styles?.includes(filterStyle)) return false;
+      if (filterTag !== '全部' && !item.tags?.includes(filterTag)) return false;
+      if (filterType !== '全部' && (item.parentType || item.type) !== filterType) return false;
       return true;
     });
-  }, [clothing, filterSeason, filterStyle]);
+  }, [clothing, filterSeason, filterTag, filterType]);
 
   const filteredOutfits = useMemo(() => {
     return outfits.filter(outfit => {
       if (filterSeason !== '全部' && !outfit.seasons?.includes(filterSeason)) return false;
-      if (filterStyle !== '全部' && !outfit.styles?.includes(filterStyle)) return false;
+      if (filterTag !== '全部' && !outfit.tags?.includes(filterTag)) return false;
       return true;
     });
-  }, [outfits, filterSeason, filterStyle]);
+  }, [outfits, filterSeason, filterTag]);
 
   const toggleAddSelect = (id: number) => {
     setSelectedAddIds(prev =>
@@ -573,15 +583,13 @@ export function WearCalendarSheet({
             {isDeleted ? deleteHint : (item.brand || item.color || '无品牌')}
           </Text>
         </View>
-        {!isDeleted && (
-          <TouchableOpacity
-            style={styles.deleteBtn}
-            onPress={() => handleDelete(item.id)}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="remove-circle-outline" size={22} color={theme.colors.warning} />
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDelete(item.id)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="remove-circle-outline" size={22} color={theme.colors.warning} />
+        </TouchableOpacity>
       </View>
     );
   };
@@ -613,16 +621,34 @@ export function WearCalendarSheet({
           </TouchableOpacity>
         ))}
       </View>
+      {pickerMode === 'items' && (
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>类型</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {['全部', ...clothingTypes].map(t => (
+              <TouchableOpacity
+                key={t}
+                style={[styles.filterChip, filterType === t && styles.filterChipActive]}
+                onPress={() => setFilterType(t)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.filterChipText, filterType === t && styles.filterChipTextActive]}>{t}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+
       <View style={styles.filterRow}>
-        <Text style={styles.filterLabel}>风格</Text>
-        {['全部', ...customStyles].map(s => (
+        <Text style={styles.filterLabel}>标签</Text>
+        {['全部', ...customTags].map(s => (
           <TouchableOpacity
             key={s}
-            style={[styles.filterChip, filterStyle === s && styles.filterChipActive]}
-            onPress={() => setFilterStyle(s)}
+            style={[styles.filterChip, filterTag === s && styles.filterChipActive]}
+            onPress={() => setFilterTag(s)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.filterChipText, filterStyle === s && styles.filterChipTextActive]}>{s}</Text>
+            <Text style={[styles.filterChipText, filterTag === s && styles.filterChipTextActive]}>{s}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -796,7 +822,7 @@ export function WearCalendarSheet({
               <Text style={styles.title}>穿着记录</Text>
               <Text style={styles.dateText}>{formatDate(date)}</Text>
             </View>
-            {!showAddPicker && (
+            {!showAddPicker && records.length > 0 && (
               <TouchableOpacity
                 style={styles.addBtn}
                 onPress={() => setShowAddPicker(true)}

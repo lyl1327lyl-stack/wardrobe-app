@@ -12,10 +12,11 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
-import { ClothingItem } from '../types';
+import { ClothingItem, Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { deleteImage } from '../utils/imageUtils';
+import { OutfitWarningModal } from '../components/OutfitWarningModal';
 
 const { width } = Dimensions.get('window');
 const COLUMN = 2;
@@ -283,11 +284,19 @@ const makeStyles = (theme: Theme) =>
 
 export function SoldItemsScreen() {
   const navigation = useNavigation<any>();
-  const { soldClothing, restoreFromSold, permanentDelete, emptySold, restoreMultipleFromSold, permanentDeleteMultiple } = useWardrobeStore();
+  const { soldClothing, restoreFromSold, permanentDelete, emptySold, restoreMultipleFromSold, permanentDeleteMultiple, getOutfitWarningForDeletion } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [outfitWarning, setOutfitWarning] = useState<{
+    title: string;
+    message: string;
+    outfits: Outfit[];
+    confirmLabel: string;
+    description?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // 批量选择相关函数
   const toggleSelect = (id: number) => {
@@ -334,29 +343,38 @@ export function SoldItemsScreen() {
 
   const handleBatchDelete = () => {
     if (selectedIds.length === 0) return;
-    Alert.alert(
-      '永久删除',
-      `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复！`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              for (const item of soldClothing.filter(c => selectedIds.includes(Number(c.id)))) {
-                await deleteImage(item.imageUri, item.thumbnailUri, item.id);
-              }
-              await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
-              cancelSelection();
-            } catch (e) {
-              console.error('批量删除失败:', e);
-              Alert.alert('删除失败，请重试');
-            }
-          },
-        },
-      ]
-    );
+    const { count, outfits } = getOutfitWarningForDeletion(selectedIds.map(id => Number(id)));
+    const doDelete = async () => {
+      try {
+        for (const item of soldClothing.filter(c => selectedIds.includes(Number(c.id)))) {
+          await deleteImage(item.imageUri, item.thumbnailUri, item.id);
+        }
+        await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
+        cancelSelection();
+      } catch (e) {
+        console.error('批量删除失败:', e);
+        Alert.alert('删除失败，请重试');
+      }
+    };
+    if (count > 0) {
+      setOutfitWarning({
+        title: '永久删除',
+        message: `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复。\n\n选中的单品涉及以下 ${count} 个搭配：`,
+        outfits,
+        confirmLabel: '删除',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
+      });
+    } else {
+      Alert.alert(
+        '永久删除',
+        `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复。`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '删除', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const handleRestore = (item: ClothingItem) => {
@@ -374,42 +392,60 @@ export function SoldItemsScreen() {
   };
 
   const handlePermanentDelete = (item: ClothingItem) => {
-    Alert.alert(
-      '永久删除',
-      '确定要永久删除这件衣服吗？此操作不可恢复！',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            await deleteImage(item.imageUri, item.thumbnailUri, item.id);
-            await permanentDelete(item.id);
-          },
-        },
-      ]
-    );
+    const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+    const doDelete = async () => {
+      await deleteImage(item.imageUri, item.thumbnailUri, item.id);
+      await permanentDelete(item.id);
+    };
+    if (count > 0) {
+      setOutfitWarning({
+        title: '永久删除',
+        message: `确定要永久删除这件衣服吗？此操作不可恢复。\n\n该单品存在于以下 ${count} 个搭配中：`,
+        outfits,
+        confirmLabel: '删除',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
+      });
+    } else {
+      Alert.alert(
+        '永久删除',
+        '确定要永久删除这件衣服吗？此操作不可恢复。',
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '删除', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const handleEmptySold = () => {
     if (soldClothing.length === 0) return;
-    Alert.alert(
-      '清空已卖出',
-      `确定要永久删除 ${soldClothing.length} 件衣服吗？此操作不可恢复！`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '清空',
-          style: 'destructive',
-          onPress: async () => {
-            for (const item of soldClothing) {
-              await deleteImage(item.imageUri, item.thumbnailUri, item.id);
-            }
-            await emptySold();
-          },
-        },
-      ]
-    );
+    const { count, outfits } = getOutfitWarningForDeletion(soldClothing.map(c => c.id));
+    const doDelete = async () => {
+      for (const item of soldClothing) {
+        await deleteImage(item.imageUri, item.thumbnailUri, item.id);
+      }
+      await emptySold();
+    };
+    if (count > 0) {
+      setOutfitWarning({
+        title: '清空已卖出',
+        message: `确定要永久删除 ${soldClothing.length} 件衣服吗？此操作不可恢复。\n\n已卖出列表中的单品涉及以下 ${count} 个搭配：`,
+        outfits,
+        confirmLabel: '清空',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
+      });
+    } else {
+      Alert.alert(
+        '清空已卖出',
+        `确定要永久删除 ${soldClothing.length} 件衣服吗？此操作不可恢复。`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '清空', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const renderItem = ({ item }: { item: ClothingItem }) => {
@@ -564,6 +600,22 @@ export function SoldItemsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {outfitWarning && (
+        <OutfitWarningModal
+          visible={true}
+          onClose={() => setOutfitWarning(null)}
+          onConfirm={() => {
+            outfitWarning.onConfirm();
+            setOutfitWarning(null);
+          }}
+          title={outfitWarning.title}
+          message={outfitWarning.message}
+          outfits={outfitWarning.outfits}
+          confirmLabel={outfitWarning.confirmLabel}
+          description={outfitWarning.description}
+        />
       )}
     </View>
   );

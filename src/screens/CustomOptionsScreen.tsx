@@ -16,7 +16,7 @@ import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 
-type OptionCategory = 'categories' | 'seasons' | 'occasions' | 'styles' | 'sizes';
+type OptionCategory = 'categories' | 'seasons' | 'tags' | 'sizes';
 
 type RouteParams = {
   CustomOptions: { category?: OptionCategory };
@@ -31,8 +31,7 @@ interface CategoryConfig {
 const CATEGORIES: CategoryConfig[] = [
   { key: 'categories', label: '类型', icon: 'grid-outline' },
   { key: 'seasons', label: '季节', icon: 'flower-outline' },
-  { key: 'occasions', label: '场合', icon: 'calendar-outline' },
-  { key: 'styles', label: '风格', icon: 'brush-outline' },
+  { key: 'tags', label: '标签', icon: 'pricetags-outline' },
   { key: 'sizes', label: '尺码', icon: 'resize-outline' },
 ];
 
@@ -352,8 +351,7 @@ export function CustomOptionsScreen() {
   // Zustand selectors
   const categories = useCustomOptionsStore(state => state.categories);
   const seasons = useCustomOptionsStore(state => state.seasons);
-  const occasions = useCustomOptionsStore(state => state.occasions);
-  const storeStyles = useCustomOptionsStore(state => state.styles);
+  const storeTags = useCustomOptionsStore(state => state.tags);
   const sizes = useCustomOptionsStore(state => state.sizes);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
   const load = useCustomOptionsStore(state => state.load);
@@ -395,10 +393,8 @@ export function CustomOptionsScreen() {
         return Object.keys(categories);
       case 'seasons':
         return seasons;
-      case 'occasions':
-        return occasions;
-      case 'styles':
-        return storeStyles;
+      case 'tags':
+        return storeTags;
       case 'sizes':
         return sizes;
     }
@@ -431,11 +427,8 @@ export function CustomOptionsScreen() {
           case 'seasons':
             if (item.seasons.includes(value)) return true;
             break;
-          case 'occasions':
-            if (item.occasions.includes(value)) return true;
-            break;
-          case 'styles':
-            if (item.styles && item.styles.includes(value)) return true;
+          case 'tags':
+            if (item.tags && item.tags.includes(value)) return true;
             break;
           case 'sizes':
             if (item.size === value) return true;
@@ -547,7 +540,7 @@ export function CustomOptionsScreen() {
         onPress: async () => {
           const newOpts = [...opts];
           newOpts.splice(index, 1);
-          await updateCategory(category as 'seasons' | 'occasions' | 'styles' | 'sizes', newOpts);
+          await updateCategory(category as 'seasons' | 'tags' | 'sizes', newOpts);
         },
       },
     ]);
@@ -586,7 +579,7 @@ export function CustomOptionsScreen() {
           Alert.alert('选项已存在', '请使用不同的名称');
           return;
         }
-        await updateCategory(cat as 'seasons' | 'occasions' | 'styles' | 'sizes', [...opts, trimmed]);
+        await updateCategory(cat as 'seasons' | 'tags' | 'sizes', [...opts, trimmed]);
       } else {
         // edit mode
         const { parent, child } = editTarget;
@@ -830,7 +823,7 @@ export function CustomOptionsScreen() {
                 </View>
               )}
 
-              {/* 一维分类：季节/场合/风格 */}
+              {/* 一维分类：季节/标签 */}
               {!isCategories && (isSingleCategoryMode || isExpanded) && (
                 <View style={styles.optionList}>
                   {catOptions.map((opt, idx) => {

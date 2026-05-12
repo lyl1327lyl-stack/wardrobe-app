@@ -21,8 +21,8 @@ interface CustomOptionsState extends CustomOptions {
   addChild: (parent: string, child: string) => Promise<void>;
   renameChild: (parent: string, oldChild: string, newChild: string) => Promise<void>;
   deleteChild: (parent: string, child: string) => Promise<void>;
-  // 一维结构的管理（seasons, occasions, styles, sizes）
-  updateCategory: (category: 'seasons' | 'occasions' | 'styles' | 'sizes', options: string[]) => Promise<void>;
+  // 一维结构的管理（seasons, tags, sizes）
+  updateCategory: (category: 'seasons' | 'tags' | 'sizes', options: string[]) => Promise<void>;
   // 工具
   resetToDefaults: () => Promise<void>;
   // 查找方法
@@ -35,8 +35,7 @@ interface CustomOptionsState extends CustomOptions {
 export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
   categories: DEFAULT_OPTIONS.categories,
   seasons: DEFAULT_OPTIONS.seasons,
-  occasions: DEFAULT_OPTIONS.occasions,
-  styles: DEFAULT_OPTIONS.styles,
+  tags: DEFAULT_OPTIONS.tags,
   sizes: DEFAULT_OPTIONS.sizes,
   isLoading: true,
 
@@ -48,8 +47,7 @@ export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
         set({
           categories: parsed.categories ?? DEFAULT_OPTIONS.categories,
           seasons: parsed.seasons ?? DEFAULT_OPTIONS.seasons,
-          occasions: parsed.occasions ?? DEFAULT_OPTIONS.occasions,
-          styles: parsed.styles ?? DEFAULT_OPTIONS.styles,
+          tags: parsed.tags ?? DEFAULT_OPTIONS.tags,
           sizes: parsed.sizes ?? DEFAULT_OPTIONS.sizes,
           isLoading: false,
         });
@@ -58,8 +56,7 @@ export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
         set({
           categories: DEFAULT_OPTIONS.categories,
           seasons: DEFAULT_OPTIONS.seasons,
-          occasions: DEFAULT_OPTIONS.occasions,
-          styles: DEFAULT_OPTIONS.styles,
+          tags: DEFAULT_OPTIONS.tags,
           sizes: DEFAULT_OPTIONS.sizes,
           isLoading: false,
         });
@@ -69,8 +66,7 @@ export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
       set({
         categories: DEFAULT_OPTIONS.categories,
         seasons: DEFAULT_OPTIONS.seasons,
-        occasions: DEFAULT_OPTIONS.occasions,
-        styles: DEFAULT_OPTIONS.styles,
+        tags: DEFAULT_OPTIONS.tags,
         sizes: DEFAULT_OPTIONS.sizes,
         isLoading: false,
       });
@@ -171,7 +167,7 @@ export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
     await saveState(get());
   },
 
-  // seasons, occasions, styles 的管理
+  // seasons, tags, sizes 的管理
   updateCategory: async (category, options) => {
     set({ [category]: options } as any);
     await saveState(get());
@@ -181,8 +177,7 @@ export const useCustomOptionsStore = create<CustomOptionsState>((set, get) => ({
     set({
       categories: DEFAULT_OPTIONS.categories,
       seasons: DEFAULT_OPTIONS.seasons,
-      occasions: DEFAULT_OPTIONS.occasions,
-      styles: DEFAULT_OPTIONS.styles,
+      tags: DEFAULT_OPTIONS.tags,
       sizes: DEFAULT_OPTIONS.sizes,
     });
     await saveState(get());
@@ -212,8 +207,7 @@ async function saveState(state: CustomOptionsState): Promise<void> {
     await AsyncStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify({
       categories: state.categories,
       seasons: state.seasons,
-      occasions: state.occasions,
-      styles: state.styles,
+      tags: state.tags,
       sizes: state.sizes,
     }));
   } catch (error) {

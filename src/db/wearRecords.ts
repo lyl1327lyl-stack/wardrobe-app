@@ -113,6 +113,12 @@ export async function deleteAllWearRecords(clothingId: number): Promise<void> {
   await db.runAsync('DELETE FROM wear_records WHERE clothingId = ?', [clothingId]);
 }
 
+// 删除某日期的所有穿着记录（用于替换今日穿搭）
+export async function deleteWearRecordsByDate(date: string): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM wear_records WHERE wornDate = ?', [date]);
+}
+
 // 本地日期字符串，避免时区偏移
 function localDateString(): string {
   const d = new Date();

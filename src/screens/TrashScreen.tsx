@@ -12,10 +12,11 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
-import { ClothingItem } from '../types';
+import { ClothingItem, Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { deleteImage } from '../utils/imageUtils';
+import { OutfitWarningModal } from '../components/OutfitWarningModal';
 
 const { width } = Dimensions.get('window');
 const COLUMN = 2;
@@ -267,7 +268,7 @@ const makeStyles = (theme: Theme) =>
 
 export function TrashScreen() {
   const navigation = useNavigation<any>();
-  const { trashClothing, restoreFromTrash, permanentDelete, emptyTrash, restoreMultipleFromTrash, permanentDeleteMultiple } = useWardrobeStore();
+  const { trashClothing, restoreFromTrash, permanentDelete, emptyTrash, restoreMultipleFromTrash, permanentDeleteMultiple, getOutfitWarningForDeletion } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -275,6 +276,14 @@ export function TrashScreen() {
   // 批量选择状态
   const [isSelecting, setIsSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  const [outfitWarning, setOutfitWarning] = useState<{
+    title: string;
+    message: string;
+    outfits: Outfit[];
+    confirmLabel: string;
+    description?: string;
+    onConfirm: () => void;
+  } | null>(null);
 
   // 批量选择相关函数
   const toggleSelect = (id: number) => {
@@ -321,29 +330,38 @@ export function TrashScreen() {
 
   const handleBatchDelete = () => {
     if (selectedIds.length === 0) return;
-    Alert.alert(
-      '永久删除',
-      `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复！`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              for (const item of trashClothing.filter(c => selectedIds.includes(Number(c.id)))) {
-                await deleteImage(item.imageUri, item.thumbnailUri, item.id);
-              }
-              await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
-              cancelSelection();
-            } catch (e) {
-              console.error('批量删除失败:', e);
-              Alert.alert('删除失败，请重试');
-            }
-          },
-        },
-      ]
-    );
+    const { count, outfits } = getOutfitWarningForDeletion(selectedIds.map(id => Number(id)));
+    const doDelete = async () => {
+      try {
+        for (const item of trashClothing.filter(c => selectedIds.includes(Number(c.id)))) {
+          await deleteImage(item.imageUri, item.thumbnailUri, item.id);
+        }
+        await permanentDeleteMultiple(selectedIds.map(id => Number(id)));
+        cancelSelection();
+      } catch (e) {
+        console.error('批量删除失败:', e);
+        Alert.alert('删除失败，请重试');
+      }
+    };
+    if (count > 0) {
+      setOutfitWarning({
+        title: '永久删除',
+        message: `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复。\n\n选中的单品涉及以下 ${count} 个搭配：`,
+        outfits,
+        confirmLabel: '删除',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
+      });
+    } else {
+      Alert.alert(
+        '永久删除',
+        `确定要永久删除 ${selectedIds.length} 件衣服吗？此操作不可恢复。`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '删除', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   useFocusEffect(
@@ -367,51 +385,69 @@ export function TrashScreen() {
   };
 
   const handlePermanentDelete = (item: ClothingItem) => {
-    Alert.alert(
-      '永久删除',
-      '确定要永久删除这件衣服吗？此操作不可恢复！',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '删除',
-          style: 'destructive',
-          onPress: () => {
-            deleteImage(item.imageUri, item.thumbnailUri, item.id)
-              .then(() => permanentDelete(item.id))
-              .catch(e => {
-                console.error('永久删除失败:', e);
-                Alert.alert('删除失败，请重试');
-              });
-          },
-        },
-      ]
-    );
+    const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+    const doDelete = () => {
+      deleteImage(item.imageUri, item.thumbnailUri, item.id)
+        .then(() => permanentDelete(item.id))
+        .catch(e => {
+          console.error('永久删除失败:', e);
+          Alert.alert('删除失败，请重试');
+        });
+    };
+    if (count > 0) {
+      setOutfitWarning({
+        title: '永久删除',
+        message: `确定要永久删除这件衣服吗？此操作不可恢复。\n\n该单品存在于以下 ${count} 个搭配中：`,
+        outfits,
+        confirmLabel: '删除',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
+      });
+    } else {
+      Alert.alert(
+        '永久删除',
+        '确定要永久删除这件衣服吗？此操作不可恢复。',
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '删除', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const handleEmptyTrash = () => {
     if (trashClothing.length === 0) return;
-    Alert.alert(
-      '清空废衣篓',
-      `确定要永久删除 ${trashClothing.length} 件衣服吗？此操作不可恢复！`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '清空',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              for (const item of trashClothing) {
-                await deleteImage(item.imageUri, item.thumbnailUri, item.id);
-              }
-              await emptyTrash();
-            } catch (e) {
-              console.error('清空废衣篓失败:', e);
-              Alert.alert('清空失败，请重试');
-            }
-          },
-        },
-      ]
-    );
+    const { count, outfits } = getOutfitWarningForDeletion(trashClothing.map(c => c.id));
+    const doDelete = async () => {
+      try {
+        for (const item of trashClothing) {
+          await deleteImage(item.imageUri, item.thumbnailUri, item.id);
+        }
+        await emptyTrash();
+      } catch (e) {
+        console.error('清空废衣篓失败:', e);
+        Alert.alert('清空失败，请重试');
+      }
+    };
+    if (count > 0) {
+      setOutfitWarning({
+        title: '清空废衣篓',
+        message: `确定要永久删除 ${trashClothing.length} 件衣服吗？此操作不可恢复。\n\n废衣篓中的单品涉及以下 ${count} 个搭配：`,
+        outfits,
+        confirmLabel: '清空',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
+      });
+    } else {
+      Alert.alert(
+        '清空废衣篓',
+        `确定要永久删除 ${trashClothing.length} 件衣服吗？此操作不可恢复。`,
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '清空', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const renderItem = ({ item }: { item: ClothingItem }) => {
@@ -561,6 +597,22 @@ export function TrashScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      )}
+
+      {outfitWarning && (
+        <OutfitWarningModal
+          visible={true}
+          onClose={() => setOutfitWarning(null)}
+          onConfirm={() => {
+            outfitWarning.onConfirm();
+            setOutfitWarning(null);
+          }}
+          title={outfitWarning.title}
+          message={outfitWarning.message}
+          outfits={outfitWarning.outfits}
+          confirmLabel={outfitWarning.confirmLabel}
+          description={outfitWarning.description}
+        />
       )}
     </View>
   );

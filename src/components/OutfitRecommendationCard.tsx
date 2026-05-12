@@ -5,56 +5,89 @@ import {
   StyleSheet,
   TouchableOpacity,
   Image,
-  ScrollView,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { OutfitRecommendation, Scene } from '../types';
+import { OutfitRecommendation } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
+import { OutfitConfirmModal } from './OutfitConfirmModal';
 
 interface Props {
   recommendation: OutfitRecommendation;
   onRefresh: () => void;
-  onWear: () => void;
+  onWear: (mode: 'append' | 'replace') => void;
+  onCalendar: () => void;
+  todayThumbnails: Array<{ uri: string; type: string; id: number }>;
 }
 
-const SCENE_CONFIG: Record<Scene, { icon: string; label: string; color: string }> = {
-  '工作': { icon: 'briefcase', label: '工作', color: '#6B7FD7' },
-  '运动': { icon: 'fitness', label: '运动', color: '#00B894' },
-  '约会': { icon: 'heart', label: '约会', color: '#E17055' },
-  '宅家': { icon: 'home', label: '宅家', color: '#FDCB6E' },
-};
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const CARD_MARGIN = 16;
+const CARD_PADDING = 20;
+const CONTENT_WIDTH = SCREEN_WIDTH - CARD_MARGIN * 2 - CARD_PADDING * 2;
+const RATIO = 3 / 5;
+const GRID_GAP = 10;
+const GRID_WIDTH = CONTENT_WIDTH * RATIO;
+
+function getCalendarGrid(year: number, month: number) {
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+
+  const weeks: (number | null)[][] = [];
+  let day = 1;
+  for (let w = 0; w < 6; w++) {
+    const week: (number | null)[] = [];
+    for (let d = 0; d < 7; d++) {
+      if ((w === 0 && d < startOffset) || day > daysInMonth) {
+        week.push(null);
+      } else {
+        week.push(day++);
+      }
+    }
+    weeks.push(week);
+    if (day > daysInMonth) break;
+  }
+  return weeks;
+}
+
+const WEEK_HEADERS = ['一', '二', '三', '四', '五', '六', '日'];
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     container: {
       backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.xl,
-      padding: 20,
-      marginHorizontal: 16,
+      borderRadius: 20,
+      padding: CARD_PADDING,
+      marginHorizontal: CARD_MARGIN,
       marginTop: 16,
+      overflow: 'visible' as const,
       ...theme.shadows.lg,
     },
     header: {
       flexDirection: 'row',
+      alignItems: 'flex-start',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 12,
+      marginBottom: 6,
     },
-    headerLeft: {},
-    headerRight: {},
-    sceneBadge: {
+    headerLeft: {
+      flex: 1,
+      marginRight: 12,
+    },
+    titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: theme.borderRadius.full,
+      gap: 6,
+      marginBottom: 4,
     },
-    sceneText: {
-      fontSize: 12,
-      fontWeight: '600',
+    titleIcon: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      backgroundColor: theme.colors.primary + '18',
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     title: {
       fontSize: 20,
@@ -62,194 +95,345 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
       letterSpacing: -0.3,
     },
-    reason: {
-      fontSize: 13,
-      color: theme.colors.textSecondary,
-      marginTop: 4,
-      lineHeight: 18,
-    },
-    itemsScroll: {
-      marginTop: 16,
-      marginHorizontal: -20,
-    },
-    itemsContainer: {
-      paddingHorizontal: 20,
-      gap: 12,
-    },
-    itemCard: {
-      width: 100,
-      borderRadius: theme.borderRadius.lg,
-      overflow: 'hidden',
-      backgroundColor: theme.colors.borderLight,
-      ...theme.shadows.sm,
-    },
-    itemImage: {
-      width: '100%',
-      height: 120,
-      resizeMode: 'cover',
-    },
-    itemOverlay: {
-      padding: 8,
-      backgroundColor: 'rgba(255,255,255,0.95)',
-    },
-    itemType: {
+    subtitle: {
       fontSize: 12,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    itemColor: {
-      fontSize: 11,
       color: theme.colors.textTertiary,
+      fontWeight: '400',
+      marginLeft: 34,
+    },
+    headerRefresh: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.colors.borderLight || theme.colors.border + '40',
+      justifyContent: 'center',
+      alignItems: 'center',
       marginTop: 2,
     },
-    actions: {
+    // ── 长方形印章（双层边框，溢出卡片）──
+    stampWrap: {
+      position: 'absolute',
+      top: 0,
+      left: 140,
+      zIndex: 10,
+    },
+    stampOuter: {
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderWidth: 2,
+      borderColor: '#C4545A',
+      borderRadius: 5,
+      backgroundColor: 'rgba(255, 246, 246, 0.88)',
+      transform: [{ rotate: '-10deg' }],
+    },
+    stampInner: {
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+      borderWidth: 1,
+      borderColor: '#C4545A',
+      borderRadius: 3,
+      opacity: 0.5,
+    },
+    stampText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: '#C4545A',
+      letterSpacing: 2,
+    },
+    contentRow: {
       flexDirection: 'row',
-      gap: 12,
+      gap: 16,
       marginTop: 16,
     },
+    grid: {
+      width: GRID_WIDTH,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: GRID_GAP,
+    },
+    gridImage: {
+      borderRadius: 12,
+      resizeMode: 'cover',
+    },
+    actionsColumn: {
+      flex: 1,
+      justifyContent: 'center',
+      gap: 10,
+    },
     wearButton: {
-      flex: 1.5,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       gap: 8,
       backgroundColor: theme.colors.primary,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.lg,
+      paddingVertical: 16,
+      borderRadius: 16,
       ...theme.shadows.md,
     },
     wearButtonDisabled: {
-      opacity: 0.6,
+      opacity: 0.5,
     },
     wearButtonText: {
       color: theme.colors.white,
-      fontSize: 15,
-      fontWeight: '600',
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: 0.3,
     },
-    refreshButton: {
-      flex: 1,
+
+    // ── 日历按钮 ──
+    calendarWrap: {
+      // 自然高度，不拉伸
+    },
+    calendarRings: {
       flexDirection: 'row',
-      alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      backgroundColor: theme.colors.background,
-      paddingVertical: 14,
-      borderRadius: theme.borderRadius.lg,
-      borderWidth: 1.5,
-      borderColor: theme.colors.primary,
+      gap: 18,
+      marginBottom: -4,
+      zIndex: 1,
     },
-    refreshText: {
-      color: theme.colors.primary,
-      fontSize: 14,
-      fontWeight: '600',
+    calendarRing: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      backgroundColor: theme.colors.border,
     },
-    scoreRow: {
+    calendarBody: {
+      backgroundColor: theme.colors.white,
+      borderRadius: 12,
+      paddingHorizontal: 8,
+      paddingVertical: 6,
+      ...theme.shadows.sm,
+      borderWidth: StyleSheet.hairlineWidth,
+      borderColor: theme.colors.borderLight,
+    },
+    calendarMonthRow: {
       flexDirection: 'row',
+      justifyContent: 'center',
       alignItems: 'center',
-      gap: 8,
-      marginTop: 16,
+      marginBottom: 3,
+      gap: 6,
     },
-    scoreLabel: {
+    calMonthText: {
       fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    calDivider: {
+      width: 18,
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: theme.colors.accent,
+    },
+    calWeekRow: {
+      flexDirection: 'row',
+      marginBottom: 0,
+    },
+    calWeekCell: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 0,
+    },
+    calWeekText: {
+      fontSize: 7,
+      fontWeight: '600',
       color: theme.colors.textTertiary,
     },
-    scoreBar: {
+    calDateRow: {
+      flexDirection: 'row',
+    },
+    calDateCell: {
       flex: 1,
-      height: 4,
-      backgroundColor: theme.colors.borderLight,
-      borderRadius: 2,
-      overflow: 'hidden',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 0,
     },
-    scoreFill: {
-      height: '100%',
-      backgroundColor: theme.colors.accent,
-      borderRadius: 2,
+    calDateText: {
+      fontSize: 8,
+      color: theme.colors.textSecondary,
+      lineHeight: 14,
     },
-    scoreValue: {
-      fontSize: 12,
-      color: theme.colors.accent,
-      fontWeight: '600',
-      width: 36,
-      textAlign: 'right',
+    calDateTextToday: {
+      fontSize: 8,
+      fontWeight: '700',
+      color: theme.colors.white,
+    },
+    calTodayDot: {
+      width: 13,
+      height: 13,
+      borderRadius: 7,
+      backgroundColor: theme.colors.primary,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    calendarLabel: {
+      textAlign: 'center',
+      fontSize: 10,
+      color: theme.colors.textSecondary,
+      fontWeight: '500',
+      marginTop: 3,
     },
   });
 
-export function OutfitRecommendationCard({ recommendation, onRefresh, onWear }: Props) {
+export function OutfitRecommendationCard({ recommendation, onRefresh, onWear, onCalendar, todayThumbnails }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { items, reason, scene } = recommendation;
+  const { items } = recommendation;
   const [isLoading, setIsLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  const sceneConfig = SCENE_CONFIG[scene];
+  const hasTodayRecord = todayThumbnails.length > 0;
 
-  const handleWearAll = async () => {
+  // 推荐单品都是今日已记录的子集时，视为重复
+  const todayIdSet = useMemo(() => new Set(todayThumbnails.map(t => t.id)), [todayThumbnails]);
+  const isDuplicate = hasTodayRecord && items.length > 0 && items.every(i => todayIdSet.has(i.id));
+
+  const handlePressWear = () => {
+    if (isDuplicate) {
+      Alert.alert('已记录', '这套搭配和今天已记录的一致，无需重复记录');
+      return;
+    }
+    setShowModal(true);
+  };
+
+  const handleWear = async (mode: 'append' | 'replace') => {
+    setShowModal(false);
     setIsLoading(true);
     try {
-      await onWear();
-    } catch (error) {
-      Alert.alert('记录失败', '请重试');
+      await onWear(mode);
     } finally {
       setIsLoading(false);
     }
   };
 
+  const gridItems = items.slice(0, 6);
+  const gridCols = gridItems.length > 4 ? 3 : 2;
+  const gridColSize = (GRID_WIDTH - GRID_GAP * (gridCols - 1)) / gridCols;
+
+  // 固定网格高度：始终按 2×2 大图布局预留空间，避免卡片高度跳动
+  const baseColSize = (GRID_WIDTH - GRID_GAP) / 2;
+  const gridHeight = 2 * baseColSize * 1.25 + GRID_GAP;
+
+  const today = new Date();
+  const todayDate = today.getDate();
+  const calYear = today.getFullYear();
+  const calMonth = today.getMonth() + 1;
+  const calWeeks = useMemo(() => getCalendarGrid(calYear, calMonth), [calYear, calMonth]);
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={[styles.sceneBadge, { backgroundColor: `${sceneConfig.color}20` }]}>
-            <Ionicons name={sceneConfig.icon as any} size={14} color={sceneConfig.color} />
-            <Text style={[styles.sceneText, { color: sceneConfig.color }]}>{sceneConfig.label}</Text>
-          </View>
-        </View>
-      </View>
-
-      <Text style={styles.title}>今日穿搭推荐</Text>
-      <Text style={styles.reason}>{reason}</Text>
-
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.itemsContainer}
-        style={styles.itemsScroll}
-      >
-        {items.map(item => (
-          <View key={item.id} style={styles.itemCard}>
-            <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.itemImage} />
-            <View style={styles.itemOverlay}>
-              <Text style={styles.itemType} numberOfLines={1}>{item.type}</Text>
-              <Text style={styles.itemColor} numberOfLines={1}>{item.color}</Text>
+      {/* ── 印章（溢出在卡片右上角）── */}
+      {hasTodayRecord && (
+        <View style={styles.stampWrap} pointerEvents="none">
+          <View style={styles.stampOuter}>
+            <View style={styles.stampInner}>
+              <Text style={styles.stampText}>今日已记录</Text>
             </View>
           </View>
-        ))}
-      </ScrollView>
-
-      <View style={styles.actions}>
-        <TouchableOpacity
-          style={[styles.wearButton, isLoading && styles.wearButtonDisabled]}
-          onPress={handleWearAll}
-          disabled={isLoading}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="checkmark-done" size={20} color={theme.colors.white} />
-          <Text style={styles.wearButtonText}>
-            {isLoading ? '记录中...' : '就穿这套'}
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.refreshButton} onPress={onRefresh} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={20} color={theme.colors.primary} />
-          <Text style={styles.refreshText}>换一套</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.scoreRow}>
-        <Text style={styles.scoreLabel}>搭配匹配度</Text>
-        <View style={styles.scoreBar}>
-          <View style={[styles.scoreFill, { width: `${recommendation.score}%` }]} />
         </View>
-        <Text style={styles.scoreValue}>{recommendation.score}%</Text>
+      )}
+
+      {/* ── Header: 图标 + 标题, 右侧换一套按钮 ── */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <View style={styles.titleRow}>
+            <View style={styles.titleIcon}>
+              <Ionicons name="sparkles" size={15} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.title}>今日推荐</Text>
+          </View>
+        </View>
+        <TouchableOpacity style={styles.headerRefresh} onPress={onRefresh} activeOpacity={0.7}>
+          <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
       </View>
+
+      {/* ── Body: 图片网格 + 操作区 ── */}
+      <View style={[styles.contentRow, { height: gridHeight }]}>
+        <View style={[styles.grid, { height: gridHeight }]}>
+          {gridItems.map(item => (
+            <Image
+              key={item.id}
+              source={{ uri: item.thumbnailUri || item.imageUri }}
+              style={[styles.gridImage, { width: gridColSize, height: gridColSize * 1.25 }]}
+            />
+          ))}
+        </View>
+
+        <View style={styles.actionsColumn}>
+          <TouchableOpacity
+            style={[
+              styles.wearButton,
+              isLoading && styles.wearButtonDisabled,
+            ]}
+            onPress={handlePressWear}
+            disabled={isLoading}
+            activeOpacity={0.85}
+          >
+            <Ionicons
+              name="checkmark-outline"
+              size={16}
+              color={theme.colors.white}
+            />
+            <Text style={styles.wearButtonText}>
+              {isLoading ? '记录中...' : '就穿这套'}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.calendarWrap} onPress={onCalendar} activeOpacity={0.7}>
+            {/* 日历活页环 */}
+            <View style={styles.calendarRings}>
+              <View style={styles.calendarRing} />
+              <View style={styles.calendarRing} />
+            </View>
+
+            {/* 日历主体 */}
+            <View style={styles.calendarBody}>
+              <View style={styles.calendarMonthRow}>
+                <Text style={styles.calMonthText}>{calMonth}月</Text>
+                <View style={styles.calDivider} />
+              </View>
+
+              <View style={styles.calWeekRow}>
+                {WEEK_HEADERS.map((d, i) => (
+                  <View key={i} style={styles.calWeekCell}>
+                    <Text style={styles.calWeekText}>{d}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {calWeeks.map((week, wi) => (
+                <View key={wi} style={styles.calDateRow}>
+                  {week.map((d, di) => (
+                    <View key={di} style={styles.calDateCell}>
+                      {d !== null ? (
+                        d === todayDate ? (
+                          <View style={styles.calTodayDot}>
+                            <Text style={styles.calDateTextToday}>{d}</Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.calDateText}>{d}</Text>
+                        )
+                      ) : (
+                        <Text style={styles.calDateText}> </Text>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              ))}
+
+              <Text style={styles.calendarLabel}>穿着日历</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <OutfitConfirmModal
+        visible={showModal}
+        onClose={() => setShowModal(false)}
+        onConfirm={handleWear}
+        todayThumbnails={todayThumbnails}
+        recItems={items}
+      />
     </View>
   );
 }

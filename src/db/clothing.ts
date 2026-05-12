@@ -23,8 +23,9 @@ function parseClothingRow<T extends ClothingItem>(row: T): ClothingItem {
     ...row,
     id: Number(row.id),
     seasons: JSON.parse(row.seasons as unknown as string || '[]'),
-    occasions: JSON.parse(row.occasions as unknown as string || '[]'),
-    styles: JSON.parse((row as any).styles || '[]'),
+    tags: JSON.parse((row as any).styles || '[]'),
+    fit: (row as any).fit || '',
+    thickness: (row as any).thickness || '',
     parentType: parseParentType(row),
   };
 }
@@ -45,8 +46,8 @@ export async function getClothingById(id: number): Promise<ClothingItem | null> 
 export async function addClothing(item: Omit<ClothingItem, 'id'>): Promise<number> {
   const db = await getDatabase();
   const result = await db.runAsync(
-    `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, styles, fit, thickness, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       item.imageUri,
       item.thumbnailUri,
@@ -58,8 +59,9 @@ export async function addClothing(item: Omit<ClothingItem, 'id'>): Promise<numbe
       item.size,
       item.remarks || '',
       JSON.stringify(item.seasons),
-      JSON.stringify(item.occasions),
-      JSON.stringify(item.styles || []),
+      JSON.stringify(item.tags || []),
+      item.fit || '',
+      item.thickness || '',
       item.purchaseDate,
       item.price,
       item.wearCount,
@@ -76,7 +78,7 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
   await db.runAsync(
     `UPDATE clothing_items SET
       imageUri = ?, thumbnailUri = ?, originalImageUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
-      seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wearCount = ?, lastWornAt = ?,
+      seasons = ?, styles = ?, fit = ?, thickness = ?, purchaseDate = ?, price = ?, wearCount = ?, lastWornAt = ?,
       soldAt = ?, soldPrice = ?, soldPlatform = ?, wardrobeId = ?
      WHERE id = ?`,
     [
@@ -90,8 +92,9 @@ export async function updateClothing(item: ClothingItem): Promise<void> {
       item.size,
       item.remarks || '',
       JSON.stringify(item.seasons),
-      JSON.stringify(item.occasions),
-      JSON.stringify(item.styles || []),
+      JSON.stringify(item.tags || []),
+      item.fit || '',
+      item.thickness || '',
       item.purchaseDate,
       item.price,
       item.wearCount,
@@ -253,7 +256,7 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
       await db.runAsync(
         `UPDATE clothing_items SET
           imageUri = ?, thumbnailUri = ?, originalImageUri = ?, type = ?, parentType = ?, color = ?, brand = ?, size = ?, remarks = ?,
-          seasons = ?, occasions = ?, styles = ?, purchaseDate = ?, price = ?, wardrobeId = ?
+          seasons = ?, styles = ?, fit = ?, thickness = ?, purchaseDate = ?, price = ?, wardrobeId = ?
          WHERE id = ? AND isDraft = 1`,
         [
           item.imageUri,
@@ -266,8 +269,9 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
           item.size,
           item.remarks || '',
           JSON.stringify(item.seasons),
-          JSON.stringify(item.occasions),
-          JSON.stringify(item.styles || []),
+          JSON.stringify(item.tags || []),
+          item.fit || '',
+          item.thickness || '',
           item.purchaseDate,
           item.price,
           item.wardrobeId ?? 1,
@@ -278,8 +282,8 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
     } else {
       // 新增草稿
       const result = await db.runAsync(
-        `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, occasions, styles, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId, isDraft)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+        `INSERT INTO clothing_items (imageUri, thumbnailUri, originalImageUri, type, parentType, color, brand, size, remarks, seasons, styles, fit, thickness, purchaseDate, price, wearCount, lastWornAt, createdAt, wardrobeId, isDraft)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
         [
           item.imageUri,
           item.thumbnailUri,
@@ -291,8 +295,9 @@ export async function saveClothingDraft(item: Omit<ClothingItem, 'id'> & { id?: 
           item.size,
           item.remarks || '',
           JSON.stringify(item.seasons),
-          JSON.stringify(item.occasions),
-          JSON.stringify(item.styles || []),
+          JSON.stringify(item.tags || []),
+          item.fit || '',
+          item.thickness || '',
           item.purchaseDate,
           item.price,
           0,

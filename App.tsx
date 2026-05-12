@@ -4,7 +4,7 @@ import { NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -28,6 +28,7 @@ import { WardrobeManagementScreen } from './src/screens/WardrobeManagementScreen
 import { DraftsScreen } from './src/screens/DraftsScreen';
 import { ImageCropScreen } from './src/screens/ImageCropScreen';
 import { WearCalendarScreen } from './src/screens/WearCalendarScreen';
+import { HomeScreen } from './src/screens/HomeScreen';
 import { ThemeProvider } from './src/context/ThemeContext';
 import { useTheme } from './src/hooks/useTheme';
 import { useWardrobeStore } from './src/store/wardrobeStore';
@@ -40,6 +41,7 @@ function TabIcon({ name, focused, theme }: { name: string; focused: boolean; the
   const icons: Record<string, { focused: keyof typeof Ionicons.glyphMap; unfocused: keyof typeof Ionicons.glyphMap }> = {
     '衣橱': { focused: 'shirt', unfocused: 'shirt-outline' },
     '搭配': { focused: 'grid', unfocused: 'grid-outline' },
+    '主页': { focused: 'home', unfocused: 'home-outline' },
     '统计': { focused: 'stats-chart', unfocused: 'stats-chart-outline' },
     '个人中心': { focused: 'person', unfocused: 'person-outline' },
   };
@@ -95,6 +97,7 @@ function MainTabs() {
   const insets = useSafeAreaInsets();
   return (
     <Tab.Navigator
+      initialRouteName="主页"
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} theme={theme} />,
         tabBarActiveTintColor: theme.colors.primary,
@@ -116,6 +119,7 @@ function MainTabs() {
     >
       <Tab.Screen name="衣橱" component={WardrobeStackScreen} />
       <Tab.Screen name="搭配" component={GroupListScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="主页" component={HomeScreen} options={{ headerShown: false }} />
       <Tab.Screen name="统计" component={StatsScreen} options={{ headerShown: false }} />
       <Tab.Screen name="个人中心" component={PersonalCenterScreen} options={{ headerShown: false }} />
     </Tab.Navigator>

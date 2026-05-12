@@ -12,13 +12,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { deleteImage } from '../utils/imageUtils';
-import { ClothingItem } from '../types';
+import { ClothingItem, Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
 import { WearCalendarSheet } from '../components/WearCalendarSheet';
+import { OutfitWarningModal } from '../components/OutfitWarningModal';
 import * as wearRecordsDb from '../db/wearRecords';
 
 type DetailSource = 'wardrobe' | 'trash' | 'sold' | 'draft';
@@ -516,7 +517,7 @@ const makeStyles = (theme: Theme) =>
 export function ClothingDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ClothingDetail'>>();
-  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, publishDraft, addWearRecord, deleteWearRecord } = useWardrobeStore();
+  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, publishDraft, addWearRecord, deleteWearRecord, getOutfitWarningForDeletion } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -549,6 +550,14 @@ export function ClothingDetailScreen() {
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
   const [showWearCalendar, setShowWearCalendar] = useState(false);
+  const [outfitWarning, setOutfitWarning] = useState<{
+    title: string;
+    message: string;
+    outfits: Outfit[];
+    confirmLabel: string;
+    description?: string;
+    onConfirm: () => void;
+  } | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [wearDates, setWearDates] = useState<string[]>([]);
   const [dynamicLastWorn, setDynamicLastWorn] = useState<string | null>(null);
@@ -846,29 +855,82 @@ export function ClothingDetailScreen() {
   };
 
   const handleDiscardConfirm = async (reason: string) => {
-    await moveToTrash(item.id, reason);
-    setShowDiscardSheet(false);
-    navigation.goBack();
+    const doMove = async () => {
+      await moveToTrash(item.id, reason);
+      setShowDiscardSheet(false);
+      navigation.goBack();
+    };
+    const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+    if (count > 0) {
+      setOutfitWarning({
+        title: '移进废衣篓',
+        message: `移进废衣篓后，该单品将从衣柜中移除。\n\n该单品存在于以下 ${count} 个搭配中：`,
+        outfits,
+        confirmLabel: '确认移除',
+        description: '这些搭配的画板中仍会保留图片，但单品将显示为已移除状态。你可以随时从废衣篓恢复。',
+        onConfirm: doMove,
+      });
+    } else {
+      doMove();
+    }
   };
 
   const handleSellConfirm = async (soldPrice: number, soldPlatform: string) => {
-    await sellClothing(item.id, soldPrice, soldPlatform);
-    setShowSellSheet(false);
-    navigation.goBack();
+    const doSell = async () => {
+      await sellClothing(item.id, soldPrice, soldPlatform);
+      setShowSellSheet(false);
+      navigation.goBack();
+    };
+    const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+    if (count > 0) {
+      setOutfitWarning({
+        title: '标记为已卖出',
+        message: `卖出后，该单品将从衣柜中移除。\n\n该单品存在于以下 ${count} 个搭配中：`,
+        outfits,
+        confirmLabel: '确认卖出',
+        description: '这些搭配的画板中仍会保留图片，但单品将显示为已移除状态。你可以随时从已卖出列表恢复。',
+        onConfirm: doSell,
+      });
+    } else {
+      doSell();
+    }
   };
 
   const handleDiscardPermanentDelete = () => {
-    deleteImage(item.imageUri, item.thumbnailUri, item.id)
-      .then(() => permanentDelete(item.id))
-      .then(() => {
-        setShowDiscardSheet(false);
-        setShowSellSheet(false);
-        navigation.goBack();
-      })
-      .catch(e => {
-        console.error('删除失败:', e);
-        Alert.alert('删除失败，请重试');
+    const doDelete = () => {
+      deleteImage(item.imageUri, item.thumbnailUri, item.id)
+        .then(() => permanentDelete(item.id))
+        .then(() => {
+          setShowDiscardSheet(false);
+          setShowSellSheet(false);
+          navigation.goBack();
+        })
+        .catch(e => {
+          console.error('删除失败:', e);
+          Alert.alert('删除失败，请重试');
+        });
+    };
+
+    const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+    if (count > 0) {
+      setOutfitWarning({
+        title: '确认彻底删除',
+        message: `此操作不可恢复。\n\n该单品存在于以下 ${count} 个搭配中：`,
+        outfits,
+        confirmLabel: '彻底删除',
+        description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+        onConfirm: doDelete,
       });
+    } else {
+      Alert.alert(
+        '确认彻底删除',
+        '确定要永久删除这件衣服吗？此操作不可恢复。',
+        [
+          { text: '取消', style: 'cancel' },
+          { text: '彻底删除', style: 'destructive', onPress: doDelete },
+        ]
+      );
+    }
   };
 
   const handleRestore = async () => {
@@ -1040,11 +1102,21 @@ export function ClothingDetailScreen() {
                 <Text style={[styles.tagText, i === 0 && styles.tagTextSeason]}>{s}</Text>
               </View>
             ))}
-            {item.occasions.map(o => (
-              <View key={`occ-${o}`} style={styles.tag}>
-                <Text style={styles.tagText}>{o}</Text>
+            {item.tags.map(t => (
+              <View key={`tag-${t}`} style={styles.tag}>
+                <Text style={styles.tagText}>{t}</Text>
               </View>
             ))}
+            {item.fit ? (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>版型: {item.fit}</Text>
+              </View>
+            ) : null}
+            {item.thickness ? (
+              <View style={styles.tag}>
+                <Text style={styles.tagText}>厚薄: {item.thickness}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -1261,26 +1333,35 @@ export function ClothingDetailScreen() {
               <Text style={styles.restoreActionText}>恢复</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.deleteAction} onPress={() => {
-              Alert.alert(
-                '确认彻底删除',
-                '此操作不可恢复，确定要彻底删除这件衣服吗？',
-                [
-                  { text: '取消', style: 'cancel' },
-                  {
-                    text: '彻底删除',
-                    style: 'destructive',
-                    onPress: () => {
-                      deleteImage(item.imageUri, item.thumbnailUri, item.id)
-                        .then(() => permanentDelete(item.id))
-                        .then(() => navigation.goBack())
-                        .catch(e => {
-                          console.error('删除失败:', e);
-                          Alert.alert('删除失败，请重试');
-                        });
-                    },
-                  },
-                ]
-              );
+              const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+              const doDelete = () => {
+                deleteImage(item.imageUri, item.thumbnailUri, item.id)
+                  .then(() => permanentDelete(item.id))
+                  .then(() => navigation.goBack())
+                  .catch(e => {
+                    console.error('删除失败:', e);
+                    Alert.alert('删除失败，请重试');
+                  });
+              };
+              if (count > 0) {
+                setOutfitWarning({
+                  title: '确认彻底删除',
+                  message: `此操作不可恢复。\n\n该单品存在于以下 ${count} 个搭配中：`,
+                  outfits,
+                  confirmLabel: '彻底删除',
+                  description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+                  onConfirm: doDelete,
+                });
+              } else {
+                Alert.alert(
+                  '确认彻底删除',
+                  '确定要永久删除这件衣服吗？此操作不可恢复。',
+                  [
+                    { text: '取消', style: 'cancel' },
+                    { text: '彻底删除', style: 'destructive', onPress: doDelete },
+                  ]
+                );
+              }
             }} activeOpacity={0.8}>
               <Ionicons name="trash-outline" size={20} color={theme.colors.white} />
               <Text style={styles.deleteActionText}>彻底删除</Text>
@@ -1333,6 +1414,22 @@ export function ClothingDetailScreen() {
         onDeleteRecord={handleDeleteRecord}
         onAddRecord={loadWearDates}
       />
+
+      {outfitWarning && (
+        <OutfitWarningModal
+          visible={true}
+          onClose={() => setOutfitWarning(null)}
+          onConfirm={() => {
+            outfitWarning.onConfirm();
+            setOutfitWarning(null);
+          }}
+          title={outfitWarning.title}
+          message={outfitWarning.message}
+          outfits={outfitWarning.outfits}
+          confirmLabel={outfitWarning.confirmLabel}
+          description={outfitWarning.description}
+        />
+      )}
     </View>
   );
 }

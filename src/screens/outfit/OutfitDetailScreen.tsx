@@ -48,7 +48,7 @@ export function OutfitDetailScreen() {
   const deleteOutfit = useWardrobeStore(s => s.deleteOutfit);
   const addWearRecords = useWardrobeStore(s => s.addWearRecords);
   const customSeasons = useCustomOptionsStore(s => s.seasons);
-  const customStyles = useCustomOptionsStore(s => s.styles);
+  const customTags = useCustomOptionsStore(s => s.tags);
 
   const outfit = useMemo(() => outfits.find(o => o.id === outfitId), [outfits, outfitId]);
   const currentGroup = groups.find(g => g.id === (outfit?.groupId || groupId));
@@ -60,7 +60,7 @@ export function OutfitDetailScreen() {
 
   const draftGroup = useMemo(() => groups.find(g => g.id === draftGroupId), [groups, draftGroupId]);
   const [draftSeasons, setDraftSeasons] = useState<string[]>([]);
-  const [draftStyles, setDraftStyles] = useState<string[]>([]);
+  const [draftTags, setDraftTags] = useState<string[]>([]);
   const [draftNotes, setDraftNotes] = useState('');
 
   // Initialize draft state when outfit loads
@@ -68,7 +68,7 @@ export function OutfitDetailScreen() {
     if (outfit) {
       setDraftGroupId(outfit.groupId ?? null);
       setDraftSeasons([...(outfit.seasons || [])]);
-      setDraftStyles([...(outfit.styles || [])]);
+      setDraftTags([...(outfit.tags || [])]);
       setDraftNotes(outfit.notes || '');
     }
   }, [outfit?.id]);
@@ -81,16 +81,16 @@ export function OutfitDetailScreen() {
   }, [isFocused, outfit, navigation]);
 
   const savedSeasons: string[] = outfit?.seasons || [];
-  const savedStyles: string[] = outfit?.styles || [];
+  const savedTags: string[] = outfit?.tags || [];
   const savedNotes: string = outfit?.notes || '';
 
   const hasChanges = useMemo(() => {
     const groupChanged = draftGroupId !== (outfit?.groupId ?? null);
     const seasonsChanged = [...draftSeasons].sort().join(',') !== [...savedSeasons].sort().join(',');
-    const stylesChanged = [...draftStyles].sort().join(',') !== [...savedStyles].sort().join(',');
+    const tagsChanged = [...draftTags].sort().join(',') !== [...savedTags].sort().join(',');
     const notesChanged = draftNotes !== savedNotes;
-    return groupChanged || seasonsChanged || stylesChanged || notesChanged;
-  }, [draftGroupId, outfit?.groupId, draftSeasons, draftStyles, draftNotes, savedSeasons, savedStyles, savedNotes]);
+    return groupChanged || seasonsChanged || tagsChanged || notesChanged;
+  }, [draftGroupId, outfit?.groupId, draftSeasons, draftTags, draftNotes, savedSeasons, savedTags, savedNotes]);
 
   const toggleSeason = useCallback((season: string) => {
     setDraftSeasons(prev =>
@@ -98,9 +98,9 @@ export function OutfitDetailScreen() {
     );
   }, []);
 
-  const toggleStyle = useCallback((style: string) => {
-    setDraftStyles(prev =>
-      prev.includes(style) ? prev.filter(s => s !== style) : [...prev, style]
+  const toggleTag = useCallback((tag: string) => {
+    setDraftTags(prev =>
+      prev.includes(tag) ? prev.filter(s => s !== tag) : [...prev, tag]
     );
   }, []);
 
@@ -110,10 +110,10 @@ export function OutfitDetailScreen() {
       ...outfit,
       groupId: draftGroupId ?? undefined,
       seasons: [...draftSeasons],
-      styles: [...draftStyles],
+      tags: [...draftTags],
       notes: draftNotes,
     } as Outfit);
-  }, [outfit, draftGroupId, draftSeasons, draftStyles, draftNotes, updateOutfit]);
+  }, [outfit, draftGroupId, draftSeasons, draftTags, draftNotes, updateOutfit]);
 
   const handleDelete = useCallback(() => {
     Alert.alert(
@@ -126,12 +126,11 @@ export function OutfitDetailScreen() {
           style: 'destructive',
           onPress: async () => {
             await deleteOutfit(outfitId);
-            navigation.goBack();
           },
         },
       ],
     );
-  }, [outfitId, deleteOutfit, navigation]);
+  }, [outfitId, deleteOutfit]);
 
   const handleSelectDraftGroup = useCallback((toGroupId: number) => {
     setDraftGroupId(toGroupId);
@@ -150,12 +149,35 @@ export function OutfitDetailScreen() {
     }
   }, [outfit?.itemIds, addWearRecords]);
 
-  const outfitClothing = useMemo(() => {
+  // 从 canvasData 中获取已删除单品的缓存图片 URI
+  const deletedImageUriMap = useMemo(() => {
+    const map: Record<number, string> = {};
+    const canvasData = (outfit as any)?.canvasData;
+    if (canvasData && Array.isArray(canvasData)) {
+      canvasData.forEach((ci: any) => {
+        if (ci.clothingId && ci.imageUri) {
+          map[ci.clothingId] = ci.imageUri;
+        }
+      });
+    }
+    return map;
+  }, [outfit]);
+
+  const outfitItems = useMemo(() => {
     if (!outfit?.itemIds) return [];
-    return outfit.itemIds
-      .map(id => clothing.find(c => c.id === id))
-      .filter(Boolean) as ClothingItem[];
-  }, [outfit?.itemIds, clothing]);
+    return outfit.itemIds.map(id => {
+      const found = clothing.find(c => c.id === id);
+      if (found) return found;
+      const cachedUri = deletedImageUriMap[id];
+      return { id, deleted: true, thumbnailUri: cachedUri || null } as unknown as ClothingItem;
+    });
+  }, [outfit?.itemIds, clothing, deletedImageUriMap]);
+
+  const outfitClothing = useMemo(() => {
+    return outfitItems.filter(item => !(item as any).deleted) as ClothingItem[];
+  }, [outfitItems]);
+
+  const deletedCount = outfitItems.length - outfitClothing.length;
 
   const totalPrice = useMemo(() => {
     return outfitClothing.reduce((sum, c) => sum + (c.price || 0), 0);
@@ -308,34 +330,34 @@ export function OutfitDetailScreen() {
           <View style={styles.infoBlock}>
             <View style={styles.cardHeaderLeft}>
               <View style={[styles.cardDot, { backgroundColor: theme.colors.accent }]} />
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>风格</Text>
+              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>标签</Text>
             </View>
-            {customStyles.length > 0 ? (
+            {customTags.length > 0 ? (
               <View style={styles.chipRow}>
-                {customStyles.map(style => (
+                {customTags.map(tag => (
                   <TouchableOpacity
-                    key={style}
+                    key={tag}
                     style={[
                       styles.chip,
                       { backgroundColor: theme.colors.background, borderColor: theme.colors.border },
-                      draftStyles.includes(style) && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                      draftTags.includes(tag) && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
                     ]}
-                    onPress={() => toggleStyle(style)}
+                    onPress={() => toggleTag(tag)}
                     activeOpacity={0.7}
                   >
                     <Text style={[
                       styles.chipText,
                       { color: theme.colors.textSecondary },
-                      draftStyles.includes(style) && { color: '#fff' },
+                      draftTags.includes(tag) && { color: '#fff' },
                     ]}>
-                      {style}
+                      {tag}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             ) : (
               <Text style={[styles.emptyHint, { color: theme.colors.textTertiary }]}>
-                暂无风格选项，可在个人中心添加
+                暂无标签选项，可在个人中心添加
               </Text>
             )}
           </View>
@@ -379,27 +401,52 @@ export function OutfitDetailScreen() {
                   {outfitClothing.length}件
                 </Text>
               </View>
+              {deletedCount > 0 && (
+                <Text style={[styles.deletedHint, { color: theme.colors.warning }]}>
+                  ({deletedCount}件已删除)
+                </Text>
+              )}
             </View>
             {totalPrice > 0 && (
               <Text style={[styles.clothingPrice, { color: theme.colors.primary }]}>¥{totalPrice.toLocaleString()}</Text>
             )}
           </View>
-          {outfitClothing.length > 0 ? (
+          {outfitItems.length > 0 ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.clothingScroll}
             >
-              {outfitClothing.map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[styles.clothingItem, { backgroundColor: theme.colors.background }]}
-                  onPress={() => navigation.navigate('ClothingDetail', { id: item.id })}
-                  activeOpacity={0.7}
-                >
-                  <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.clothingImage} />
-                </TouchableOpacity>
-              ))}
+              {outfitItems.map(item => {
+                const isDeleted = (item as any).deleted;
+                if (isDeleted) {
+                  return (
+                    <View
+                      key={`deleted-${item.id}`}
+                      style={[styles.clothingItem, styles.clothingItemDeleted, { backgroundColor: theme.colors.borderLight, borderColor: theme.colors.border }]}
+                    >
+                      {item.thumbnailUri ? (
+                        <Image source={{ uri: item.thumbnailUri }} style={[styles.clothingImage, { opacity: 0.45 }]} />
+                      ) : (
+                        <Ionicons name="help-circle-outline" size={24} color={theme.colors.textTertiary} />
+                      )}
+                      <View style={styles.deletedOverlay}>
+                        <Text style={styles.deletedOverlayText}>已删除</Text>
+                      </View>
+                    </View>
+                  );
+                }
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.clothingItem, { backgroundColor: theme.colors.background }]}
+                    onPress={() => navigation.navigate('ClothingDetail', { id: item.id })}
+                    activeOpacity={0.7}
+                  >
+                    <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.clothingImage} />
+                  </TouchableOpacity>
+                );
+              })}
             </ScrollView>
           ) : (
             <Text style={[styles.emptyHint, { color: theme.colors.textTertiary }]}>
@@ -642,6 +689,31 @@ const makeStyles = (theme: Theme, insets: any) =>
       ...theme.shadows.sm,
     },
     clothingImage: { width: '100%', height: '100%', objectFit: 'cover' },
+    clothingItemDeleted: {
+      borderWidth: 1.5,
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    deletedOverlay: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.colors.warning + 'CC',
+      paddingVertical: 3,
+      alignItems: 'center',
+    },
+    deletedOverlayText: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: '#fff',
+    },
+    deletedHint: {
+      fontSize: 11,
+      fontWeight: '500',
+      marginLeft: 4,
+    },
 
     // Modal shared
     modalOverlay: {

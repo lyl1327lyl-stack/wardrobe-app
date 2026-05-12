@@ -21,7 +21,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ImagePickerModal } from '../components/ImagePickerModal';
 import { processImage } from '../utils/imageUtils';
-import { ClothingItem, COLORS } from '../types';
+import { ClothingItem, COLORS, FIT_OPTIONS, THICKNESS_OPTIONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { Theme } from '../utils/theme';
@@ -65,8 +65,9 @@ function hasUnsavedChanges(initial: any, current: any): boolean {
     brand: initial.brand !== current.brand,
     size: initial.size !== current.size,
     seasons: JSON.stringify(initial.seasons) !== JSON.stringify(current.seasons),
-    occasions: JSON.stringify(initial.occasions) !== JSON.stringify(current.occasions),
-    clothingStyles: JSON.stringify(initial.clothingStyles) !== JSON.stringify(current.clothingStyles),
+    tags: JSON.stringify(initial.tags) !== JSON.stringify(current.tags),
+    fit: initial.fit !== current.fit,
+    thickness: initial.thickness !== current.thickness,
     purchaseDate: initial.purchaseDate !== current.purchaseDate,
     price: initial.price !== current.price,
     remarks: initial.remarks !== current.remarks,
@@ -652,8 +653,7 @@ export function AddClothingScreen() {
   const getParents = useCustomOptionsStore(state => state.getParents);
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
   const customSeasons = useCustomOptionsStore(state => state.seasons);
-  const customOccasions = useCustomOptionsStore(state => state.occasions);
-  const customStyles = useCustomOptionsStore(state => state.styles);
+  const customTags = useCustomOptionsStore(state => state.tags);
   const customSizes = useCustomOptionsStore(state => state.sizes);
   const load = useCustomOptionsStore(state => state.load);
   const customIsLoading = useCustomOptionsStore(state => state.isLoading);
@@ -718,8 +718,9 @@ export function AddClothingScreen() {
   const [brand, setBrand] = useState(existingItem?.brand || '');
   const [size, setSize] = useState(existingItem?.size || '');
   const [seasons, setSeasons] = useState<string[]>(existingItem?.seasons || []);
-  const [occasions, setOccasions] = useState<string[]>(existingItem?.occasions || []);
-  const [clothingStyles, setClothingStyles] = useState<string[]>(existingItem?.styles || []);
+  const [tags, setTags] = useState<string[]>(existingItem?.tags || []);
+  const [fit, setFit] = useState<string>(existingItem?.fit || '');
+  const [thickness, setThickness] = useState<string>(existingItem?.thickness || '');
   const [purchaseDate, setPurchaseDate] = useState<Date | null>(
     existingItem?.purchaseDate ? new Date(existingItem.purchaseDate) : null
   );
@@ -746,8 +747,9 @@ export function AddClothingScreen() {
       setBrand(existingItem.brand || '');
       setSize(existingItem.size || '');
       setSeasons(existingItem.seasons || []);
-      setOccasions(existingItem.occasions || []);
-      setClothingStyles(existingItem.styles || []);
+      setTags(existingItem.tags || []);
+      setFit(existingItem.fit || '');
+      setThickness(existingItem.thickness || '');
       setPurchaseDate(existingItem.purchaseDate ? new Date(existingItem.purchaseDate) : null);
       setPrice(existingItem.price != null ? String(existingItem.price) : '');
       setWearCount(existingItem.wearCount ?? 0);
@@ -790,8 +792,9 @@ export function AddClothingScreen() {
     brand: '',
     size: '',
     seasons: [] as string[],
-    occasions: [] as string[],
-    clothingStyles: [] as string[],
+    tags: [] as string[],
+    fit: '',
+    thickness: '',
     purchaseDate: '',
     price: '',
     remarks: '',
@@ -809,8 +812,9 @@ export function AddClothingScreen() {
         brand: existingItem.brand || '',
         size: existingItem.size || '',
         seasons: existingItem.seasons || [],
-        occasions: existingItem.occasions || [],
-        clothingStyles: existingItem.styles || [],
+        tags: existingItem.tags || [],
+        fit: existingItem.fit || '',
+        thickness: existingItem.thickness || '',
         purchaseDate: existingItem.purchaseDate || '',
         price: existingItem.price != null ? String(existingItem.price) : '',
         remarks: existingItem.remarks || '',
@@ -825,8 +829,8 @@ export function AddClothingScreen() {
   const scrollViewRef = useRef<ScrollView>(null);
 
   const currentState = {
-    imageUri, originalImageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, occasions,
-    clothingStyles, purchaseDate: purchaseDate ? formatDate(purchaseDate) : '', price, remarks,
+    imageUri, originalImageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, tags, fit, thickness,
+    purchaseDate: purchaseDate ? formatDate(purchaseDate) : '', price, remarks,
   };
 
   const hasChanges = isInitialStateReady && hasUnsavedChanges(initialState.current, currentState);
@@ -896,16 +900,20 @@ export function AddClothingScreen() {
     setSeasons(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
   };
 
-  const toggleOccasion = (o: string) => {
-    setOccasions(prev => prev.includes(o) ? prev.filter(x => x !== o) : [...prev, o]);
+  const toggleTag = (t: string) => {
+    setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
   };
 
-  const toggleStyle = (s: string) => {
-    setClothingStyles(prev => prev.includes(s) ? prev.filter(x => x !== s) : [...prev, s]);
+  const selectFit = (f: string) => {
+    setFit(prev => prev === f ? '' : f);
+  };
+
+  const selectThickness = (t: string) => {
+    setThickness(prev => prev === t ? '' : t);
   };
 
   // 跳转到分类管理页面
-  const openOptionManager = (field: 'categories' | 'seasons' | 'occasions' | 'styles' | 'sizes') => {
+  const openOptionManager = (field: 'categories' | 'seasons' | 'tags' | 'sizes') => {
     skipUnsavedCheck.current = true;
     navigation.navigate('CustomOptions', { category: field });
   };
@@ -986,14 +994,15 @@ export function AddClothingScreen() {
         brand,
         size,
         seasons: seasons,
-        occasions,
+        tags: tags,
+        fit,
+        thickness,
         purchaseDate: purchaseDate ? formatDate(purchaseDate) : '',
         price: parseFloat(price) || 0,
         wearCount,
         lastWornAt: existingItem?.lastWornAt || null,
         createdAt: existingItem?.createdAt || new Date().toISOString(),
         remarks: remarks,
-        styles: clothingStyles,
         deletedAt: asDraft ? 'draft' : existingItem?.deletedAt,
         discardReason: existingItem?.discardReason || null,
         soldAt: existingItem?.soldAt || null,
@@ -1279,42 +1288,58 @@ export function AddClothingScreen() {
             </View>
           </View>
 
-          {/* Card 3: 场合 & 风格 */}
+          {/* Card 3: 标签 */}
           <View style={styles.formCard}>
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
-                <Text style={styles.labelText}>场合</Text>
-                <TouchableOpacity style={styles.addOptionBtn} onPress={() => openOptionManager('occasions')} activeOpacity={0.7}>
+                <Text style={styles.labelText}>标签</Text>
+                <TouchableOpacity style={styles.addOptionBtn} onPress={() => openOptionManager('tags')} activeOpacity={0.7}>
                   <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
               <View style={styles.chipRow}>
-                {(customOccasions || []).map(o => (
-                  <TouchableOpacity key={o} style={[styles.chip, occasions.includes(o) && styles.chipActive]} onPress={() => toggleOccasion(o)}>
-                    <Text style={[styles.chipLabel, occasions.includes(o) && styles.chipLabelActive]}>{o}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.formGroup}>
-              <View style={styles.labelRow}>
-                <Text style={styles.labelText}>风格</Text>
-                <TouchableOpacity style={styles.addOptionBtn} onPress={() => openOptionManager('styles')} activeOpacity={0.7}>
-                  <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.chipRow}>
-                {(customStyles || []).map(s => (
-                  <TouchableOpacity key={s} style={[styles.chip, clothingStyles.includes(s) && styles.chipActive]} onPress={() => toggleStyle(s)}>
-                    <Text style={[styles.chipLabel, clothingStyles.includes(s) && styles.chipLabelActive]}>{s}</Text>
+                {(customTags || []).map(t => (
+                  <TouchableOpacity key={t} style={[styles.chip, tags.includes(t) && styles.chipActive]} onPress={() => toggleTag(t)}>
+                    <Text style={[styles.chipLabel, tags.includes(t) && styles.chipLabelActive]}>{t}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
           </View>
 
-          {/* Card 4: 备注 */}
+          {/* Card 4: 版型 */}
+          <View style={styles.formCard}>
+            <View style={styles.formGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.labelText}>版型</Text>
+              </View>
+              <View style={styles.chipRow}>
+                {FIT_OPTIONS.map(f => (
+                  <TouchableOpacity key={f} style={[styles.chip, fit === f && styles.chipActive]} onPress={() => selectFit(f)}>
+                    <Text style={[styles.chipLabel, fit === f && styles.chipLabelActive]}>{f}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Card 5: 厚薄 */}
+          <View style={styles.formCard}>
+            <View style={styles.formGroup}>
+              <View style={styles.labelRow}>
+                <Text style={styles.labelText}>厚薄</Text>
+              </View>
+              <View style={styles.chipRow}>
+                {THICKNESS_OPTIONS.map(t => (
+                  <TouchableOpacity key={t} style={[styles.chip, thickness === t && styles.chipActive]} onPress={() => selectThickness(t)}>
+                    <Text style={[styles.chipLabel, thickness === t && styles.chipLabelActive]}>{t}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          </View>
+
+          {/* Card 6: 备注 */}
           <View style={styles.formCard}>
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>备注</Text>

@@ -16,20 +16,18 @@ export const DEFAULT_CATEGORIES: CustomCategories = {
   '包包': ['单肩包', '双肩包', '手提包', '钱包'],
 };
 
-// 保留 seasons, occasions, styles 的一维结构
+// 保留 seasons, tags, sizes 的一维结构
 export interface CustomOptions {
   categories: CustomCategories;  // 两级分类（替代原来的 types）
   seasons: string[];
-  occasions: string[];
-  styles: string[];
+  tags: string[];
   sizes: string[];
 }
 
 export const DEFAULT_OPTIONS: CustomOptions = {
   categories: DEFAULT_CATEGORIES,
   seasons: ['春', '夏', '秋', '冬'],
-  occasions: ['日常', '工作', '运动', '正式', '休闲'],
-  styles: ['休闲', '简约', '运动', '通勤', '优雅', '街头', '韩系', '日系', '复古'],
+  tags: ['休闲', '简约', '运动', '通勤', '优雅', '街头', '韩系', '日系', '复古'],
   sizes: ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXL以上', '均码'],
 };
 

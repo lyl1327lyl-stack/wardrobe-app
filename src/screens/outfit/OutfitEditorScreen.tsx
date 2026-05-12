@@ -56,6 +56,7 @@ interface DraggableItemProps {
   onDelete: (clothingId: number) => void;
   isSelected: boolean;
   onSelect: () => void;
+  isDeleted?: boolean;
   styles: any;
   theme: any;
 }
@@ -68,6 +69,7 @@ function DraggableItem({
   onDelete,
   isSelected,
   onSelect,
+  isDeleted,
   styles,
   theme,
 }: DraggableItemProps) {
@@ -192,12 +194,18 @@ function DraggableItem({
                 width: imageSize,
                 height: imageSize,
                 transform: [{ rotate: `${rotation}deg` }],
-                borderColor: isSelected ? theme.colors.primary : 'transparent',
-                borderWidth: isSelected ? 2 : 0,
+                borderColor: isSelected ? theme.colors.primary : (isDeleted ? theme.colors.warning : 'transparent'),
+                borderWidth: isSelected ? 2 : (isDeleted ? 1.5 : 0),
                 borderStyle: (isSelected ? 'dashed' : 'solid') as any,
+                opacity: isDeleted ? 0.75 : 1,
               },
             ]}
           >
+            {isDeleted && (
+              <View style={styles.deletedBadge}>
+                <Ionicons name="warning" size={10} color="#fff" />
+              </View>
+            )}
             <TouchableOpacity
               activeOpacity={0.9}
               onPress={() => onSelect()}
@@ -269,11 +277,22 @@ export function OutfitEditorScreen({ onSave }: Props) {
     reset,
   } = useOutfitStore();
 
-  const { addOutfit, updateOutfit, outfits, groups } = useWardrobeStore();
+  const { addOutfit, updateOutfit, outfits, groups, clothing } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
+
+  // 检测画板中已删除的单品
+  const deletedClothingIds = useMemo(() => {
+    return canvasItems
+      .filter(ci => !clothing.some(c => c.id === ci.clothingId))
+      .map(ci => ci.clothingId);
+  }, [canvasItems, clothing]);
+
+  const handleClearDeleted = useCallback(() => {
+    deletedClothingIds.forEach(id => removeCanvasItem(id));
+  }, [deletedClothingIds, removeCanvasItem]);
   const canvasRef = useRef<View>(null);
   const captureTargetRef = useRef<View>(null);
 
@@ -490,7 +509,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
         const gName = groups.find(g => g.id === groupId)?.name || '';
         Alert.alert(
           '搭配已创建',
-          '是否需要编辑搭配的季节、风格、备注等属性？',
+          '是否需要编辑搭配的季节、标签、备注等属性？',
           [
             {
               text: '返回分组',
@@ -557,6 +576,25 @@ export function OutfitEditorScreen({ onSave }: Props) {
         </TouchableOpacity>
       </View>
 
+      {/* 已删除单品清除横幅 */}
+      {deletedClothingIds.length > 0 && (
+        <View style={styles.deletedBanner}>
+          <View style={styles.deletedBannerLeft}>
+            <Ionicons name="warning-outline" size={16} color={theme.colors.warning} />
+            <Text style={styles.deletedBannerText}>
+              检测到 {deletedClothingIds.length} 个已删除的单品
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.deletedBannerBtn, { backgroundColor: theme.colors.warning }]}
+            onPress={handleClearDeleted}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.deletedBannerBtnText}>一键清除</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.content}>
         <View style={styles.canvasCentered}>
           <TouchableOpacity
@@ -580,6 +618,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
                 onDelete={handleDelete}
                 isSelected={selectedItemId === item.clothingId}
                 onSelect={() => handleSelect(item.clothingId)}
+                isDeleted={deletedClothingIds.includes(item.clothingId)}
                 styles={styles}
                 theme={theme}
               />
@@ -760,6 +799,49 @@ const createStyles = (theme: any, insets: any) =>
       color: '#fff',
       fontSize: 14,
       fontWeight: '500',
+    },
+    deletedBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: theme.colors.warning + '12',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.warning + '30',
+    },
+    deletedBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flex: 1,
+    },
+    deletedBannerText: {
+      fontSize: 13,
+      fontWeight: '500',
+      color: theme.colors.warning,
+    },
+    deletedBannerBtn: {
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 14,
+    },
+    deletedBannerBtnText: {
+      color: '#fff',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    deletedBadge: {
+      position: 'absolute',
+      top: -4,
+      left: -4,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
+      backgroundColor: theme.colors.warning,
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 100,
     },
     content: {
       flex: 1,

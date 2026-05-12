@@ -134,13 +134,35 @@ export async function processImage(uri: string, removeBg: boolean = false, origi
 
 export async function deleteImage(imageUri: string, thumbnailUri: string, clothingId?: number) {
   try {
-    await deleteAsync(imageUri, { idempotent: true });
-    // 如果有穿着记录，保留缩略图（穿着记录需要显示该缩略图）
+    // 先检查所有引用，再决定删除策略
+    let hasWearRecords = false;
+    let hasOutfitRefs = false;
+
     if (clothingId) {
       const { getWearRecordsByClothing } = require('../db/wearRecords');
       const records = await getWearRecordsByClothing(clothingId);
-      if (records.length > 0) return;
+      hasWearRecords = records.length > 0;
+
+      const { getAllOutfits } = require('../db/outfit');
+      const outfits = await getAllOutfits();
+      hasOutfitRefs = outfits.some((o: any) =>
+        o.canvasData?.some((ci: any) => ci.clothingId === clothingId)
+      );
     }
+
+    // 搭配画板引用的是主图 (canvasData.imageUri = item.imageUri)
+    // 穿着记录引用的是缩略图
+    if (hasOutfitRefs) {
+      // 搭配需要主图 + 穿着记录需要缩略图 → 全部保留
+      return;
+    }
+
+    // 没有搭配引用 → 主图可以安全删除
+    await deleteAsync(imageUri, { idempotent: true });
+
+    // 穿着记录需要缩略图
+    if (hasWearRecords) return;
+
     await deleteAsync(thumbnailUri, { idempotent: true });
   } catch (error) {
     console.error('Failed to delete images:', error);

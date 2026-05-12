@@ -7,9 +7,11 @@ import {
   Image,
   ScrollView,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { DEFAULT_OPTIONS, getAllChildren } from '../utils/customOptions';
@@ -21,11 +23,16 @@ import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
 import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
 import * as wearRecordsDb from '../db/wearRecords';
 
+const SEASON_FILTER_KEY = 'wardrobe_season_filter';
+
+const GRID_COLUMNS = 4;
+const GRID_GAP = 8;
+const GRID_PADDING = 16;
+
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
 const SORT_OPTIONS = [
   { key: 'createdAt' as const, label: '创建时间', icon: 'time-outline' as const },
-  { key: 'type' as const, label: '类型', icon: 'shirt-outline' as const },
   { key: 'price' as const, label: '价格', icon: 'cash-outline' as const },
   { key: 'color' as const, label: '颜色', icon: 'color-palette-outline' as const },
 ];
@@ -125,8 +132,8 @@ const makeStyles = (theme: Theme) =>
     filterSection: {
       flexDirection: 'row',
       paddingHorizontal: 16,
-      paddingVertical: 8,
-      gap: 8,
+      paddingVertical: 4,
+      gap: 6,
     },
     scrollView: {
       flex: 1,
@@ -136,17 +143,16 @@ const makeStyles = (theme: Theme) =>
       paddingTop: 16,
     },
     categoryCard: {
-      backgroundColor: theme.colors.card,
-      borderRadius: 16,
-      padding: 14,
-      marginBottom: 14,
-      ...theme.shadows.sm,
+      backgroundColor: 'transparent',
+      paddingVertical: 10,
+      paddingHorizontal: 4,
+      marginBottom: 6,
     },
     categoryHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 12,
+      marginBottom: 8,
     },
     categoryTitleRow: {
       flexDirection: 'row',
@@ -173,35 +179,33 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.textTertiary,
     },
     categoryScroll: {
-      gap: 10,
+      gap: 8,
     },
     itemCard: {
-      width: 100,
-      height: 100,
-      borderRadius: 10,
+      width: 88,
+      height: 88,
+      borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: theme.colors.borderLight,
+      backgroundColor: 'transparent',
       position: 'relative',
-      borderWidth: 1,
-      borderColor: 'transparent',
     },
     itemCardSelected: {
-      borderWidth: 3,
+      borderWidth: 2,
       borderColor: theme.colors.primary,
+      borderRadius: 8,
     },
-    // 透明图片背景 - 无边框，融入页面背景
     itemCardTransparent: {
-      width: 100,
-      height: 100,
-      borderRadius: 10,
+      width: 88,
+      height: 88,
+      borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: theme.colors.background,
+      backgroundColor: 'transparent',
       position: 'relative',
     },
     itemImage: {
       width: '100%',
       height: '100%',
-      backgroundColor: theme.colors.borderLight,
+      borderRadius: 8,
     },
     costBadge: {
       position: 'absolute',
@@ -228,40 +232,36 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
-    // 网格视图样式 - 简洁版
+    // 网格视图样式
     gridContainer: {
       flexDirection: 'row',
       flexWrap: 'wrap',
       paddingHorizontal: 16,
-      gap: 10,
+      rowGap: GRID_GAP,
+      columnGap: GRID_GAP,
     },
     gridItemWrap: {
-      width: '31%',
-      aspectRatio: 1,
-      borderRadius: 12,
+      width: 88,
+      height: 88,
+      borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: theme.colors.card,
-      borderWidth: 1,
-      borderColor: 'transparent',
-      ...theme.shadows.sm,
+      backgroundColor: 'transparent',
     },
     gridItemSelected: {
-      borderWidth: 3,
+      borderWidth: 2,
       borderColor: theme.colors.primary,
     },
-    // 透明图片背景 - 使用与 gridItemWrap 一致的背景色
     gridItemTransparentWrap: {
-      width: '31%',
-      aspectRatio: 1,
-      borderRadius: 12,
+      width: 88,
+      height: 88,
+      borderRadius: 8,
       overflow: 'hidden',
-      backgroundColor: theme.colors.borderLight,
-      borderWidth: 1,
-      borderColor: 'transparent',
+      backgroundColor: 'transparent',
     },
     gridItemImage: {
-      width: '100%',
-      height: '100%',
+      width: 88,
+      height: 88,
+      borderRadius: 8,
     },
     // 网格视图右下角单次穿着价格
     gridCostBadge: {
@@ -420,17 +420,17 @@ const makeStyles = (theme: Theme) =>
     seasonPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 16,
       backgroundColor: theme.colors.card,
-      gap: 6,
+      gap: 4,
     },
     seasonPillActive: {
       backgroundColor: theme.colors.primary,
     },
     seasonPillText: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: '500',
       color: theme.colors.textSecondary,
     },
@@ -442,17 +442,17 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 8,
+      paddingVertical: 4,
     },
     sortContent: {
-      gap: 8,
+      gap: 6,
     },
     sortPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: 16,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 14,
       backgroundColor: theme.colors.card,
       gap: 4,
       borderWidth: 1,
@@ -580,16 +580,43 @@ export function WardrobeScreen() {
   const categories = useCustomOptionsStore(state => state.categories);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
   const seasons = useCustomOptionsStore(state => state.seasons);
-  const customStyles = useCustomOptionsStore(state => state.styles);
+  const customTags = useCustomOptionsStore(state => state.tags);
   const load = useCustomOptionsStore(state => state.load);
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
-  const styleOptions = useMemo(() => {
-    return customStyles && customStyles.length > 0 ? customStyles : DEFAULT_OPTIONS.styles;
-  }, [customStyles]);
+  const gridItemSize = useMemo(() => {
+    const { width: screenWidth } = Dimensions.get('window');
+    return (screenWidth - GRID_PADDING * 2 - GRID_GAP * (GRID_COLUMNS - 1)) / GRID_COLUMNS;
+  }, []);
 
-  const [selectedSeasons, setSelectedSeasons] = useState<('全部' | Season)[]>(['全部']);
-  const [selectedStyle, setSelectedStyle] = useState<string>('全部');
+  const tagOptions = useMemo(() => {
+    return customTags && customTags.length > 0 ? customTags : DEFAULT_OPTIONS.tags;
+  }, [customTags]);
+
+  const [selectedSeason, setSelectedSeason] = useState<('全部' | Season)>('全部');
+  const [seasonLoaded, setSeasonLoaded] = useState(false);
+
+  // 从 AsyncStorage 恢复季节筛选
+  useEffect(() => {
+    (async () => {
+      try {
+        const saved = await AsyncStorage.getItem(SEASON_FILTER_KEY);
+        if (saved && SEASON_OPTIONS.includes(saved as any)) {
+          setSelectedSeason(saved as ('全部' | Season));
+        }
+      } catch {}
+      setSeasonLoaded(true);
+    })();
+  }, []);
+
+  // 季节变更时持久化
+  const handleSeasonChange = useCallback((season: '全部' | Season) => {
+    setSelectedSeason(season);
+    AsyncStorage.setItem(SEASON_FILTER_KEY, season).catch(() => {});
+  }, []);
+
+  const [selectedTag, setSelectedTag] = useState<string>('全部');
+  const [selectedType, setSelectedType] = useState<string>('全部');
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
@@ -619,33 +646,35 @@ export function WardrobeScreen() {
   };
 
   const handleViewAll = (parent: string) => {
-    const season = selectedSeasons.includes('全部') ? '全部' : selectedSeasons[0];
+    const season = selectedSeason;
     navigation.navigate('CategoryDetail', { type: parent, season });
   };
 
   const getItemId = (item: ClothingItem) => Number(item.id);
 
   const getTitle = () => {
-    if (selectedSeasons.includes('全部') || selectedSeasons.length === 0) return '我的衣橱';
-    if (selectedSeasons.length === 1) return `${selectedSeasons[0]}季衣橱`;
-    return `${selectedSeasons.length}个季节`;
+    if (selectedSeason === '全部') return '我的衣橱';
+    return `${selectedSeason}季衣橱`;
   };
+
+  // 不含种类筛选的列表，用于计算 availableParents（避免种类筛选后其他选项消失）
+  const clothingForTypeFilter = useMemo(() => {
+    let result = clothing.filter(item => item.wardrobeId === currentWardrobeId);
+    if (selectedSeason !== '全部') {
+      result = result.filter(item => item.seasons.includes(selectedSeason));
+    }
+    if (selectedTag !== '全部') {
+      result = result.filter(item => item.tags.includes(selectedTag));
+    }
+    return result;
+  }, [selectedSeason, selectedTag, clothing, currentWardrobeId]);
 
   // 使用 useMemo 确保稳定的数组引用
   const filteredClothing = useMemo(() => {
-    // 先按衣橱筛选
-    let result = clothing.filter(item => item.wardrobeId === currentWardrobeId);
-    // 再按季节筛选
-    if (!selectedSeasons.includes('全部') && selectedSeasons.length > 0) {
-      result = result.filter(item =>
-        item.seasons.some(season => selectedSeasons.includes(season))
-      );
-    }
-    // 按风格筛选
-    if (selectedStyle !== '全部') {
-      result = result.filter(item =>
-        item.styles.includes(selectedStyle)
-      );
+    let result = clothingForTypeFilter;
+    // 按衣服种类筛选（仅网格模式生效）
+    if (viewMode === 'grid' && selectedType !== '全部') {
+      result = result.filter(item => item.parentType === selectedType);
     }
     // 排序：网格视图使用选择的排序方式，列表视图默认按创建时间
     const sortKey = viewMode === 'grid' ? sortBy : 'createdAt';
@@ -670,7 +699,7 @@ export function WardrobeScreen() {
       return ascending ? cmp : -cmp;
     });
     return result;
-  }, [selectedSeasons, selectedStyle, sortBy, sortAsc, viewMode, clothing, currentWardrobeId]);
+  }, [clothingForTypeFilter, selectedType, sortBy, sortAsc, viewMode]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -691,9 +720,10 @@ export function WardrobeScreen() {
   }, [filteredClothing, parentCategories]);
 
   // 根据父分类获取衣服（直接用 parentType 字段匹配，消除歧义）
+  // 使用 clothingForTypeFilter 确保种类筛选芯片不会因选中某项而消失
   const getClothingByParent = useMemo(() => {
     return (parent: string) => {
-      return filteredClothing.filter(item => {
+      return clothingForTypeFilter.filter(item => {
         // 直接匹配 parentType
         if (item.parentType === parent) return true;
         // parentType 为空时，如果 type 正好是这个父分类名称（直接选了一级分类的情况）
@@ -701,7 +731,7 @@ export function WardrobeScreen() {
         return false;
       });
     };
-  }, [filteredClothing]);
+  }, [clothingForTypeFilter]);
 
   // Find parents that have clothes with matching types
   const parentsWithClothing = useMemo(() => {
@@ -863,20 +893,10 @@ export function WardrobeScreen() {
       {/* 季节筛选按钮 */}
       <View style={styles.filterSection}>
         {SEASON_OPTIONS.map((season) => {
-          const isSelected = selectedSeasons.includes(season);
+          const isSelected = selectedSeason === season;
           const iconConfig = SEASON_ICONS[season];
           const handlePress = () => {
-            if (season === '全部') {
-              setSelectedSeasons(['全部']);
-            } else {
-              const newSeasons = selectedSeasons.filter(s => s !== '全部');
-              if (isSelected) {
-                const filtered = newSeasons.filter(s => s !== season);
-                setSelectedSeasons(filtered.length === 0 ? ['全部'] : filtered);
-              } else {
-                setSelectedSeasons([...newSeasons, season]);
-              }
-            }
+            handleSeasonChange(season);
           };
           return (
             <TouchableOpacity
@@ -898,29 +918,51 @@ export function WardrobeScreen() {
         })}
       </View>
 
-      {/* 风格筛选按钮 - 单选 */}
+      {/* 衣服种类筛选 - 仅网格视图 */}
+      {viewMode === 'grid' && (
+        <View style={styles.filterSection}>
+          {['全部', ...availableParents].map((type) => {
+            const isSelected = selectedType === type;
+            const handlePress = () => setSelectedType(type);
+            return (
+              <TouchableOpacity
+                key={type}
+                style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
+                onPress={handlePress}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
+                  {type}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
+      {/* 标签筛选按钮 - 单选 */}
       <View style={styles.filterSection}>
-        {['全部', ...styleOptions].map((style) => {
-          const isSelected = selectedStyle === style;
+        {['全部', ...tagOptions].map((tag) => {
+          const isSelected = selectedTag === tag;
           const handlePress = () => {
-            setSelectedStyle(style);
+            setSelectedTag(tag);
           };
           return (
             <TouchableOpacity
-              key={style}
+              key={tag}
               style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
               onPress={handlePress}
               activeOpacity={0.7}
             >
               <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
-                {style}
+                {tag}
               </Text>
             </TouchableOpacity>
           );
         })}
       </View>
 
-      {/* 排序选项 - 仅网格视图 */}
+      {/* 排序 - 仅网格视图 */}
       {viewMode === 'grid' && (
         <View style={styles.sortSection}>
           <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.textTertiary} style={{ marginRight: 6 }} />
@@ -974,10 +1016,10 @@ export function WardrobeScreen() {
             <Ionicons name="shirt-outline" size={56} color={theme.colors.border} />
           </View>
           <Text style={styles.emptyTitle}>
-            {selectedSeasons.includes('全部') || selectedSeasons.length === 0 ? '还没有添加衣服' : `暂无${selectedSeasons[0]}季衣物`}
+            {selectedSeason === '全部' ? '还没有添加衣服' : `暂无${selectedSeason}季衣物`}
           </Text>
           <Text style={styles.emptySubtext}>
-            {selectedSeasons.includes('全部') || selectedSeasons.length === 0 ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
+            {selectedSeason === '全部' ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
           </Text>
         </View>
       ) : viewMode === 'grid' ? (
@@ -999,6 +1041,7 @@ export function WardrobeScreen() {
                   key={`grid-${itemId}-${isSelected}`}
                   style={[
                     styles.gridItemTransparentWrap,
+                    { width: gridItemSize, height: gridItemSize },
                     isSelecting && isSelected && styles.gridItemSelected
                   ]}
                   onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
@@ -1007,17 +1050,12 @@ export function WardrobeScreen() {
                 >
                   <Image
                     source={{ uri: imageUri }}
-                    style={styles.gridItemImage}
+                    style={[styles.gridItemImage, { width: gridItemSize, height: gridItemSize }]}
                     resizeMode="cover"
                   />
                   {isSelecting && isSelected && (
                     <View style={styles.gridSelectBadge}>
                       <Ionicons name="checkmark" size={14} color={theme.colors.white} />
-                    </View>
-                  )}
-                  {!isSelecting && item.price > 0 && item.wearCount > 0 && (
-                    <View style={styles.gridCostBadge}>
-                      <Text style={styles.gridCostText}>{Math.round(item.price / item.wearCount)}元/次</Text>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -1067,9 +1105,6 @@ export function WardrobeScreen() {
                 >
                   {[...items].sort((a, b) => Number(b.createdAt?.replace(/-/g, '')) - Number(a.createdAt?.replace(/-/g, ''))).map(item => {
                     const itemId = getItemId(item);
-                    const costPerWear = item.price > 0 && item.wearCount > 0
-                      ? Math.round(item.price / item.wearCount)
-                      : null;
                     const isSelected = selectedIds.includes(itemId);
                     const imageUri = item.thumbnailUri || item.imageUri;
                     const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
@@ -1092,11 +1127,6 @@ export function WardrobeScreen() {
                         {isSelecting && isSelected && (
                           <View style={styles.selectBadge}>
                             <Ionicons name="checkmark" size={14} color={theme.colors.white} />
-                          </View>
-                        )}
-                        {costPerWear !== null && !isSelecting && (
-                          <View style={styles.costBadge}>
-                            <Text style={styles.costText}>{costPerWear}元/次</Text>
                           </View>
                         )}
                       </TouchableOpacity>
@@ -1127,9 +1157,6 @@ export function WardrobeScreen() {
               >
                 {[...uncategorizedItems].sort((a, b) => Number(b.createdAt?.replace(/-/g, '')) - Number(a.createdAt?.replace(/-/g, ''))).map(item => {
                   const itemId = getItemId(item);
-                  const costPerWear = item.price > 0 && item.wearCount > 0
-                    ? Math.round(item.price / item.wearCount)
-                    : null;
                   const isSelected = selectedIds.includes(itemId);
                   const imageUri = item.thumbnailUri || item.imageUri;
                   const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
@@ -1152,11 +1179,6 @@ export function WardrobeScreen() {
                       {isSelecting && isSelected && (
                         <View style={styles.selectBadge}>
                           <Ionicons name="checkmark" size={14} color={theme.colors.white} />
-                        </View>
-                      )}
-                      {costPerWear !== null && !isSelecting && (
-                        <View style={styles.costBadge}>
-                          <Text style={styles.costText}>{costPerWear}元/次</Text>
                         </View>
                       )}
                     </TouchableOpacity>

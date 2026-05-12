@@ -10,9 +10,8 @@ export interface Wardrobe {
 // 类型别名 - 使用字符串，用户可自定义
 export type ClothingType = string;
 export type Season = string;
-export type Occasion = string;
 export type Scene = '工作' | '运动' | '约会' | '宅家';
-export type Style = string;
+export type Tag = string;
 
 // 两级分类筛选状态
 export interface CategoryFilter {
@@ -32,8 +31,9 @@ export interface ClothingItem {
   size: string;
   remarks: string;
   seasons: string[];
-  occasions: string[];
-  styles: string[];
+  tags: string[];
+  fit: string;
+  thickness: string;
   purchaseDate: string;
   price: number;
   wearCount: number;
@@ -96,7 +96,7 @@ export interface Outfit {
   thumbnailUri?: string;
   notes?: string;
   seasons: string[];
-  styles: string[];
+  tags: string[];
   createdAt: string;
 }
 
@@ -115,8 +115,9 @@ export interface OutfitRecommendation {
 }
 
 export const SEASONS: string[] = ['春', '夏', '秋', '冬'];
-export const OCCASIONS: string[] = ['日常', '工作', '运动', '正式', '休闲'];
 export const SCENES: Scene[] = ['工作', '运动', '约会', '宅家'];
+export const FIT_OPTIONS: string[] = ['修身', '标准', '宽松', 'Oversized'];
+export const THICKNESS_OPTIONS: string[] = ['薄款', '适中', '加厚', '厚款'];
 export const COLORS: string[] = ['黑色', '白色', '灰色', '红色', '蓝色', '绿色', '黄色', '紫色', '粉色', '棕色', '米色', '橙色', '青色', '咖啡色', '酒红色', '藏青色', '卡其色', '军绿色', '其他'];
 
 export const SOLD_PLATFORMS = ['闲鱼', '转转', '得物', '微信', '小红书', '其他'];

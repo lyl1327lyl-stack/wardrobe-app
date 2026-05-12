@@ -254,7 +254,7 @@ export function StatsScreen() {
       const parent = getParentOfChild(item.type);
       if (parent) byParent[parent] = (byParent[parent] || 0) + 1;
       item.seasons.forEach(s => { bySeason[s] = (bySeason[s] || 0) + 1; });
-      if (item.styles) item.styles.forEach(s => { byStyle[s] = (byStyle[s] || 0) + 1; });
+      if (item.tags) item.tags.forEach(s => { byStyle[s] = (byStyle[s] || 0) + 1; });
     });
 
     const totalValue = filteredClothing.reduce((sum, item) => sum + (item.price || 0), 0);

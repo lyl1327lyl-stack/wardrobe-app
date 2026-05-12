@@ -224,10 +224,12 @@ export function GroupDetailScreen() {
   const renderOutfitCard = ({ item }: { item: Outfit }) => {
     const thumbUri = item.thumbnailUri;
     const isSelected = selectedIds.has(item.id);
-    const count = item.itemIds?.length || 0;
+    const canvasData = (item as any).canvasData;
+    const count = item.itemIds
+      ? item.itemIds.filter(id => clothing.some(c => c.id === id)).length
+      : 0;
     const bg = (item as any).canvasBackground;
     const frameColor = bg?.type === 'color' ? bg.value : theme.colors.card;
-    const canvasData = (item as any).canvasData;
     const totalPrice = canvasData
       ? canvasData.reduce((sum: number, ci: any) => {
           const c = clothing.find(cl => cl.id === ci.clothingId);

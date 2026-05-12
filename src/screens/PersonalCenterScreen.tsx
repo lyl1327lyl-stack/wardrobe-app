@@ -44,8 +44,7 @@ const MENU_ITEMS: MenuSection[] = [
     items: [
       { key: 'categories', label: '类型管理', icon: 'shirt-outline', action: 'categories' },
       { key: 'seasons', label: '季节管理', icon: 'flower-outline', action: 'seasons' },
-      { key: 'occasions', label: '场合管理', icon: 'calendar-outline', action: 'occasions' },
-      { key: 'styles', label: '风格管理', icon: 'brush-outline', action: 'styles' },
+      { key: 'tags', label: '标签管理', icon: 'pricetags-outline', action: 'tags' },
     ],
   },
   {
@@ -183,8 +182,7 @@ export function PersonalCenterScreen() {
     switch (action) {
       case 'categories':
       case 'seasons':
-      case 'occasions':
-      case 'styles':
+      case 'tags':
         (navigation as any).navigate('CustomOptions', { category: action });
         break;
       case 'export':

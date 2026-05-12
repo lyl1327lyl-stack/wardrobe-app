@@ -34,7 +34,7 @@ export async function getAllOutfits(): Promise<Outfit[]> {
     thumbnailUri: item.thumbnailUri,
     notes: item.notes || '',
     seasons: JSON.parse(item.seasons || '[]'),
-    styles: JSON.parse(item.styles || '[]'),
+    tags: JSON.parse(item.styles || '[]'),
   }));
 }
 
@@ -56,7 +56,7 @@ export async function addOutfit(
       outfit.thumbnailUri || '',
       (outfit as any).notes || '',
       (outfit as any).seasons ? JSON.stringify((outfit as any).seasons) : '[]',
-      (outfit as any).styles ? JSON.stringify((outfit as any).styles) : '[]',
+      (outfit as any).tags ? JSON.stringify((outfit as any).tags) : '[]',
       outfit.createdAt,
     ]
   );
@@ -86,7 +86,7 @@ export async function updateOutfit(
       outfit.thumbnailUri || '',
       (outfit as any).notes || '',
       (outfit as any).seasons ? JSON.stringify((outfit as any).seasons) : '[]',
-      (outfit as any).styles ? JSON.stringify((outfit as any).styles) : '[]',
+      (outfit as any).tags ? JSON.stringify((outfit as any).tags) : '[]',
       outfit.id,
     ]
   );

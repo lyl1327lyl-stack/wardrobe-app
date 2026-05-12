@@ -215,7 +215,7 @@ export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedI
         item.brand.toLowerCase().includes(kw) ||
         item.color.toLowerCase().includes(kw) ||
         item.remarks.toLowerCase().includes(kw) ||
-        item.occasions.some(o => o.toLowerCase().includes(kw));
+        item.tags.some(t => t.toLowerCase().includes(kw));
       if (!match) return false;
     }
     if (alreadyAddedIds.includes(item.id)) return false;
@@ -270,7 +270,7 @@ export function ClothingPickerModal({ visible, onClose, onConfirm, alreadyAddedI
               style={styles.searchInput}
               value={searchKeyword}
               onChangeText={setSearchKeyword}
-              placeholder="搜索品牌/场合/风格/颜色/备注"
+              placeholder="搜索品牌/标签/颜色/备注"
               placeholderTextColor={theme.colors.textTertiary}
             />
             {searchKeyword.length > 0 && (

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ClothingItem, Outfit, OutfitGroup, ClothingType, Season, Occasion, Scene, Wardrobe, WearRecord } from '../types';
+import { ClothingItem, Outfit, OutfitGroup, ClothingType, Season, Scene, Wardrobe, WearRecord } from '../types';
 import * as clothingDb from '../db/clothing';
 import * as outfitDb from '../db/outfit';
 import * as groupDb from '../db/group';
@@ -66,12 +66,13 @@ interface WardrobeState {
   getClothingByIdIncludingTrash: (id: number) => ClothingItem | undefined;
   getClothingByIdIncludingAll: (id: number) => ClothingItem | undefined;
   getClothingByIdIncludingDrafts: (id: number) => ClothingItem | undefined;
+  getOutfitsByClothingId: (clothingId: number) => Outfit[];
+  getOutfitWarningForDeletion: (clothingIds: number[]) => { count: number; names: string[]; outfits: Outfit[] };
   getColorStats: () => Record<string, number>;
   // 推荐相关
   getRecentWornIds: (days: number) => number[];
   getLeastWornItems: (limit?: number) => ClothingItem[];
   getClothingByType: (type: ClothingType) => ClothingItem[];
-  getClothingByScene: (scene: Scene) => ClothingItem[];
   getDaysSinceLastWorn: (id: number) => number | null;
   wearMultipleClothing: (ids: number[]) => Promise<void>;
   migrateClothingType: (oldType: string, newType: string) => Promise<number>;
@@ -106,6 +107,7 @@ interface WardrobeState {
   addWearRecord: (clothingId: number, date: string) => Promise<number>;
   addWearRecords: (clothingIds: number[], date: string) => Promise<number>;
   deleteWearRecord: (id: number) => Promise<void>;
+  deleteWearRecordsByDate: (date: string) => Promise<void>;
   getWearDatesByClothing: (clothingId: number) => string[];
   getWearRecordsByDate: (date: string) => WearRecord[];
   getWearCount: (clothingId: number) => number;
@@ -427,6 +429,24 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     );
   },
 
+  getOutfitsByClothingId: (clothingId) => {
+    return get().outfits.filter(o => o.itemIds.includes(clothingId));
+  },
+
+  getOutfitWarningForDeletion: (clothingIds) => {
+    const { outfits } = get();
+    const matched = new Map<number, Outfit>();
+    clothingIds.forEach(cid => {
+      outfits.filter(o => o.itemIds.includes(cid)).forEach(o => matched.set(o.id, o));
+    });
+    const affectedOutfits = Array.from(matched.values());
+    return {
+      count: affectedOutfits.length,
+      names: affectedOutfits.map(o => o.name || '未命名搭配'),
+      outfits: affectedOutfits,
+    };
+  },
+
   getColorStats: () => {
     const { clothing } = get();
     const stats: Record<string, number> = {};
@@ -466,19 +486,6 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     return get().clothing.filter(item => item.type === type);
   },
 
-  getClothingByScene: (scene: Scene) => {
-    const { clothing } = get();
-    const sceneOccasionMap: Record<Scene, Occasion[]> = {
-      '工作': ['工作', '正式'],
-      '运动': ['运动'],
-      '约会': ['休闲', '正式'],
-      '宅家': ['日常', '休闲'],
-    };
-    const occasions = sceneOccasionMap[scene] || ['日常'];
-    return clothing.filter(item =>
-      item.occasions.some(o => occasions.includes(o))
-    );
-  },
 
   getDaysSinceLastWorn: (id: number) => {
     const item = get().clothing.find(c => c.id === id);
@@ -840,6 +847,55 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
           ? { ...c, wearCount: isFuture ? c.wearCount : Math.max(0, c.wearCount - 1), lastWornAt: lastDate || c.lastWornAt }
           : c
       ),
+    }));
+  },
+
+  deleteWearRecordsByDate: async (date) => {
+    const existingRecords = await wearRecordsDb.getWearRecordsByDate(date);
+    if (existingRecords.length === 0) return;
+
+    await wearRecordsDb.deleteWearRecordsByDate(date);
+
+    const today = localDateString();
+    const isFuture = date > today;
+
+    // 统计每个 clothingId 被删除了几条记录
+    const deleteCountByClothing: Record<number, number> = {};
+    for (const r of existingRecords) {
+      deleteCountByClothing[r.clothingId] = (deleteCountByClothing[r.clothingId] || 0) + 1;
+    }
+
+    if (!isFuture) {
+      for (const [clothingId, count] of Object.entries(deleteCountByClothing)) {
+        for (let i = 0; i < count; i++) {
+          await clothingDb.decrementWearCount(Number(clothingId));
+        }
+      }
+    }
+
+    // 更新内存：逐条递减，与 deleteWearRecord 保持一致
+    // 计算新的 lastWornAt
+    const affectedIds = [...new Set(existingRecords.map(r => r.clothingId))];
+    const lastWornUpdates: Record<number, string | null> = {};
+
+    for (const id of affectedIds) {
+      const records = await wearRecordsDb.getWearRecordsByClothing(id);
+      const pastRecords = records.filter(r => r.wornDate <= today);
+      lastWornUpdates[id] = pastRecords.length > 0
+        ? pastRecords.reduce((a, b) => a.wornDate > b.wornDate ? a : b).wornDate
+        : null;
+    }
+
+    set(state => ({
+      clothing: state.clothing.map(c => {
+        const deleteCount = deleteCountByClothing[c.id];
+        if (!deleteCount) return c;
+        return {
+          ...c,
+          wearCount: isFuture ? c.wearCount : Math.max(0, c.wearCount - deleteCount),
+          lastWornAt: lastWornUpdates[c.id as number] || c.lastWornAt,
+        };
+      }),
     }));
   },
 

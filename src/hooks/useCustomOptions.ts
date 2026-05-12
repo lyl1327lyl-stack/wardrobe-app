@@ -5,11 +5,10 @@ import { CustomCategories } from '../utils/customOptions';
 interface UseCustomOptionsReturn {
   categories: CustomCategories;
   seasons: string[];
-  occasions: string[];
-  styles: string[];
+  tags: string[];
   isLoading: boolean;
   refresh: () => Promise<void>;
-  updateCategory: (category: 'seasons' | 'occasions' | 'styles', options: string[]) => Promise<void>;
+  updateCategory: (category: 'seasons' | 'tags' | 'sizes', options: string[]) => Promise<void>;
   getAllChildTypes: () => string[];
   getParentOfChild: (child: string) => string | undefined;
   getChildrenOf: (parent: string) => string[];
@@ -19,8 +18,7 @@ interface UseCustomOptionsReturn {
 export function useCustomOptions(): UseCustomOptionsReturn {
   const categories = useCustomOptionsStore(state => state.categories);
   const seasons = useCustomOptionsStore(state => state.seasons);
-  const occasions = useCustomOptionsStore(state => state.occasions);
-  const styles = useCustomOptionsStore(state => state.styles);
+  const tags = useCustomOptionsStore(state => state.tags);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
   const load = useCustomOptionsStore(state => state.load);
   const updateCategory = useCustomOptionsStore(state => state.updateCategory);
@@ -43,8 +41,7 @@ export function useCustomOptions(): UseCustomOptionsReturn {
   return {
     categories,
     seasons,
-    occasions,
-    styles,
+    tags,
     isLoading: isLoading || localLoading,
     refresh,
     updateCategory,

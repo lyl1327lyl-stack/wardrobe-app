@@ -182,12 +182,18 @@ function effectiveParent(item: ClothingItem): string {
   const t = item.type;
   if (['T恤', '衬衫', '卫衣', '毛衣', '针织衫', 'Polo衫', '背心', '打底衫', 'POLO衫', '长袖', '短袖', '雪纺衫', '马甲'].includes(t)) return '上装';
   if (['牛仔裤', '休闲裤', '西裤', '运动裤', '短裤', '工装裤', '阔腿裤', '直筒裤', '九分裤', '裙子', '半身裙', '长裤'].includes(t)) return '下装';
-  if (['连衣裙', '连体裤', '吊带裙', '长裙', '短裙', '旗袍'].includes(t)) return '连衣裙';
+  if (['连衣裙', '连体裤', '吊带裙', '背带裙', '长裙', '短裙', '旗袍'].includes(t)) return '连衣裙';
   if (['外套', '夹克', '风衣', '大衣', '羽绒服', '棉服', '西装', '棒球服', '牛仔外套', '皮衣', '针织开衫', '派克大衣'].includes(t)) return '外套';
   if (['运动鞋', '休闲鞋', '皮鞋', '靴子', '凉鞋', '帆布鞋', '高跟鞋', '拖鞋', '板鞋', '乐福鞋', '马丁靴'].includes(t)) return '鞋';
   if (['包包', '背包', '手提包', '斜挎包', '双肩包', '单肩包', '钱包', '腰包'].includes(t)) return '包包';
   if (['帽子', '围巾', '手套', '腰带', '眼镜', '首饰', '手表', '项链', '耳环', '手链', '戒指'].includes(t)) return '配饰';
   return t;
+}
+
+/** 是否需要内搭上衣：背带裙/吊带裙等设计为叠穿的连衣裙 */
+function dressNeedsTop(item: ClothingItem): boolean {
+  const keywords = ['背带', '吊带', '马甲'];
+  return keywords.some(kw => item.type.includes(kw));
 }
 
 // ═════════════════════════════════════════════════
@@ -200,28 +206,28 @@ function generateCandidates(
   recentRecommendedItemIds?: Set<number>,
   itemDiversity?: Map<number, number>,
   pairFreq?: Map<string, number>,
+  season?: string,
 ): ClothingItem[][] {
   const tops = items.filter(i => effectiveParent(i) === '上装');
   const bottoms = items.filter(i => effectiveParent(i) === '下装');
   const shoes = items.filter(i => effectiveParent(i) === '鞋');
   const outers = items.filter(i => effectiveParent(i) === '外套');
   const dresses = items.filter(i => effectiveParent(i) === '连衣裙');
+  const bags = items.filter(i => effectiveParent(i) === '包包');
+
+  // 按季节调整外套概率：春秋常需叠穿，冬季几乎必备，夏季很少
+  const outerProb = season === '冬' ? 0.70 : season === '夏' ? 0.15 : 0.50;
+  const bagProb = bags.length > 0 ? 0.55 : 0;
 
   // 搭配历史太少（< 5 个 outfit）时 compat gate 反而有害：矩阵太稀疏，
   // 大部分 compat() 返回空集后回退到全量，导致少数有历史记录的单品被反复选中。
   const compatEnabled = pairFreq && pairFreq.size >= 5;
-  console.log(`[generateCandidates] pools — tops:${tops.length} bottoms:${bottoms.length} shoes:${shoes.length} outers:${outers.length} dresses:${dresses.length} compatEnabled:${compatEnabled} (pairFreq.size=${pairFreq?.size || 0})`);
-  if (compatEnabled && pairFreq) {
-    if (tops.length > 0) {
-      const sample = tops[0];
-      const filtered = bottoms.filter(b => getPairFreq(pairFreq, sample.id, b.id) > 0);
-      console.log(`[generateCandidates] compat sample: top#${sample.id} → ${filtered.length}/${bottoms.length} bottoms compatible`);
-    }
-  }
+  console.log(`[generateCandidates] pools — tops:${tops.length} bottoms:${bottoms.length} shoes:${shoes.length} outers:${outers.length} dresses:${dresses.length} bags:${bags.length} season:${season} outerProb:${outerProb} compatEnabled:${compatEnabled}`);
 
   const candidates: ClothingItem[][] = [];
   const seen = new Set<string>();
   const hasShoes = shoes.length > 0;
+  const hasBags = bags.length > 0;
 
   function add(outfitItems: ClothingItem[]) {
     if (outfitItems.length < 2) return;
@@ -256,6 +262,15 @@ function generateCandidates(
     return filtered.length > 0 ? filtered : pool;
   }
 
+  // 三目标兼容（上装+下装+外套）：至少与其中一个搭配过
+  function compatAny(pool: ClothingItem[], ids: number[]): ClothingItem[] {
+    if (!pairFreq) return pool;
+    const filtered = pool.filter(item =>
+      ids.some(id => getPairFreq(pairFreq, id, item.id) > 0),
+    );
+    return filtered.length > 0 ? filtered : pool;
+  }
+
   // 情况 A: 有选中单品，优先围绕它搭配
   if (selectedItem) {
     const pt = effectiveParent(selectedItem);
@@ -266,28 +281,44 @@ function generateCandidates(
         if (hasShoes) {
           outfit.push(weightedRandomSelect(compatEither(shoes, selectedItem.id, bottom.id), s => fw(s.id)));
         }
-        if (outers.length > 0 && Math.random() < 0.35) {
-          add([...outfit, weightedRandomSelect(compat(outers, selectedItem.id), o => fw(o.id))]);
-        } else {
-          add(outfit);
+        if (outers.length > 0 && Math.random() < outerProb) {
+          outfit.push(weightedRandomSelect(compat(outers, selectedItem.id), o => fw(o.id)));
         }
+        if (hasBags && Math.random() < bagProb) {
+          outfit.push(weightedRandomSelect(compatAny(bags, outfit.map(o => o.id)), b => fw(b.id)));
+        }
+        add(outfit);
       } else if (pt === '下装' && tops.length > 0) {
         const top = weightedRandomSelect(compat(tops, selectedItem.id), t => fw(t.id));
         const outfit = [top, selectedItem];
         if (hasShoes) {
           outfit.push(weightedRandomSelect(compatEither(shoes, top.id, selectedItem.id), s => fw(s.id)));
         }
+        if (outers.length > 0 && Math.random() < outerProb) {
+          outfit.push(weightedRandomSelect(compat(outers, top.id), o => fw(o.id)));
+        }
+        if (hasBags && Math.random() < bagProb) {
+          outfit.push(weightedRandomSelect(compatAny(bags, outfit.map(o => o.id)), b => fw(b.id)));
+        }
         add(outfit);
       } else if (pt === '连衣裙') {
-        const outfit = [selectedItem];
+        const needsTop = dressNeedsTop(selectedItem) && tops.length > 0;
+        const outfit: ClothingItem[] = [];
+        if (needsTop) {
+          const top = weightedRandomSelect(compat(tops, selectedItem.id), t => fw(t.id));
+          outfit.push(top);
+        }
+        outfit.push(selectedItem);
         if (hasShoes) {
           outfit.push(weightedRandomSelect(compat(shoes, selectedItem.id), s => fw(s.id)));
         }
-        if (outers.length > 0 && Math.random() < 0.35) {
-          add([...outfit, weightedRandomSelect(compat(outers, selectedItem.id), o => fw(o.id))]);
-        } else {
-          add(outfit);
+        if (outers.length > 0 && Math.random() < outerProb) {
+          outfit.push(weightedRandomSelect(compat(outers, selectedItem.id), o => fw(o.id)));
         }
+        if (hasBags && Math.random() < bagProb) {
+          outfit.push(weightedRandomSelect(compatAny(bags, outfit.map(o => o.id)), b => fw(b.id)));
+        }
+        add(outfit);
       } else if (pt === '鞋' && tops.length > 0 && bottoms.length > 0) {
         const top = weightedRandomSelect(tops, t => fw(t.id));
         const bottom = weightedRandomSelect(compat(bottoms, top.id), b => fw(b.id));
@@ -319,28 +350,37 @@ function generateCandidates(
 
     if (useDress) {
       const dress = weightedRandomSelect(dresses, d => fw(d.id));
-      const outfit = [dress];
+      const needsTop = dressNeedsTop(dress) && tops.length > 0;
+      const outfit: ClothingItem[] = [];
+      if (needsTop) {
+        const top = weightedRandomSelect(compat(tops, dress.id), t => fw(t.id));
+        outfit.push(top);
+      }
+      outfit.push(dress);
       if (hasShoes) {
         outfit.push(weightedRandomSelect(compat(shoes, dress.id), s => fw(s.id)));
       }
-      if (outers.length > 0 && Math.random() < 0.35) {
-        add([...outfit, weightedRandomSelect(compat(outers, dress.id), o => fw(o.id))]);
-      } else {
-        add(outfit);
+      if (outers.length > 0 && Math.random() < outerProb) {
+        outfit.push(weightedRandomSelect(compat(outers, dress.id), o => fw(o.id)));
       }
+      if (hasBags && Math.random() < bagProb) {
+        outfit.push(weightedRandomSelect(compatAny(bags, outfit.map(o => o.id)), b => fw(b.id)));
+      }
+      add(outfit);
     } else if (canTopBottom) {
       const top = weightedRandomSelect(tops, t => fw(t.id));
-      // 关键：下装只能从历史上与这件上装搭配过的里面选
       const bottom = weightedRandomSelect(compat(bottoms, top.id), b => fw(b.id));
       const outfit = [top, bottom];
       if (hasShoes) {
         outfit.push(weightedRandomSelect(compatEither(shoes, top.id, bottom.id), s => fw(s.id)));
       }
-      if (outers.length > 0 && Math.random() < 0.35) {
-        add([...outfit, weightedRandomSelect(compat(outers, top.id), o => fw(o.id))]);
-      } else {
-        add(outfit);
+      if (outers.length > 0 && Math.random() < outerProb) {
+        outfit.push(weightedRandomSelect(compat(outers, top.id), o => fw(o.id)));
       }
+      if (hasBags && Math.random() < bagProb) {
+        outfit.push(weightedRandomSelect(compatAny(bags, outfit.map(o => o.id)), b => fw(b.id)));
+      }
+      add(outfit);
     }
   }
 
@@ -574,7 +614,7 @@ export function generateRecommendations(
   }
 
   // Step 2 & 3: 生成候选 + 评分
-  const candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq);
+  const candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq, currentSeason);
 
   // 候选太少则回退到简单生成
   if (candidates.length === 0) {
