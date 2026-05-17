@@ -132,7 +132,8 @@ const makeStyles = (theme: Theme) =>
     filterSection: {
       flexDirection: 'row',
       paddingHorizontal: 16,
-      paddingVertical: 4,
+      paddingVertical: 6,
+      marginBottom: 2,
       gap: 6,
     },
     scrollView: {
@@ -140,7 +141,7 @@ const makeStyles = (theme: Theme) =>
     },
     scrollContent: {
       paddingHorizontal: 16,
-      paddingTop: 16,
+      paddingTop: 6,
     },
     categoryCard: {
       backgroundColor: 'transparent',
@@ -422,15 +423,18 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
       paddingHorizontal: 10,
       paddingVertical: 5,
-      borderRadius: 16,
+      borderRadius: 14,
       backgroundColor: theme.colors.card,
       gap: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
     seasonPillActive: {
       backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
     },
     seasonPillText: {
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: '500',
       color: theme.colors.textSecondary,
     },
@@ -442,7 +446,8 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 4,
+      paddingVertical: 6,
+      marginBottom: 2,
     },
     sortContent: {
       gap: 6,
@@ -463,7 +468,7 @@ const makeStyles = (theme: Theme) =>
       borderColor: theme.colors.primary,
     },
     sortPillText: {
-      fontSize: 12,
+      fontSize: 14,
       fontWeight: '500',
       color: theme.colors.textSecondary,
     },
@@ -657,21 +662,22 @@ export function WardrobeScreen() {
     return `${selectedSeason}季衣橱`;
   };
 
-  // 不含种类筛选的列表，用于计算 availableParents（避免种类筛选后其他选项消失）
+  // 类型选项的可用范围，只按季节筛选，不受标签影响（标签和类型独立）
   const clothingForTypeFilter = useMemo(() => {
     let result = clothing.filter(item => item.wardrobeId === currentWardrobeId);
     if (selectedSeason !== '全部') {
       result = result.filter(item => item.seasons.includes(selectedSeason));
     }
-    if (selectedTag !== '全部') {
-      result = result.filter(item => item.tags.includes(selectedTag));
-    }
     return result;
-  }, [selectedSeason, selectedTag, clothing, currentWardrobeId]);
+  }, [selectedSeason, clothing, currentWardrobeId]);
 
   // 使用 useMemo 确保稳定的数组引用
   const filteredClothing = useMemo(() => {
     let result = clothingForTypeFilter;
+    // 标签筛选
+    if (selectedTag !== '全部') {
+      result = result.filter(item => item.tags.includes(selectedTag));
+    }
     // 按衣服种类筛选（仅网格模式生效）
     if (viewMode === 'grid' && selectedType !== '全部') {
       result = result.filter(item => item.parentType === selectedType);
@@ -892,6 +898,7 @@ export function WardrobeScreen() {
 
       {/* 季节筛选按钮 */}
       <View style={styles.filterSection}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
         {SEASON_OPTIONS.map((season) => {
           const isSelected = selectedSeason === season;
           const iconConfig = SEASON_ICONS[season];
@@ -916,11 +923,13 @@ export function WardrobeScreen() {
             </TouchableOpacity>
           );
         })}
+        </ScrollView>
       </View>
 
       {/* 衣服种类筛选 - 仅网格视图 */}
       {viewMode === 'grid' && (
         <View style={styles.filterSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
           {['全部', ...availableParents].map((type) => {
             const isSelected = selectedType === type;
             const handlePress = () => setSelectedType(type);
@@ -937,11 +946,13 @@ export function WardrobeScreen() {
               </TouchableOpacity>
             );
           })}
+          </ScrollView>
         </View>
       )}
 
       {/* 标签筛选按钮 - 单选 */}
       <View style={styles.filterSection}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
         {['全部', ...tagOptions].map((tag) => {
           const isSelected = selectedTag === tag;
           const handlePress = () => {
@@ -960,6 +971,7 @@ export function WardrobeScreen() {
             </TouchableOpacity>
           );
         })}
+        </ScrollView>
       </View>
 
       {/* 排序 - 仅网格视图 */}
@@ -1027,7 +1039,7 @@ export function WardrobeScreen() {
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingTop: 16, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingTop: 6, paddingBottom: 100 }}
         >
           <View style={styles.gridContainer}>
             {filteredClothing.map(item => {

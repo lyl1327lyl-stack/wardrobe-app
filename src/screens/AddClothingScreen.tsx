@@ -20,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ImagePickerModal } from '../components/ImagePickerModal';
+import { consumeCropResult } from '../utils/cropNavigation';
 import { processImage } from '../utils/imageUtils';
 import { ClothingItem, COLORS, FIT_OPTIONS, THICKNESS_OPTIONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
@@ -733,10 +734,14 @@ export function AddClothingScreen() {
   const [imagePickerMode, setImagePickerMode] = useState<'edit' | 'replace'>('edit');
   const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
   const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
-  // 从裁剪页面返回时重置编辑状态
+  // 从裁剪页面返回时消费裁剪结果
   useFocusEffect(
     useCallback(() => {
-      // 屏幕获得焦点时重置图片编辑状态
+      const result = consumeCropResult();
+      if (result) {
+        setImageUri(result.uri);
+        setRemoveBackground(result.removeBg);
+      }
     }, [])
   );
 
@@ -1070,7 +1075,18 @@ export function AddClothingScreen() {
 
       <ScrollView ref={scrollViewRef} style={styles.scrollView} showsVerticalScrollIndicator={false} scrollIndicatorInsets={{ right: 1 }} keyboardShouldPersistTaps="handled">
         {/* Image Area */}
-        <TouchableOpacity style={styles.imageArea} onPress={() => { setImagePickerMode('edit'); setShowImagePicker(true); }} activeOpacity={0.9}>
+        <TouchableOpacity
+          style={styles.imageArea}
+          onPress={() => {
+            if (imageUri) {
+              navigation.navigate('ImageCrop', { imageUri, isBgRemoved: removeBackground });
+            } else {
+              setImagePickerMode('edit');
+              setShowImagePicker(true);
+            }
+          }}
+          activeOpacity={0.9}
+        >
           {imageUri ? (
             <>
               <Image source={{ uri: imageUri }} style={styles.image} />
@@ -1079,7 +1095,9 @@ export function AddClothingScreen() {
                 <View style={styles.imageActionRow}>
                   <TouchableOpacity
                     style={[styles.imageActionBtn, removeBackground && styles.imageActionBtnPrimary]}
-                    onPress={() => { setImagePickerMode('edit'); setShowImagePicker(true); }}
+                    onPress={() => {
+                      navigation.navigate('ImageCrop', { imageUri, isBgRemoved: removeBackground });
+                    }}
                     activeOpacity={0.7}
                   >
                     <Ionicons name="create-outline" size={12} color={removeBackground ? '#fff' : theme.colors.text} />
@@ -1361,17 +1379,16 @@ export function AddClothingScreen() {
       <ImagePickerModal
         visible={showImagePicker}
         onClose={() => setShowImagePicker(false)}
-        onImageSelected={(uri, shouldRemoveBg, originalUri) => {
-          setImageUri(uri);
-          if (originalUri) {
-            setOriginalImageUri(originalUri);
-          }
-          setRemoveBackground(shouldRemoveBg);
+        onImageSelected={(uri, _shouldRemoveBg, originalUri) => {
+          // Navigate directly to crop screen
+          const imgUri = originalUri || uri;
+          setOriginalImageUri(imgUri);
           setShowImagePicker(false);
+          navigation.navigate('ImageCrop', { imageUri: imgUri, isBgRemoved: false });
         }}
         initialImageUri={imagePickerMode === 'edit' ? (imageUri || undefined) : undefined}
         originalImageUri={imagePickerMode === 'edit' ? (originalImageUri || imageUri || undefined) : undefined}
-        skipEdit={false}
+        skipEdit={true}
       />
 
       {/* 衣橱选择居中对话框 */}

@@ -4,7 +4,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { processImage } from '../utils/imageUtils';
-import { registerCropCallback } from '../screens/ImageCropScreen';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { getRemoveBgCredits } from '../utils/backgroundRemoval';
@@ -443,15 +442,9 @@ export function ImagePickerModal({ visible, onClose, onImageSelected, initialIma
               activeOpacity={0.7}
               disabled={isRemovingBg}
               onPress={() => {
-                // 优先使用 originalUri（原始图片），确保裁剪的是原图而非已裁剪过的图
+                // DEPRECATED: 此代码路径已不再被 AddClothingScreen 使用（改用 skipEdit=true）
                 const uriToCrop = originalUri || processedUri || selectedUri;
                 if (!uriToCrop) return;
-                // 注册回调：裁剪完成后将结果写入 processedUri 并恢复本 Modal
-                registerCropCallback((croppedUri: string) => {
-                  setProcessedUri(croppedUri);
-                  setIsCropNavigating(false);
-                });
-                // 隐藏本 Modal，push 到裁剪页面
                 setIsCropNavigating(true);
                 navigation.navigate('ImageCrop', { imageUri: uriToCrop });
               }}
