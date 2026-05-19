@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,9 +7,15 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Animated,
+  Dimensions,
+  ActivityIndicator,
+  StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navigation/native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import * as MediaLibrary from 'expo-media-library';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { deleteImage } from '../utils/imageUtils';
 import { ClothingItem, Outfit } from '../types';
@@ -550,6 +556,8 @@ export function ClothingDetailScreen() {
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
   const [showWearCalendar, setShowWearCalendar] = useState(false);
+  const [showImageViewer, setShowImageViewer] = useState(false);
+  const [savingImage, setSavingImage] = useState(false);
   const [outfitWarning, setOutfitWarning] = useState<{
     title: string;
     message: string;
@@ -565,6 +573,24 @@ export function ClothingDetailScreen() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
   });
+
+  const handleSaveImage = useCallback(async () => {
+    if (!item?.imageUri || savingImage) return;
+    setSavingImage(true);
+    try {
+      const { status } = await MediaLibrary.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('需要权限', '请在设置中允许访问相册以保存图片');
+        return;
+      }
+      await MediaLibrary.createAssetAsync(item.imageUri);
+      Alert.alert('已保存', '图片已保存到相册');
+    } catch (e) {
+      Alert.alert('保存失败', '无法保存图片到相册');
+    } finally {
+      setSavingImage(false);
+    }
+  }, [item?.imageUri, savingImage]);
 
   // 根据路由或物品状态判断来源
   const source: DetailSource = route.params.source ||
@@ -1016,10 +1042,14 @@ export function ClothingDetailScreen() {
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* 图片区域 */}
         <View style={styles.imageSection}>
-          <View style={[
-            styles.imageWrapper,
-            item.imageUri?.endsWith('.png') && { backgroundColor: theme.colors.background }
-          ]}>
+          <TouchableOpacity
+            style={[
+              styles.imageWrapper,
+              item.imageUri?.endsWith('.png') && { backgroundColor: theme.colors.background }
+            ]}
+            activeOpacity={0.9}
+            onPress={() => setShowImageViewer(true)}
+          >
             <Image
               source={{ uri: item.imageUri || item.originalImageUri || item.thumbnailUri }}
               style={[
@@ -1028,7 +1058,7 @@ export function ClothingDetailScreen() {
               ]}
             />
             {item.color && <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />}
-          </View>
+          </TouchableOpacity>
         </View>
 
         {/* 废弃/卖出详情卡片 */}
@@ -1430,6 +1460,151 @@ export function ClothingDetailScreen() {
           description={outfitWarning.description}
         />
       )}
+
+      {/* Full-screen image viewer (absolute positioned, not Modal — RNGH gestures don't work inside Modal) */}
+      {showImageViewer && (
+        <ImageViewerContent
+          imageUri={item.imageUri || item.originalImageUri || item.thumbnailUri || ''}
+          isPng={item.imageUri?.endsWith('.png') || false}
+          onClose={() => setShowImageViewer(false)}
+          onSave={handleSaveImage}
+          saving={savingImage}
+          theme={theme}
+        />
+      )}
+    </View>
+  );
+}
+
+// ── Full-screen image viewer with pinch zoom + save ──
+
+const { width: SW, height: SH } = Dimensions.get('window');
+
+function ImageViewerContent({ imageUri, isPng, onClose, onSave, saving, theme }: {
+  imageUri: string;
+  isPng: boolean;
+  onClose: () => void;
+  onSave: () => void;
+  saving: boolean;
+  theme: Theme;
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const offset = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const scaleRef = useRef(1);
+  const offsetRef = useRef({ x: 0, y: 0 });
+  const startScale = useRef(1);
+  const startOffset = useRef({ x: 0, y: 0 });
+
+  const singleTap = Gesture.Tap()
+    .onEnd(() => {
+      if (scaleRef.current <= 1.05) onClose();
+    });
+
+  const doubleTap = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scaleRef.current > 1.1) {
+        scaleRef.current = 1;
+        offsetRef.current = { x: 0, y: 0 };
+        Animated.parallel([
+          Animated.spring(scale, { toValue: 1, useNativeDriver: false, overshootClamping: true, stiffness: 300, damping: 25 }),
+          Animated.spring(offset, { toValue: { x: 0, y: 0 }, useNativeDriver: false, overshootClamping: true, stiffness: 300, damping: 25 }),
+        ]).start();
+      } else {
+        scaleRef.current = 2.5;
+        Animated.spring(scale, { toValue: 2.5, useNativeDriver: false, overshootClamping: true, stiffness: 200, damping: 20 }).start();
+      }
+    });
+
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      startScale.current = scaleRef.current;
+    })
+    .onUpdate((e) => {
+      const s = Math.max(0.5, Math.min(5, startScale.current * e.scale));
+      scaleRef.current = s;
+      scale.setValue(s);
+    })
+    .onEnd(() => {
+      if (scaleRef.current < 1) {
+        scaleRef.current = 1;
+        Animated.spring(scale, { toValue: 1, useNativeDriver: false, overshootClamping: true, stiffness: 300, damping: 25 }).start();
+      }
+    });
+
+  const pan = Gesture.Pan()
+    .onStart(() => { startOffset.current = { ...offsetRef.current }; })
+    .onUpdate((e) => {
+      if (scaleRef.current <= 1) return;
+      const x = startOffset.current.x + e.translationX;
+      const y = startOffset.current.y + e.translationY;
+      offsetRef.current = { x, y };
+      offset.setValue({ x, y });
+    })
+    .onEnd(() => {
+      if (scaleRef.current <= 1) {
+        offsetRef.current = { x: 0, y: 0 };
+        Animated.spring(offset, { toValue: { x: 0, y: 0 }, useNativeDriver: false, overshootClamping: true, stiffness: 300, damping: 25 }).start();
+      }
+    });
+
+  // Tap gestures exclusive (doubleTap priority), all simultaneous with pinch/pan
+  const taps = Gesture.Exclusive(doubleTap, singleTap);
+  const composed = Gesture.Simultaneous(taps, pinch, pan);
+
+  return (
+    <View style={{
+      position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+      backgroundColor: '#000', zIndex: 9999,
+    }}>
+      <StatusBar hidden />
+      <GestureDetector gesture={composed}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Animated.Image
+            source={{ uri: imageUri }}
+            style={{
+              width: SW,
+              height: SW,
+              transform: [
+                { translateX: offset.x },
+                { translateY: offset.y },
+                { scale },
+              ],
+            }}
+            resizeMode={isPng ? 'contain' : 'cover'}
+          />
+        </View>
+      </GestureDetector>
+
+      {/* Top bar */}
+      <View style={{
+        position: 'absolute', top: 0, left: 0, right: 0,
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingTop: 50, paddingHorizontal: 16, paddingBottom: 12,
+      }}>
+        <TouchableOpacity onPress={onClose} style={{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' }}>
+          <Ionicons name="close" size={28} color="#fff" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={onSave}
+          disabled={saving}
+          style={{
+            flexDirection: 'row', alignItems: 'center', gap: 4,
+            paddingHorizontal: 14, height: 36, borderRadius: 18,
+            backgroundColor: 'rgba(255,255,255,0.2)',
+          }}
+          activeOpacity={0.7}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="download-outline" size={18} color="#fff" />
+          )}
+          <Text style={{ fontSize: 13, fontWeight: '600', color: '#fff' }}>
+            {saving ? '保存中' : '保存'}
+          </Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
