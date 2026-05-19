@@ -8,6 +8,9 @@ import {
   Animated,
   ActivityIndicator,
   Image,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,57 +24,83 @@ import { removeBackground, getRemoveBgCredits } from '../utils/backgroundRemoval
 import { isBackgroundRemovalConfigured } from '../utils/backgroundRemoval';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import { ImageRequirements } from '../components/ImageRequirements';
-import { setCropResult } from '../utils/cropNavigation';
+import { RotationSlider } from '../components/RotationSlider';
+import { setCropResult, type CropState } from '../utils/cropNavigation';
 import {
   getDisplaySize,
   getInitialOffset,
   clampOffset,
+  clampOffsetAABB,
   screenCropToPixelCrop,
 } from '../utils/cropMath';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CROP_SIZE = SCREEN_WIDTH;
 
 type CropRouteParams = {
-  ImageCrop: { imageUri: string; isBgRemoved?: boolean };
+  ImageCrop: { imageUri: string; isBgRemoved?: boolean; cropState?: CropState };
 };
 
-const makeStyles = (theme: Theme, topInset: number) =>
+type ToolMode = 'rotate' | 'removebg' | null;
+
+const BG_DARK = '#1a1a1a';
+const TOOLBAR_BG = 'rgba(0,0,0,0.88)';
+
+const makeStyles = (theme: Theme, topInset: number, bottomInset: number) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: BG_DARK,
     },
-    // ── Header ──
-    header: {
+
+    // ── Top bar (overlay) ──
+    topBar: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 4,
+      paddingHorizontal: 8,
       paddingTop: topInset + 6,
       paddingBottom: 10,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
+      zIndex: 10,
     },
-    headerBtn: {
+    topBtn: {
       width: 44,
       height: 44,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    headerTitle: {
-      fontSize: 17,
-      fontWeight: '600',
-      color: theme.colors.text,
+    saveBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      height: 36,
+      paddingHorizontal: 16,
+      borderRadius: 18,
+      backgroundColor: theme.colors.primary,
+    },
+    saveBtnDisabled: {
+      opacity: 0.4,
+    },
+    saveBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: '#fff',
     },
 
-    // ── Body ──
+    // ── Body (editing area) ──
     body: {
       flex: 1,
       overflow: 'hidden',
-      backgroundColor: theme.colors.background,
+      backgroundColor: BG_DARK,
     },
     loadingCenter: {
       flex: 1,
@@ -86,111 +115,78 @@ const makeStyles = (theme: Theme, topInset: number) =>
       height: CROP_SIZE,
       left: 0,
       borderWidth: 1.5,
-      borderColor: theme.colors.primary,
+      borderColor: 'rgba(255,255,255,0.6)',
     },
     gridLine: {
       position: 'absolute',
-      backgroundColor: 'rgba(255,255,255,0.25)',
+      backgroundColor: 'rgba(255,255,255,0.18)',
     },
     corner: {
       position: 'absolute',
       width: 20,
       height: 20,
-      borderColor: theme.colors.primary,
+      borderColor: 'rgba(255,255,255,0.8)',
     },
     cornerTL: { top: -1, left: -1, borderTopWidth: 3, borderLeftWidth: 3 },
     cornerTR: { top: -1, right: -1, borderTopWidth: 3, borderRightWidth: 3 },
     cornerBL: { bottom: -1, left: -1, borderBottomWidth: 3, borderLeftWidth: 3 },
     cornerBR: { bottom: -1, right: -1, borderBottomWidth: 3, borderRightWidth: 3 },
 
-    // ── Hint ──
-    hint: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      paddingVertical: 6,
-      backgroundColor: theme.colors.background,
+    // ── Bottom panel area ──
+    bottomPanel: {
+      backgroundColor: TOOLBAR_BG,
+      paddingBottom: bottomInset + 8,
     },
-    hintText: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-    },
-
-    // ── Footer actions ──
-    footer: {
+    subPanel: {
       paddingHorizontal: 16,
-      paddingBottom: 34,
-      paddingTop: 8,
-      backgroundColor: theme.colors.background,
+      paddingVertical: 8,
     },
-    footerRow: {
-      flexDirection: 'row',
-      gap: 10,
-      alignItems: 'center',
-    },
-    btnOutline: {
+    toolbar: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      borderRadius: 12,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      backgroundColor: theme.colors.card,
+      justifyContent: 'space-around',
+      paddingVertical: 6,
+      paddingHorizontal: 8,
     },
-    btnOutlineDisabled: {
-      opacity: 0.45,
-    },
-    btnOutlineText: {
-      fontSize: 13,
-      fontWeight: '500',
-      color: theme.colors.textSecondary,
-    },
-    btnBg: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 4,
-      paddingVertical: 12,
-      paddingHorizontal: 14,
-      borderRadius: 12,
-      backgroundColor: theme.colors.primary + '15',
-    },
-    btnBgText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.primary,
-    },
-    btnPrimary: {
+    toolBtn: {
       flex: 1,
-      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 13,
-      borderRadius: 12,
-      backgroundColor: theme.colors.primary,
+      paddingVertical: 8,
+      minWidth: 60,
     },
-    btnPrimaryDisabled: {
-      opacity: 0.45,
+    toolBtnActive: {
+      // active state handled via icon/text color
     },
-    btnPrimaryText: {
-      fontSize: 15,
-      fontWeight: '700',
-      color: '#fff',
+    toolIcon: {
+      width: 44,
+      height: 30,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    toolLabel: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: 'rgba(255,255,255,0.7)',
+      marginTop: 2,
+    },
+    toolLabelActive: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+    },
+    toolLabelDone: {
+      color: theme.colors.accent,
     },
   });
 
 export function ImageCropScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<CropRouteParams, 'ImageCrop'>>();
-  const { imageUri, isBgRemoved: initialBgRemoved } = route.params;
+  const { imageUri, isBgRemoved: initialBgRemoved, cropState: initialCropState } = route.params;
+  const restoreStateRef = useRef(initialCropState);
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const styles = useMemo(() => makeStyles(theme, insets.top), [theme, insets.top]);
+  const styles = useMemo(() => makeStyles(theme, insets.top, insets.bottom), [theme, insets.top, insets.bottom]);
 
   // ── State ──
   const [imageReady, setImageReady] = useState(false);
@@ -205,6 +201,9 @@ export function ImageCropScreen() {
   const [creditsInfo, setCreditsInfo] = useState<{ remaining: number } | null>(null);
   const [bgRemovalConfigured, setBgRemovalConfigured] = useState(false);
 
+  // Tool panel
+  const [activeTool, setActiveTool] = useState<ToolMode>(null);
+
   // Refs
   const originalSizeRef = useRef({ width: 1, height: 1 });
   const displaySizeRef = useRef({ width: CROP_SIZE, height: CROP_SIZE });
@@ -215,11 +214,19 @@ export function ImageCropScreen() {
   const startScaleRef = useRef(1);
   const startOffsetRef = useRef({ x: 0, y: 0 });
 
-  // Capture ref for bg-removed composite (image on white background)
+  // Rotation
+  const [rotationAngle, setRotationAngle] = useState(0);
+  const rotationAnim = useRef(new Animated.Value(0)).current;
+  const rotationRef = useRef(0);
+
+  // Capture ref for bg-removed composite
   const captureViewRef = useRef<View>(null);
+  const bounceAnimRef = useRef<any>(null);
 
   const cropTop = bodyHeight > 0 ? (bodyHeight - CROP_SIZE) / 2 : 0;
   const maskHeight = Math.max(0, (bodyHeight - CROP_SIZE) / 2);
+  const isPng = currentImageUri.toLowerCase().endsWith('.png') || currentImageUri.startsWith('data:image/png');
+  const canShrink = bgRemoved || isPng;
 
   // ── Load image dimensions ──
   useEffect(() => {
@@ -231,11 +238,27 @@ export function ImageCropScreen() {
         const ds = getDisplaySize(width, height, CROP_SIZE);
         displaySizeRef.current = ds;
         setDisplaySize(ds);
-        const init = getInitialOffset(ds.width, ds.height, CROP_SIZE);
-        offsetRef.current = init;
-        offsetAnim.setValue(init);
-        scaleRef.current = 1;
-        scaleAnim.setValue(1);
+
+        const saved = restoreStateRef.current;
+        restoreStateRef.current = undefined;
+        if (saved &&
+            Math.abs(saved.displayWidth - ds.width) < 1 &&
+            Math.abs(saved.displayHeight - ds.height) < 1) {
+          offsetRef.current = saved.offset;
+          offsetAnim.setValue(saved.offset);
+          scaleRef.current = saved.scale;
+          scaleAnim.setValue(saved.scale);
+          rotationRef.current = saved.rotation;
+          rotationAnim.setValue(saved.rotation);
+          setRotationAngle(saved.rotation);
+        } else {
+          const init = getInitialOffset(ds.width, ds.height, CROP_SIZE);
+          offsetRef.current = init;
+          offsetAnim.setValue(init);
+          scaleRef.current = 1;
+          scaleAnim.setValue(1);
+        }
+
         setImageReady(true);
       },
       (error) => {
@@ -260,46 +283,84 @@ export function ImageCropScreen() {
       startScaleRef.current = scaleRef.current;
     })
     .onUpdate((e) => {
-      const minScale = bgRemoved ? 0.5 : 1;
+      let minScale: number;
+      if (canShrink) {
+        minScale = 0.5;
+      } else {
+        const radians = Math.abs(rotationRef.current) * Math.PI / 180;
+        minScale = (Math.abs(Math.cos(radians)) + Math.abs(Math.sin(radians))) * 1.03;
+      }
       const newScale = Math.max(minScale, Math.min(4, startScaleRef.current * e.scale));
       scaleRef.current = newScale;
       scaleAnim.setValue(newScale);
     })
     .onEnd(() => {
-      const { width: dw, height: dh } = displaySizeRef.current;
+      if (canShrink) return;
       const s = scaleRef.current;
-      if (!bgRemoved && s < 1.05) {
-        scaleRef.current = 1;
-        scaleAnim.setValue(1);
-        const init = getInitialOffset(dw, dh, CROP_SIZE);
-        offsetRef.current = init;
-        offsetAnim.setValue(init);
-      } else if (!bgRemoved) {
-        const clamped = clampOffset(offsetRef.current, displaySizeRef.current, s, CROP_SIZE);
-        offsetRef.current = clamped;
-        offsetAnim.setValue(clamped);
+      const radians = Math.abs(rotationRef.current) * Math.PI / 180;
+      const minScale = (Math.abs(Math.cos(radians)) + Math.abs(Math.sin(radians))) * 1.03;
+      if (s <= minScale + 0.05) {
+        scaleRef.current = minScale;
+        scaleAnim.setValue(minScale);
+        if (rotationRef.current === 0) {
+          const init = getInitialOffset(displaySizeRef.current.width, displaySizeRef.current.height, CROP_SIZE);
+          offsetRef.current = init;
+          offsetAnim.setValue(init);
+          return;
+        }
       }
+      const clamped = clampOffset(offsetRef.current, displaySizeRef.current, scaleRef.current, CROP_SIZE, rotationRef.current);
+      offsetRef.current = clamped;
+      offsetAnim.setValue(clamped);
     });
 
   const panGesture = Gesture.Pan()
     .onStart(() => {
+      if (bounceAnimRef.current) {
+        bounceAnimRef.current.stop();
+        bounceAnimRef.current = null;
+      }
       startOffsetRef.current = { ...offsetRef.current };
     })
     .onChange((e) => {
       const newX = startOffsetRef.current.x + e.translationX;
       const newY = startOffsetRef.current.y + e.translationY;
-      if (bgRemoved) {
+      if (canShrink) {
         offsetRef.current = { x: newX, y: newY };
         offsetAnim.setValue({ x: newX, y: newY });
       } else {
-        const clamped = clampOffset(
+        const clamped = clampOffsetAABB(
           { x: newX, y: newY },
           displaySizeRef.current,
           scaleRef.current,
           CROP_SIZE,
+          rotationRef.current,
         );
         offsetRef.current = clamped;
         offsetAnim.setValue(clamped);
+      }
+    })
+    .onEnd(() => {
+      if (canShrink) return;
+      const target = clampOffset(
+        offsetRef.current,
+        displaySizeRef.current,
+        scaleRef.current,
+        CROP_SIZE,
+        rotationRef.current,
+      );
+      const dx = target.x - offsetRef.current.x;
+      const dy = target.y - offsetRef.current.y;
+      if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+        offsetRef.current = target;
+        bounceAnimRef.current = Animated.spring(offsetAnim, {
+          toValue: { x: target.x, y: target.y },
+          useNativeDriver: false,
+          overshootClamping: true,
+          stiffness: 400,
+          damping: 30,
+        });
+        bounceAnimRef.current.start(() => { bounceAnimRef.current = null; });
       }
     });
 
@@ -307,7 +368,7 @@ export function ImageCropScreen() {
 
   // ── Confirm ──
   const handleConfirm = useCallback(async () => {
-    if (!imageReady) return;
+    if (!imageReady || isProcessing) return;
     setIsProcessing(true);
     let tempInputPath: string | null = null;
     try {
@@ -326,7 +387,6 @@ export function ImageCropScreen() {
 
       await ensureImageDir();
 
-      // Convert data URI to file before crop (manipulateAsync may fail with large data URIs)
       let cropSourceUri = currentImageUri;
       if (currentImageUri.startsWith('data:image/png;base64,')) {
         const tempPath = `${documentDirectory}images/temp_input_${Date.now()}.png`;
@@ -334,41 +394,34 @@ export function ImageCropScreen() {
         const base64 = currentImageUri.split(',')[1];
         await writeAsStringAsync(tempPath, base64, { encoding: 'base64' });
         cropSourceUri = tempPath;
-        // Update originalSize to reflect actual file dimensions
         const sizeResult = await new Promise<{ width: number; height: number }>((resolve) => {
           Image.getSize(cropSourceUri, (w, h) => resolve({ width: w, height: h }), () => resolve({ width: curW, height: curH }));
         });
         originalSizeRef.current = sizeResult;
       }
 
-      // Start bg-removed original save (runs in parallel with crop)
       let bgRemovedOriginalUri: string | undefined;
       let bgSavePromise: Promise<void> | null = null;
       if (bgRemoved && currentImageUri !== imageUri) {
         const fullOriginalPath = `${documentDirectory}images/bg_full_${Date.now()}.png`;
         bgRemovedOriginalUri = fullOriginalPath;
-        // cropSourceUri is already a file, so just copy it
         bgSavePromise = copyAsync({ from: cropSourceUri, to: fullOriginalPath });
         bgSavePromise = bgSavePromise.catch((e) => {
           console.error('[ImageCrop] Failed to save bg-removed original:', e);
         });
       }
 
-      // Start crop (runs in parallel with bg save)
-      // Always use captureRef for reliable results — manipulateAsync crop can produce
-      // empty output on certain PNG/image types when zoomed in
       let cropPromise: Promise<void>;
       const captureView = captureViewRef.current;
       if (captureView) {
         cropPromise = (async () => {
           const capturedUri = await captureRef(captureView, {
-            format: isPng ? 'png' : 'jpg',
+            format: (bgRemoved || isPng) ? 'png' : 'jpg',
             quality: 1,
           });
           await copyAsync({ from: capturedUri, to: savedPath });
         })();
       } else {
-        // Fallback: manipulateAsync (only if captureView unavailable)
         const pixelCrop = screenCropToPixelCrop(offset, s, ds, { width: curW, height: curH }, CROP_SIZE);
         const ox = Math.max(0, Math.min(Math.round(pixelCrop.originX), curW - 1));
         const oy = Math.max(0, Math.min(Math.round(pixelCrop.originY), curH - 1));
@@ -399,14 +452,24 @@ export function ImageCropScreen() {
         })();
       }
 
-      // Await both in parallel
       if (bgSavePromise) {
         await Promise.all([cropPromise, bgSavePromise]);
       } else {
         await cropPromise;
       }
 
-      setCropResult({ uri: savedPath, removeBg: bgRemoved, bgRemovedOriginalUri });
+      setCropResult({
+        uri: savedPath,
+        removeBg: bgRemoved,
+        bgRemovedOriginalUri,
+        cropState: {
+          offset: { ...offsetRef.current },
+          scale: scaleRef.current,
+          rotation: rotationRef.current,
+          displayWidth: displaySizeRef.current.width,
+          displayHeight: displaySizeRef.current.height,
+        },
+      });
       navigation.goBack();
     } catch (error) {
       console.error('[ImageCrop] Crop failed:', error);
@@ -414,28 +477,26 @@ export function ImageCropScreen() {
       navigation.goBack();
     } finally {
       setIsProcessing(false);
-      // Clean up temp file from data URI conversion
       if (tempInputPath) {
         deleteAsync(tempInputPath, { idempotent: true }).catch(() => {});
       }
     }
-  }, [imageReady, currentImageUri, bgRemoved, imageUri, navigation]);
+  }, [imageReady, currentImageUri, bgRemoved, imageUri, navigation, isProcessing]);
 
   const handleCancel = useCallback(() => {
-    setCropResult({ uri: imageUri, removeBg: bgRemoved });
+    // Don't set crop result — user cancelled
     navigation.goBack();
-  }, [imageUri, bgRemoved, navigation]);
+  }, [navigation]);
 
   // ── Background removal ──
   const handleRemoveBg = useCallback(async () => {
-    if (isRemovingBg) return;
+    if (isRemovingBg || bgRemoved) return;
     setIsRemovingBg(true);
     try {
       const result = await removeBackground(currentImageUri);
       if (result) {
         setCurrentImageUri(result);
         setBgRemoved(true);
-        // Refresh credits
         getRemoveBgCredits().then(setCreditsInfo).catch(() => {});
       }
     } catch (e) {
@@ -443,7 +504,7 @@ export function ImageCropScreen() {
     } finally {
       setIsRemovingBg(false);
     }
-  }, [currentImageUri, isRemovingBg]);
+  }, [currentImageUri, isRemovingBg, bgRemoved]);
 
   // ── Reset ──
   const handleReset = useCallback(() => {
@@ -455,28 +516,57 @@ export function ImageCropScreen() {
     offsetAnim.setValue(init);
     scaleRef.current = 1;
     scaleAnim.setValue(1);
+    rotationRef.current = 0;
+    rotationAnim.setValue(0);
+    setRotationAngle(0);
+    setActiveTool(null);
   }, [imageUri, initialBgRemoved]);
 
+  // ── Tool toggle ──
+  const toggleTool = useCallback((tool: ToolMode) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setActiveTool((prev) => prev === tool ? null : tool);
+  }, []);
+
   const showContent = imageReady && bodyHeight > 0;
-  const canRemoveBg = bgRemovalConfigured && !isRemovingBg && !isProcessing && !bgRemoved;
+
+  // Transform string for rotate
+  const rotateTransform = rotationAnim.interpolate({
+    inputRange: [-180, 180],
+    outputRange: ['-180deg', '180deg'],
+  });
 
   return (
     <View style={styles.container}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={handleCancel} style={styles.headerBtn} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
+      {/* ── Top bar overlay ── */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={handleCancel} style={styles.topBtn} activeOpacity={0.7}>
+          <Ionicons name="close" size={28} color="rgba(255,255,255,0.9)" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>裁剪编辑</Text>
-        <View style={styles.headerBtn} />
+
+        <TouchableOpacity
+          style={[styles.saveBtn, (isProcessing || !imageReady || isRemovingBg) && styles.saveBtnDisabled]}
+          onPress={handleConfirm}
+          disabled={isProcessing || !imageReady || isRemovingBg}
+          activeOpacity={0.85}
+        >
+          {isProcessing ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Ionicons name="checkmark" size={20} color="#fff" />
+          )}
+          <Text style={styles.saveBtnText}>
+            {isProcessing ? '处理中' : '保存'}
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      {/* ── Body ── */}
+      {/* ── Body (editing area) ── */}
       <View
         style={styles.body}
         onLayout={(e) => setBodyHeight(e.nativeEvent.layout.height)}
       >
-        {/* Hidden composite view for bg-removed capture (rendered behind everything) */}
+        {/* Hidden capture view */}
         <View
           ref={captureViewRef}
           style={{
@@ -485,7 +575,7 @@ export function ImageCropScreen() {
             left: 0,
             width: CROP_SIZE,
             height: CROP_SIZE,
-            backgroundColor: '#ffffff',
+            backgroundColor: canShrink ? 'transparent' : '#ffffff',
             overflow: 'hidden',
           }}
           collapsable={false}
@@ -501,6 +591,7 @@ export function ImageCropScreen() {
                   { translateX: offsetAnim.x },
                   { translateY: offsetAnim.y },
                   { scale: scaleAnim },
+                  { rotate: rotateTransform },
                 ],
               }}
               resizeMode="cover"
@@ -522,6 +613,7 @@ export function ImageCropScreen() {
                   { translateX: offsetAnim.x },
                   { translateY: offsetAnim.y },
                   { scale: scaleAnim },
+                  { rotate: rotateTransform },
                 ],
                 opacity: showContent ? 1 : 0,
               }}
@@ -533,45 +625,23 @@ export function ImageCropScreen() {
         {/* Loading */}
         {!showContent && (
           <View style={styles.loadingCenter}>
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={{ marginTop: 10, color: theme.colors.textTertiary, fontSize: 13 }}>
+            <ActivityIndicator size="large" color="#fff" />
+            <Text style={{ marginTop: 10, color: 'rgba(255,255,255,0.6)', fontSize: 13 }}>
               加载图片中...
             </Text>
           </View>
         )}
 
+        {/* Masks + crop frame */}
         {showContent && (
           <>
-            {/* Top mask */}
             {maskHeight > 0 && (
-              <View
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: maskHeight,
-                  backgroundColor: 'rgba(0,0,0,0.42)',
-                }}
-                pointerEvents="none"
-              />
+              <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: maskHeight, backgroundColor: 'rgba(0,0,0,0.55)' }} pointerEvents="none" />
             )}
-            {/* Bottom mask */}
             {maskHeight > 0 && (
-              <View
-                style={{
-                  position: 'absolute',
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: maskHeight,
-                  backgroundColor: 'rgba(0,0,0,0.42)',
-                }}
-                pointerEvents="none"
-              />
+              <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: maskHeight, backgroundColor: 'rgba(0,0,0,0.55)' }} pointerEvents="none" />
             )}
 
-            {/* Crop frame */}
             <View style={[styles.cropBorder, { top: cropTop }]} pointerEvents="none">
               <View style={[styles.gridLine, { width: '100%', height: 1, top: CROP_SIZE / 3 }]} />
               <View style={[styles.gridLine, { width: '100%', height: 1, top: (CROP_SIZE * 2) / 3 }]} />
@@ -586,74 +656,103 @@ export function ImageCropScreen() {
         )}
       </View>
 
-      {/* ── Hint ── */}
-      <View style={styles.hint}>
-        <Ionicons name="hand-left-outline" size={12} color={theme.colors.textTertiary} />
-        <Text style={styles.hintText}>
-          捏合缩放 · 拖动调整裁剪区域
-        </Text>
-      </View>
+      {/* ── Bottom panel ── */}
+      <View style={styles.bottomPanel}>
+        {/* Expandable sub-panel */}
+        {activeTool === 'rotate' && showContent && (
+          <View style={styles.subPanel}>
+            <RotationSlider
+              value={rotationAngle}
+              onValueChange={(angle) => {
+                rotationRef.current = angle;
+                setRotationAngle(angle);
+                rotationAnim.setValue(angle);
+                if (!canShrink) {
+                  const radians = Math.abs(angle) * Math.PI / 180;
+                  const minScale = (Math.abs(Math.cos(radians)) + Math.abs(Math.sin(radians))) * 1.03;
+                  if (scaleRef.current < minScale) {
+                    scaleRef.current = minScale;
+                    scaleAnim.setValue(minScale);
+                  }
+                  const clamped = clampOffset(offsetRef.current, displaySizeRef.current, scaleRef.current, CROP_SIZE, angle);
+                  offsetRef.current = clamped;
+                  offsetAnim.setValue(clamped);
+                }
+              }}
+              disabled={isProcessing || isRemovingBg}
+              darkMode
+            />
+          </View>
+        )}
 
-      {/* ── Action bar ── */}
-      <View style={styles.footer}>
-        <View style={styles.footerRow}>
-          {/* Reset */}
+        {/* Credits info for bg removal */}
+        {activeTool === 'removebg' && bgRemovalConfigured && !bgRemoved && (
+          <View style={styles.subPanel}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+              <Ionicons name="information-circle-outline" size={14} color="rgba(255,255,255,0.5)" />
+              <Text style={{ fontSize: 12, color: 'rgba(255,255,255,0.5)' }}>
+                {creditsInfo !== null ? `免费抠图剩余 ${creditsInfo.remaining} 次` : '加载中...'}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', textAlign: 'center', marginTop: 4, lineHeight: 16 }}>
+              主体清晰、纯色背景效果最佳
+            </Text>
+          </View>
+        )}
+
+        {/* Toolbar */}
+        <View style={styles.toolbar}>
+          {/* Rotate */}
           <TouchableOpacity
-            style={[styles.btnOutline, isProcessing && styles.btnOutlineDisabled]}
-            onPress={handleReset}
-            disabled={isProcessing || isRemovingBg}
+            style={styles.toolBtn}
             activeOpacity={0.7}
+            onPress={() => toggleTool('rotate')}
           >
-            <Ionicons name="refresh" size={16} color={theme.colors.textSecondary} />
-            <Text style={styles.btnOutlineText}>重置</Text>
+            <View style={styles.toolIcon}>
+              <Ionicons name="sync" size={22} color={activeTool === 'rotate' ? theme.colors.primary : 'rgba(255,255,255,0.9)'} />
+            </View>
+            <Text style={[styles.toolLabel, activeTool === 'rotate' && styles.toolLabelActive]}>旋转</Text>
           </TouchableOpacity>
 
-          {/* AI 抠图 */}
+          {/* AI Background Removal */}
           <TouchableOpacity
-            style={[
-              styles.btnBg,
-              (isProcessing || isRemovingBg) && styles.btnOutlineDisabled,
-              bgRemoved && { backgroundColor: theme.colors.accent + '18' },
-            ]}
-            onPress={handleRemoveBg}
-            disabled={!canRemoveBg}
+            style={styles.toolBtn}
             activeOpacity={0.7}
+            onPress={bgRemoved ? undefined : handleRemoveBg}
+            disabled={isRemovingBg || isProcessing || !bgRemovalConfigured}
           >
-            {isRemovingBg ? (
-              <ActivityIndicator size="small" color={theme.colors.primary} />
-            ) : (
-              <Ionicons
-                name={bgRemoved ? 'checkmark-circle' : 'sparkles'}
-                size={16}
-                color={bgRemoved ? theme.colors.accent : theme.colors.primary}
-              />
-            )}
-            <Text style={[styles.btnBgText, bgRemoved && { color: theme.colors.accent }]}>
+            <View style={styles.toolIcon}>
+              {isRemovingBg ? (
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+              ) : (
+                <Ionicons
+                  name={bgRemoved ? 'checkmark-circle' : 'sparkles'}
+                  size={22}
+                  color={bgRemoved ? theme.colors.accent : (activeTool === 'removebg' ? theme.colors.primary : 'rgba(255,255,255,0.9)')}
+                />
+              )}
+            </View>
+            <Text style={[
+              styles.toolLabel,
+              bgRemoved && styles.toolLabelDone,
+              !bgRemoved && activeTool === 'removebg' && styles.toolLabelActive,
+            ]}>
               {isRemovingBg ? '抠图中' : bgRemoved ? '已抠图' : 'AI抠图'}
             </Text>
           </TouchableOpacity>
 
-          {/* Confirm */}
+          {/* Reset */}
           <TouchableOpacity
-            style={[styles.btnPrimary, (isProcessing || !imageReady) && styles.btnPrimaryDisabled]}
-            onPress={handleConfirm}
-            disabled={isProcessing || !imageReady || isRemovingBg}
-            activeOpacity={0.85}
+            style={styles.toolBtn}
+            activeOpacity={0.7}
+            onPress={handleReset}
+            disabled={isProcessing || isRemovingBg}
           >
-            {isProcessing ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <Ionicons name="checkmark" size={18} color="#fff" />
-            )}
-            <Text style={styles.btnPrimaryText}>
-              {isProcessing ? '处理中...' : '确认裁剪'}
-            </Text>
+            <View style={styles.toolIcon}>
+              <Ionicons name="refresh" size={22} color="rgba(255,255,255,0.9)" />
+            </View>
+            <Text style={styles.toolLabel}>重置</Text>
           </TouchableOpacity>
-        </View>
-
-        {/* Image requirements panel */}
-        <View style={{ marginTop: 8, alignItems: 'center' }}>
-          <ImageRequirements creditsRemaining={creditsInfo?.remaining ?? null} />
         </View>
       </View>
     </View>

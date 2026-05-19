@@ -9,7 +9,7 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWardrobeStore } from '../store/wardrobeStore';
@@ -1206,7 +1206,18 @@ export function WardrobeScreen() {
       {/* 添加按钮 */}
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => navigation.navigate('AddClothing')}
+        onPress={() => {
+          // Reset stack to avoid stale AddClothing instances
+          navigation.dispatch(
+            CommonActions.reset({
+              index: 1,
+              routes: [
+                { name: 'WardrobeMain' },
+                { name: 'AddClothing' },
+              ],
+            })
+          );
+        }}
         activeOpacity={0.85}
       >
         <Ionicons name="add" size={28} color={theme.colors.white} />
@@ -1335,7 +1346,17 @@ export function WardrobeScreen() {
       {!isSelecting && (
         <TouchableOpacity
           style={styles.fab}
-          onPress={() => navigation.navigate('AddClothing')}
+          onPress={() => {
+            navigation.dispatch(
+              CommonActions.reset({
+                index: 1,
+                routes: [
+                  { name: 'WardrobeMain' },
+                  { name: 'AddClothing' },
+                ],
+              })
+            );
+          }}
           activeOpacity={0.85}
         >
           <Ionicons name="add" size={28} color={theme.colors.white} />

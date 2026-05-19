@@ -20,7 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { ImagePickerModal } from '../components/ImagePickerModal';
-import { consumeCropResult } from '../utils/cropNavigation';
+import { consumeCropResult, type CropState } from '../utils/cropNavigation';
 import { processImage } from '../utils/imageUtils';
 import { ClothingItem, COLORS, FIT_OPTIONS, THICKNESS_OPTIONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
@@ -735,6 +735,9 @@ export function AddClothingScreen() {
   const [showWardrobeDialog, setShowWardrobeDialog] = useState(false);
   const [pendingWardrobeId, setPendingWardrobeId] = useState<number | null>(null);
   // 从裁剪页面返回时消费裁剪结果
+  // Track whether this screen is expecting a crop result
+  const expectingCropRef = useRef(false);
+
   useFocusEffect(
     useCallback(() => {
       const result = consumeCropResult();
@@ -744,9 +747,26 @@ export function AddClothingScreen() {
         if (result.bgRemovedOriginalUri) {
           setOriginalImageUri(result.bgRemovedOriginalUri);
         }
+        if (result.cropState) {
+          cropStateRef.current = result.cropState;
+        } else {
+          cropStateRef.current = null;
+        }
+        expectingCropRef.current = false;
+      } else if (!isEditing && expectingCropRef.current) {
+        // 添加模式下从裁剪页返回且没有结果（用户没保存）→ 重新弹出选择器
+        expectingCropRef.current = false;
+        setTimeout(() => setShowImagePicker(true), 100);
       }
-    }, [])
+    }, [isEditing])
   );
+
+  // 当 existingItem.id 变化时，从 DB 恢复 cropState
+  useEffect(() => {
+    if (existingItem?.cropState && !cropStateRef.current) {
+      cropStateRef.current = existingItem.cropState;
+    }
+  }, [existingItem?.id]);
 
   // 当 existingItem 加载完成时，同步更新所有状态
   useEffect(() => {
@@ -835,6 +855,7 @@ export function AddClothingScreen() {
   // 跟踪是否正在导航到选项管理页面（跳过未保存检查）
   const skipUnsavedCheck = useRef(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const cropStateRef = useRef<CropState | null>(existingItem?.cropState ?? null);
 
   const currentState = {
     imageUri, originalImageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, tags, fit, thickness,
@@ -1018,6 +1039,7 @@ export function AddClothingScreen() {
         soldPrice: existingItem?.soldPrice || null,
         soldPlatform: existingItem?.soldPlatform || null,
         wardrobeId,
+        cropState: cropStateRef.current ?? (imageChanged ? null : existingItem?.cropState ?? null),
       };
       console.log('[SAVE] selectedParent:', selectedParent, 'selectedChild:', selectedChild, '-> type:', clothingData.type, 'parentType:', clothingData.parentType, 'wardrobeId:', wardrobeId);
 
@@ -1083,7 +1105,8 @@ export function AddClothingScreen() {
           style={styles.imageArea}
           onPress={() => {
             if (imageUri) {
-              navigation.navigate('ImageCrop', { imageUri: (removeBackground && originalImageUri) ? originalImageUri : imageUri, isBgRemoved: removeBackground });
+              expectingCropRef.current = true;
+              navigation.navigate('ImageCrop', { imageUri: originalImageUri || imageUri, isBgRemoved: removeBackground, cropState: cropStateRef.current || undefined });
             } else {
               setImagePickerMode('edit');
               setShowImagePicker(true);
@@ -1100,7 +1123,8 @@ export function AddClothingScreen() {
                   <TouchableOpacity
                     style={[styles.imageActionBtn, removeBackground && styles.imageActionBtnPrimary]}
                     onPress={() => {
-                      navigation.navigate('ImageCrop', { imageUri: (removeBackground && originalImageUri) ? originalImageUri : imageUri, isBgRemoved: removeBackground });
+                      expectingCropRef.current = true;
+                      navigation.navigate('ImageCrop', { imageUri: originalImageUri || imageUri, isBgRemoved: removeBackground, cropState: cropStateRef.current || undefined });
                     }}
                     activeOpacity={0.7}
                   >
@@ -1387,7 +1411,9 @@ export function AddClothingScreen() {
           // Navigate directly to crop screen
           const imgUri = originalUri || uri;
           setOriginalImageUri(imgUri);
+          cropStateRef.current = null;
           setShowImagePicker(false);
+          expectingCropRef.current = true;
           navigation.navigate('ImageCrop', { imageUri: imgUri, isBgRemoved: false });
         }}
         initialImageUri={imagePickerMode === 'edit' ? (imageUri || undefined) : undefined}

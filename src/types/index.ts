@@ -49,6 +49,14 @@ export interface ClothingItem {
   wardrobeId: number;
   // 草稿箱
   isDraft?: boolean;
+  // 裁剪状态（用于重新编辑时恢复旋转/缩放/位置）
+  cropState?: {
+    offset: { x: number; y: number };
+    scale: number;
+    rotation: number;
+    displayWidth: number;
+    displayHeight: number;
+  } | null;
 }
 
 /**

@@ -47,21 +47,177 @@ export function clampOffset(
   rotationAngle: number = 0,
 ): Point {
   const { width: dw, height: dh } = displaySize;
+  const scaledW = dw * scale;
+  const scaledH = dh * scale;
 
-  // Account for rotation — first compute the AABB of the rotated+scaled image.
-  // The visual display applies scale * rotationScale, so the effective dimensions
-  // include both the user zoom and the rotation coverage factor.
+  if (rotationAngle === 0) {
+    const minX = cropSize - scaledW;
+    const maxX = 0;
+    const minY = cropSize - scaledH;
+    const maxY = 0;
+    return {
+      x: Math.max(minX, Math.min(maxX, offset.x)),
+      y: Math.max(minY, Math.min(maxY, offset.y)),
+    };
+  }
+
+  // Analytical constraints: each crop corner must be inside the rotated rectangle.
+  // For corner (px,py), define cx=px-dw/2, cy=py-dh/2:
+  //   |cx*cosT + cy*sinT - ox*cosT - oy*sinT| ≤ scaledW/2
+  //   |-cx*sinT + cy*cosT + ox*sinT - oy*cosT| ≤ scaledH/2
+  // Each gives linear bounds on ox (given oy) and oy (given ox).
+  const radians = rotationAngle * Math.PI / 180;
+  const cosT = Math.cos(radians);
+  const sinT = Math.sin(radians);
+  const w2 = scaledW / 2;
+  const h2 = scaledH / 2;
+
+  const cd = [
+    [0, 0], [cropSize, 0], [0, cropSize], [cropSize, cropSize],
+  ].map(([px, py]) => {
+    const cx = px - dw / 2;
+    const cy = py - dh / 2;
+    return { A: cx * cosT + cy * sinT, B: -cx * sinT + cy * cosT };
+  });
+
+  // Valid ox range for given oy
+  const oxRange = (oy: number): [number, number] => {
+    let lo = -Infinity, hi = Infinity;
+    for (const { A, B } of cd) {
+      if (Math.abs(cosT) > 1e-10) {
+        const a = (A - w2 - oy * sinT) / cosT;
+        const b = (A + w2 - oy * sinT) / cosT;
+        lo = Math.max(lo, Math.min(a, b));
+        hi = Math.min(hi, Math.max(a, b));
+      }
+      if (Math.abs(sinT) > 1e-10) {
+        const a = (-B + oy * cosT - h2) / sinT;
+        const b = (-B + oy * cosT + h2) / sinT;
+        lo = Math.max(lo, Math.min(a, b));
+        hi = Math.min(hi, Math.max(a, b));
+      }
+    }
+    return [lo, hi];
+  };
+
+  // Valid oy range for given ox
+  const oyRange = (ox: number): [number, number] => {
+    let lo = -Infinity, hi = Infinity;
+    for (const { A, B } of cd) {
+      if (Math.abs(sinT) > 1e-10) {
+        const a = (A - w2 - ox * cosT) / sinT;
+        const b = (A + w2 - ox * cosT) / sinT;
+        lo = Math.max(lo, Math.min(a, b));
+        hi = Math.min(hi, Math.max(a, b));
+      }
+      if (Math.abs(cosT) > 1e-10) {
+        const a = (B + ox * sinT - h2) / cosT;
+        const b = (B + ox * sinT + h2) / cosT;
+        lo = Math.max(lo, Math.min(a, b));
+        hi = Math.min(hi, Math.max(a, b));
+      }
+    }
+    return [lo, hi];
+  };
+
+  // Check if (ox, oy) satisfies ALL corner constraints
+  const isValid = (ox: number, oy: number): boolean => {
+    for (const { A, B } of cd) {
+      const u = A - ox * cosT - oy * sinT;
+      const v = -B + ox * sinT + oy * cosT;
+      if (Math.abs(u) > w2 + 0.5 || Math.abs(v) > h2 + 0.5) return false;
+    }
+    return true;
+  };
+
+  // Try both clamping orders, pick the one closer to desired offset
+  const candidates: Point[] = [];
+
+  // Order A: oy first → ox
+  {
+    const [oyLo, oyHi] = oyRange(offset.x);
+    const oy = Math.max(oyLo, Math.min(oyHi, offset.y));
+    const [oxLo, oxHi] = oxRange(oy);
+    candidates.push({ x: Math.max(oxLo, Math.min(oxHi, offset.x)), y: oy });
+  }
+
+  // Order B: ox first → oy
+  {
+    const [oxLo, oxHi] = oxRange(offset.y);
+    const ox = Math.max(oxLo, Math.min(oxHi, offset.x));
+    const [oyLo, oyHi] = oyRange(ox);
+    candidates.push({ x: ox, y: Math.max(oyLo, Math.min(oyHi, offset.y)) });
+  }
+
+  // Order C: clamp ox to its standalone range, then oy
+  {
+    let oxLo = -Infinity, oxHi = Infinity;
+    for (const { A, B } of cd) {
+      if (Math.abs(cosT) > 1e-10) {
+        const lo = (A - w2) / cosT, hi = (A + w2) / cosT;
+        oxLo = Math.max(oxLo, Math.min(lo, hi));
+        oxHi = Math.min(oxHi, Math.max(lo, hi));
+      }
+    }
+    const ox = Math.max(oxLo, Math.min(oxHi, offset.x));
+    const [oyLo, oyHi] = oyRange(ox);
+    candidates.push({ x: ox, y: Math.max(oyLo, Math.min(oyHi, offset.y)) });
+  }
+
+  // Pick the closest valid candidate
+  let best: Point | null = null;
+  let bestDist = Infinity;
+  for (const c of candidates) {
+    if (!isValid(c.x, c.y)) continue;
+    const d = (c.x - offset.x) ** 2 + (c.y - offset.y) ** 2;
+    if (d < bestDist) { bestDist = d; best = c; }
+  }
+  if (best) return best;
+
+  // Fallback: binary search from offset toward centered position (guaranteed valid)
+  // Centered offset = image center aligns with crop center
+  const cx = (cropSize - dw * scale) / 2;
+  const cy = (cropSize - dh * scale) / 2;
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 24; i++) {
+    const mid = (lo + hi) / 2;
+    const mx = offset.x + (cx - offset.x) * mid;
+    const my = offset.y + (cy - offset.y) * mid;
+    if (isValid(mx, my)) lo = mid; else hi = mid;
+  }
+  const t = lo;
+  return { x: offset.x + (cx - offset.x) * t, y: offset.y + (cy - offset.y) * t };
+}
+
+/** AABB-only clamping (loose, used during drag for smooth movement) */
+export function clampOffsetAABB(
+  offset: Point,
+  displaySize: Size,
+  scale: number,
+  cropSize: number,
+  rotationAngle: number = 0,
+): Point {
+  const { width: dw, height: dh } = displaySize;
+  const scaledW = dw * scale;
+  const scaledH = dh * scale;
+
+  if (rotationAngle === 0) {
+    const minX = cropSize - scaledW;
+    const maxX = 0;
+    const minY = cropSize - scaledH;
+    const maxY = 0;
+    return {
+      x: Math.max(minX, Math.min(maxX, offset.x)),
+      y: Math.max(minY, Math.min(maxY, offset.y)),
+    };
+  }
+
   const radians = (Math.abs(rotationAngle) * Math.PI) / 180;
   const cosA = Math.abs(Math.cos(radians));
   const sinA = Math.abs(Math.sin(radians));
-  const rotationScale = cosA + sinA;
-  const effectiveW = dw * scale * rotationScale;
-  const effectiveH = dh * scale * rotationScale;
-  const aabbW = effectiveW * cosA + effectiveH * sinA;
-  const aabbH = effectiveW * sinA + effectiveH * cosA;
+  const aabbW = scaledW * cosA + scaledH * sinA;
+  const aabbH = scaledW * sinA + scaledH * cosA;
 
-  // AABB center = image center = (dw/2 + offset.x, dh/2 + offset.y)
-  // Constraint: AABB must fully cover crop frame [0, cropSize]
   const minX = cropSize - dw / 2 - aabbW / 2;
   const maxX = aabbW / 2 - dw / 2;
   const minY = cropSize - dh / 2 - aabbH / 2;
