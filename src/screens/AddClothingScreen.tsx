@@ -741,6 +741,9 @@ export function AddClothingScreen() {
       if (result) {
         setImageUri(result.uri);
         setRemoveBackground(result.removeBg);
+        if (result.bgRemovedOriginalUri) {
+          setOriginalImageUri(result.bgRemovedOriginalUri);
+        }
       }
     }, [])
   );
@@ -967,7 +970,8 @@ export function AddClothingScreen() {
       // 只要 imageUri 发生变化，就必须重新处理
       const imageChanged = currentImageUri && (!existingItem || currentImageUri !== existingItem.imageUri);
       if (!asDraft && imageChanged) {
-        const result = await processImage(currentImageUri, removeBackground, currentOriginalUri);
+        // Image already processed in ImageCrop (bg removal done there) — just resize & thumbnail
+        const result = await processImage(currentImageUri, false, currentOriginalUri);
         processedUri = result.imageUri || existingItem?.imageUri || currentImageUri;
         thumbnailUri = result.thumbnailUri || existingItem?.thumbnailUri || processedUri;
       } else if (imageChanged) {
@@ -1079,7 +1083,7 @@ export function AddClothingScreen() {
           style={styles.imageArea}
           onPress={() => {
             if (imageUri) {
-              navigation.navigate('ImageCrop', { imageUri, isBgRemoved: removeBackground });
+              navigation.navigate('ImageCrop', { imageUri: (removeBackground && originalImageUri) ? originalImageUri : imageUri, isBgRemoved: removeBackground });
             } else {
               setImagePickerMode('edit');
               setShowImagePicker(true);
@@ -1096,7 +1100,7 @@ export function AddClothingScreen() {
                   <TouchableOpacity
                     style={[styles.imageActionBtn, removeBackground && styles.imageActionBtnPrimary]}
                     onPress={() => {
-                      navigation.navigate('ImageCrop', { imageUri, isBgRemoved: removeBackground });
+                      navigation.navigate('ImageCrop', { imageUri: (removeBackground && originalImageUri) ? originalImageUri : imageUri, isBgRemoved: removeBackground });
                     }}
                     activeOpacity={0.7}
                   >

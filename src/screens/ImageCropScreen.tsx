@@ -13,7 +13,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
-import { documentDirectory, copyAsync } from 'expo-file-system/legacy';
+import { documentDirectory, copyAsync, writeAsStringAsync, deleteAsync } from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { captureRef } from 'react-native-view-shot';
 import { ensureImageDir } from '../utils/imageUtils';
@@ -309,27 +309,13 @@ export function ImageCropScreen() {
   const handleConfirm = useCallback(async () => {
     if (!imageReady) return;
     setIsProcessing(true);
+    let tempInputPath: string | null = null;
     try {
       const curW = originalSizeRef.current.width;
       const curH = originalSizeRef.current.height;
       const offset = offsetRef.current;
       const s = scaleRef.current;
       const ds = displaySizeRef.current;
-
-      // Determine if visual crop extends beyond image bounds (blank space)
-      const coverScale = Math.max(CROP_SIZE / curW, CROP_SIZE / curH);
-      const centerOffsetX = (ds.width * s - ds.width) / 2;
-      const centerOffsetY = (ds.height * s - ds.height) / 2;
-      const realOffsetX = offset.x - centerOffsetX;
-      const realOffsetY = offset.y - centerOffsetY;
-      const pixelX = -realOffsetX / s / coverScale;
-      const pixelY = -realOffsetY / s / coverScale;
-      const pixelSize = CROP_SIZE / s / coverScale;
-      const hasBlankSpace = bgRemoved && (
-        pixelX < 0 || pixelY < 0
-        || pixelX + pixelSize > curW
-        || pixelY + pixelSize > curH
-      );
 
       const isPng = currentImageUri.toLowerCase().endsWith('.png')
         || currentImageUri.startsWith('data:image/png');
@@ -338,48 +324,89 @@ export function ImageCropScreen() {
 
       const MAX_DIM = 1500;
 
-      if (hasBlankSpace && captureViewRef.current) {
-        // Capture at native device resolution (no width= upscale),
-        // single-step, no extra manipulateAsync overhead.
-        const capturedUri = await captureRef(captureViewRef.current, {
-          format: 'png',
-          quality: 1,
+      await ensureImageDir();
+
+      // Convert data URI to file before crop (manipulateAsync may fail with large data URIs)
+      let cropSourceUri = currentImageUri;
+      if (currentImageUri.startsWith('data:image/png;base64,')) {
+        const tempPath = `${documentDirectory}images/temp_input_${Date.now()}.png`;
+        tempInputPath = tempPath;
+        const base64 = currentImageUri.split(',')[1];
+        await writeAsStringAsync(tempPath, base64, { encoding: 'base64' });
+        cropSourceUri = tempPath;
+        // Update originalSize to reflect actual file dimensions
+        const sizeResult = await new Promise<{ width: number; height: number }>((resolve) => {
+          Image.getSize(cropSourceUri, (w, h) => resolve({ width: w, height: h }), () => resolve({ width: curW, height: curH }));
         });
-        await ensureImageDir();
-        await copyAsync({ from: capturedUri, to: savedPath });
-      } else {
-        const pixelCrop = screenCropToPixelCrop(offset, s, ds, { width: curW, height: curH }, CROP_SIZE);
-
-        // Pre-compute step1 dimensions so we can merge resize + crop into one call
-        const step1Scale = curW > curH ? MAX_DIM / curW : MAX_DIM / curH;
-        const step1W = Math.round(curW * step1Scale);
-        const step1H = Math.round(curH * step1Scale);
-
-        const ox = Math.max(0, Math.round(pixelCrop.originX * step1Scale));
-        const oy = Math.max(0, Math.round(pixelCrop.originY * step1Scale));
-        const cw = Math.round(pixelCrop.width * step1Scale);
-        const ch = Math.round(pixelCrop.height * step1Scale);
-        const cropRect = {
-          originX: Math.min(ox, step1W - 1),
-          originY: Math.min(oy, step1H - 1),
-          width: Math.min(cw, step1W - ox),
-          height: Math.min(ch, step1H - oy),
-        };
-
-        const result = await manipulateAsync(
-          currentImageUri,
-          [
-            curW > curH ? { resize: { width: MAX_DIM } } : { resize: { height: MAX_DIM } },
-            { crop: cropRect },
-          ],
-          isPng ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.92 },
-        );
-
-        await ensureImageDir();
-        await copyAsync({ from: result.uri, to: savedPath });
+        originalSizeRef.current = sizeResult;
       }
 
-      setCropResult({ uri: savedPath, removeBg: bgRemoved });
+      // Start bg-removed original save (runs in parallel with crop)
+      let bgRemovedOriginalUri: string | undefined;
+      let bgSavePromise: Promise<void> | null = null;
+      if (bgRemoved && currentImageUri !== imageUri) {
+        const fullOriginalPath = `${documentDirectory}images/bg_full_${Date.now()}.png`;
+        bgRemovedOriginalUri = fullOriginalPath;
+        // cropSourceUri is already a file, so just copy it
+        bgSavePromise = copyAsync({ from: cropSourceUri, to: fullOriginalPath });
+        bgSavePromise = bgSavePromise.catch((e) => {
+          console.error('[ImageCrop] Failed to save bg-removed original:', e);
+        });
+      }
+
+      // Start crop (runs in parallel with bg save)
+      // Always use captureRef for reliable results — manipulateAsync crop can produce
+      // empty output on certain PNG/image types when zoomed in
+      let cropPromise: Promise<void>;
+      const captureView = captureViewRef.current;
+      if (captureView) {
+        cropPromise = (async () => {
+          const capturedUri = await captureRef(captureView, {
+            format: isPng ? 'png' : 'jpg',
+            quality: 1,
+          });
+          await copyAsync({ from: capturedUri, to: savedPath });
+        })();
+      } else {
+        // Fallback: manipulateAsync (only if captureView unavailable)
+        const pixelCrop = screenCropToPixelCrop(offset, s, ds, { width: curW, height: curH }, CROP_SIZE);
+        const ox = Math.max(0, Math.min(Math.round(pixelCrop.originX), curW - 1));
+        const oy = Math.max(0, Math.min(Math.round(pixelCrop.originY), curH - 1));
+        const maxW = curW - ox;
+        const maxH = curH - oy;
+        const cw = Math.round(pixelCrop.width);
+        const ch = Math.round(pixelCrop.height);
+        const cropRect = {
+          originX: ox,
+          originY: oy,
+          width: Math.max(1, Math.min(cw, maxW)),
+          height: Math.max(1, Math.min(ch, maxH)),
+        };
+
+        cropPromise = (async () => {
+          const actions: any[] = [{ crop: cropRect }];
+          if (cropRect.width > MAX_DIM || cropRect.height > MAX_DIM) {
+            actions.push(cropRect.width > cropRect.height
+              ? { resize: { width: MAX_DIM } }
+              : { resize: { height: MAX_DIM } });
+          }
+          const result = await manipulateAsync(
+            cropSourceUri,
+            actions,
+            isPng ? { format: SaveFormat.PNG } : { format: SaveFormat.JPEG, compress: 0.92 },
+          );
+          await copyAsync({ from: result.uri, to: savedPath });
+        })();
+      }
+
+      // Await both in parallel
+      if (bgSavePromise) {
+        await Promise.all([cropPromise, bgSavePromise]);
+      } else {
+        await cropPromise;
+      }
+
+      setCropResult({ uri: savedPath, removeBg: bgRemoved, bgRemovedOriginalUri });
       navigation.goBack();
     } catch (error) {
       console.error('[ImageCrop] Crop failed:', error);
@@ -387,6 +414,10 @@ export function ImageCropScreen() {
       navigation.goBack();
     } finally {
       setIsProcessing(false);
+      // Clean up temp file from data URI conversion
+      if (tempInputPath) {
+        deleteAsync(tempInputPath, { idempotent: true }).catch(() => {});
+      }
     }
   }, [imageReady, currentImageUri, bgRemoved, imageUri, navigation]);
 

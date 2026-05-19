@@ -3,6 +3,8 @@
 export interface CropResult {
   uri: string;
   removeBg: boolean;
+  /** Full bg-removed PNG (before crop), saved for future re-editing */
+  bgRemovedOriginalUri?: string;
 }
 
 let _result: CropResult | null = null;
