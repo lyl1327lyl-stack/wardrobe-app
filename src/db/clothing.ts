@@ -1,6 +1,6 @@
 import { getDatabase } from './database';
 import { ClothingItem } from '../types';
-import { getParentOf, DEFAULT_CATEGORIES } from '../utils/customOptions';
+import { getParentOf, DEFAULT_CATEGORIES, CustomCategories } from '../utils/customOptions';
 import * as SQLite from 'expo-sqlite';
 
 // 本地日期字符串，避免时区偏移
@@ -10,11 +10,17 @@ function localDateString(): string {
 }
 
 // 从 DB 行中解析 parentType，对旧数据做兼容
+// 使用延迟加载的 customOptionsStore 中的分类数据，而非硬编码默认值
 function parseParentType(row: any): string {
-  // 新字段有值直接返回
   if (row.parentType) return row.parentType;
-  // 旧数据：通过 type 查找父分类
-  return getParentOf(DEFAULT_CATEGORIES, row.type) ?? '';
+  // 尝试从用户自定义分类中查找
+  try {
+    const { useCustomOptionsStore } = require('../store/customOptionsStore');
+    const categories = useCustomOptionsStore.getState().categories;
+    return getParentOf(categories, row.type) ?? '';
+  } catch {
+    return getParentOf(DEFAULT_CATEGORIES, row.type) ?? '';
+  }
 }
 
 // 解析 JSON 字段的通用映射
@@ -204,6 +210,15 @@ export async function migrateClothingType(oldType: string, newType: string): Pro
   const result = await db.runAsync(
     'UPDATE clothing_items SET type = ? WHERE type = ?',
     [newType, oldType]
+  );
+  return result.changes;
+}
+
+export async function migrateClothingParentType(oldParent: string, newParent: string): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.runAsync(
+    'UPDATE clothing_items SET parentType = ? WHERE parentType = ?',
+    [newParent, oldParent]
   );
   return result.changes;
 }

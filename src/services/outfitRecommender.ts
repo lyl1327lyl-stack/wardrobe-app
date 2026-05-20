@@ -7,33 +7,88 @@ import {
 
 // ── 颜色协调规则 ──
 const COLOR_HARMONY: Record<string, string[]> = {
+  // 黑灰白系
   '黑色': ['白色', '灰色', '蓝色', '红色', '绿色', '粉色', '棕色', '卡其色', '米色', '酒红色', '藏青色'],
+  '深灰': ['白色', '黑色', '蓝色', '粉色', '绿色', '酒红色'],
+  '浅灰': ['黑色', '白色', '蓝色', '粉色', '紫色', '绿色'],
   '白色': ['黑色', '灰色', '蓝色', '红色', '绿色', '粉色', '棕色', '卡其色', '黄色', '米色', '藏青色', '军绿色'],
-  '灰色': ['黑色', '白色', '蓝色', '粉色', '紫色', '绿色', '酒红色'],
-  '蓝色': ['黑色', '白色', '灰色', '棕色', '米色', '卡其色'],
-  '藏青色': ['白色', '灰色', '米色', '卡其色'],
+  '米白': ['黑色', '蓝色', '棕色', '绿色', '卡其色'],
+  '奶油色': ['黑色', '蓝色', '棕色', '咖啡色'],
+  // 红色系
   '红色': ['黑色', '白色', '灰色', '蓝色', '棕色', '米色'],
   '酒红色': ['黑色', '白色', '灰色', '米色'],
+  '砖红色': ['黑色', '白色', '蓝色', '卡其色'],
+  '粉红': ['黑色', '白色', '灰色', '蓝色'],
+  // 蓝色系
+  '蓝色': ['黑色', '白色', '灰色', '棕色', '米色', '卡其色'],
+  '深蓝': ['白色', '灰色', '米色', '卡其色'],
+  '浅蓝': ['白色', '黑色', '灰色', '棕色'],
+  '藏青色': ['白色', '灰色', '米色', '卡其色'],
+  // 绿色系
+  '绿色': ['黑色', '白色', '灰色', '棕色', '米色', '蓝色'],
+  '军绿色': ['黑色', '白色', '棕色', '卡其色'],
+  '墨绿色': ['白色', '米色', '卡其色'],
+  '薄荷绿': ['白色', '黑色', '蓝色'],
+  // 黄橙系
+  '黄色': ['黑色', '白色', '蓝色', '棕色', '灰色'],
+  '姜黄色': ['黑色', '白色', '蓝色', '棕色'],
+  '橙色': ['黑色', '白色', '蓝色', '棕色'],
+  // 紫粉系
+  '紫色': ['黑色', '白色', '灰色', '蓝色', '粉色'],
+  '薰衣草': ['白色', '黑色', '灰色'],
   '粉色': ['黑色', '白色', '灰色', '蓝色', '紫色'],
+  // 棕卡系
   '棕色': ['黑色', '白色', '蓝色', '绿色', '米色', '红色', '卡其色'],
   '咖啡色': ['黑色', '白色', '米色', '卡其色', '蓝色'],
   '卡其色': ['黑色', '白色', '蓝色', '棕色', '绿色', '红色'],
-  '绿色': ['黑色', '白色', '灰色', '棕色', '米色', '蓝色'],
-  '军绿色': ['黑色', '白色', '棕色', '卡其色'],
-  '黄色': ['黑色', '白色', '蓝色', '棕色', '灰色'],
+  '驼色': ['黑色', '白色', '蓝色', '棕色'],
+  // 其他
+  '青色': ['白色', '黑色', '灰色'],
+  '灰色': ['黑色', '白色', '蓝色', '粉色', '紫色', '绿色', '酒红色'],
   '米色': ['黑色', '白色', '蓝色', '棕色', '绿色', '红色', '藏青色', '咖啡色'],
+  '银灰色': ['黑色', '白色', '蓝色', '粉色', '紫色'],
+  '杏色': ['黑色', '白色', '蓝色', '棕色', '卡其色'],
+  '玫红色': ['黑色', '白色', '灰色', '蓝色'],
+  '桃红色': ['黑色', '白色', '灰色', '蓝色'],
+  '橘红色': ['黑色', '白色', '蓝色', '棕色', '灰色'],
+  '天蓝色': ['白色', '黑色', '灰色', '棕色', '米色'],
+  '宝蓝色': ['白色', '灰色', '米色', '卡其色'],
+  '湖蓝色': ['白色', '黑色', '灰色', '米色'],
+  '牛仔蓝': ['白色', '黑色', '灰色', '米色', '棕色', '卡其色'],
+  '靛蓝色': ['白色', '灰色', '米色', '卡其色'],
+  '水洗蓝': ['白色', '黑色', '灰色', '米色', '棕色'],
+  '翠绿色': ['黑色', '白色', '灰色', '米色', '棕色'],
+  '草绿色': ['白色', '黑色', '灰色', '米色'],
+  '金色': ['黑色', '白色', '蓝色', '棕色', '灰色'],
+  '紫红色': ['黑色', '白色', '灰色', '蓝色'],
+  '香槟色': ['黑色', '白色', '蓝色', '棕色', '卡其色'],
+  '银色': ['黑色', '白色', '蓝色', '粉色', '紫色'],
+  '其他': ['黑色', '白色', '灰色', '蓝色'],
 };
 
-const NEUTRAL_COLORS = new Set(['黑色', '白色', '灰色', '米色', '咖啡色', '藏青色']);
+const NEUTRAL_COLORS = new Set(['黑色', '白色', '灰色', '米色', '米白', '奶油色', '咖啡色', '藏青色', '深灰', '浅灰', '卡其色', '驼色', '银灰色', '杏色', '香槟色', '银色', '其他']);
 
 /** 强烈冲突色对 */
 const CLASH_PAIRS: [string, string][] = [
   ['红色', '绿色'],
   ['红色', '粉色'],
+  ['红色', '粉红'],
+  ['红色', '翠绿色'],
   ['绿色', '橙色'],
+  ['绿色', '玫红色'],
   ['蓝色', '橙色'],
+  ['蓝色', '橘红色'],
   ['紫色', '黄色'],
+  ['紫色', '草绿色'],
   ['军绿色', '红色'],
+  ['薄荷绿', '粉色'],
+  ['薄荷绿', '桃红色'],
+  ['翠绿色', '红色'],
+  ['翠绿色', '橙色'],
+  ['草绿色', '紫色'],
+  ['玫红色', '橘红色'],
+  ['紫红色', '黄色'],
+  ['橘红色', '宝蓝色'],
 ];
 
 // ── 天气 → 季节映射 ──
@@ -58,8 +113,21 @@ function weightedRandomSelect<T>(candidates: T[], getWeight: (item: T) => number
   return candidates[candidates.length - 1];
 }
 
-/** 两个颜色是否协调 */
+/** 两个颜色是否协调（支持逗号分隔的多色值） */
 function colorsCompatible(c1: string, c2: string): boolean {
+  const colors1 = c1.split(',').map(c => c.trim()).filter(Boolean);
+  const colors2 = c2.split(',').map(c => c.trim()).filter(Boolean);
+  if (colors1.length === 0 || colors2.length === 0) return true;
+  // 如果存在任意一对不协调的颜色，返回 false
+  for (const a of colors1) {
+    for (const b of colors2) {
+      if (!singleColorsCompatible(a, b)) return false;
+    }
+  }
+  return true;
+}
+
+function singleColorsCompatible(c1: string, c2: string): boolean {
   if (!c1 || !c2 || c1 === c2) return true;
   const allowed = COLOR_HARMONY[c1];
   if (allowed) return allowed.includes(c2);
@@ -486,23 +554,37 @@ function computeColorScore(items: ClothingItem[]): number {
   let count = 0;
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
-      const c1 = items[i].color, c2 = items[j].color;
-      if (!c1 || !c2 || c1 === c2) {
-        sum += 0.8; // 同色系
-      } else if (isClash(c1, c2)) {
-        sum -= 1.0;
-      } else if (NEUTRAL_COLORS.has(c1) || NEUTRAL_COLORS.has(c2)) {
-        sum += 0.6; // 含中性色
-      } else if (colorsCompatible(c1, c2)) {
-        sum += 0.8; // 已知协调
+      const colors1 = (items[i].color || '').split(',').map(c => c.trim()).filter(Boolean);
+      const colors2 = (items[j].color || '').split(',').map(c => c.trim()).filter(Boolean);
+      if (colors1.length === 0 || colors2.length === 0) {
+        sum += 0.8;
       } else {
-        sum += 0.2; // 无冲突但也不确定
+        // 对每对颜色取最差分数
+        let pairScore = 1;
+        for (const c1 of colors1) {
+          for (const c2 of colors2) {
+            let s: number;
+            if (c1 === c2) {
+              s = 0.8;
+            } else if (isClash(c1, c2)) {
+              s = -1.0;
+            } else if (NEUTRAL_COLORS.has(c1) || NEUTRAL_COLORS.has(c2)) {
+              s = 0.6;
+            } else if (singleColorsCompatible(c1, c2)) {
+              s = 0.8;
+            } else {
+              s = 0.2;
+            }
+            pairScore = Math.min(pairScore, s);
+          }
+        }
+        sum += pairScore;
       }
       count++;
     }
   }
   if (count === 0) return 0.5;
-  return Math.max(0, Math.min(1, (sum / count + 1) / 2)); // 映射到 [0, 1]
+  return Math.max(0, Math.min(1, (sum / count + 1) / 2));
 }
 
 function isClash(c1: string, c2: string): boolean {
@@ -752,7 +834,8 @@ export function generateRecommendation(
 export { colorsCompatible as areColorsCompatible };
 
 export function getColorSuggestions(item: ClothingItem): string[] {
-  const compatible = COLOR_HARMONY[item.color];
+  const primary = item.color?.split(',')[0]?.trim() || '';
+  const compatible = COLOR_HARMONY[primary];
   if (!compatible) return [];
   return compatible.slice(0, 5);
 }

@@ -76,6 +76,7 @@ interface WardrobeState {
   getDaysSinceLastWorn: (id: number) => number | null;
   wearMultipleClothing: (ids: number[]) => Promise<void>;
   migrateClothingType: (oldType: string, newType: string) => Promise<number>;
+  migrateClothingParentType: (oldParent: string, newParent: string) => Promise<number>;
   // 批量操作
   moveMultipleToTrash: (ids: number[], reason?: string) => Promise<void>;
   restoreMultipleFromTrash: (ids: number[]) => Promise<void>;
@@ -452,7 +453,9 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     const stats: Record<string, number> = {};
     clothing.forEach(item => {
       if (item.color) {
-        stats[item.color] = (stats[item.color] || 0) + 1;
+        item.color.split(',').map(c => c.trim()).filter(Boolean).forEach(c => {
+          stats[c] = (stats[c] || 0) + 1;
+        });
       }
     });
     return stats;
@@ -511,7 +514,20 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
     const count = await clothingDb.migrateClothingType(oldType, newType);
     set(state => ({
       clothing: state.clothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
+      trashClothing: state.trashClothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
       soldClothing: state.soldClothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
+      draftClothing: state.draftClothing.map(c => c.type === oldType ? { ...c, type: newType } : c),
+    }));
+    return count;
+  },
+
+  migrateClothingParentType: async (oldParent: string, newParent: string) => {
+    const count = await clothingDb.migrateClothingParentType(oldParent, newParent);
+    set(state => ({
+      clothing: state.clothing.map(c => c.parentType === oldParent ? { ...c, parentType: newParent } : c),
+      trashClothing: state.trashClothing.map(c => c.parentType === oldParent ? { ...c, parentType: newParent } : c),
+      soldClothing: state.soldClothing.map(c => c.parentType === oldParent ? { ...c, parentType: newParent } : c),
+      draftClothing: state.draftClothing.map(c => c.parentType === oldParent ? { ...c, parentType: newParent } : c),
     }));
     return count;
   },

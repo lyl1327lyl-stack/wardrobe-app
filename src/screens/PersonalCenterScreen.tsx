@@ -43,7 +43,6 @@ const MENU_ITEMS: MenuSection[] = [
     title: '管理分类选项',
     items: [
       { key: 'categories', label: '类型管理', icon: 'shirt-outline', action: 'categories' },
-      { key: 'seasons', label: '季节管理', icon: 'flower-outline', action: 'seasons' },
       { key: 'tags', label: '标签管理', icon: 'pricetags-outline', action: 'tags' },
     ],
   },

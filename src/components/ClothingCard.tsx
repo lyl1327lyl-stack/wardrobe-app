@@ -100,7 +100,7 @@ export function ClothingCard({ item, onPress }: Props) {
       </View>
       <View style={styles.info}>
         <Text style={styles.type} numberOfLines={1}>{item.type}</Text>
-        <Text style={styles.color} numberOfLines={1}>{item.color}</Text>
+        <Text style={styles.color} numberOfLines={1}>{item.color?.split(',')[0]?.trim() || ''}</Text>
         {item.brand ? <Text style={styles.brand} numberOfLines={1}>{item.brand}</Text> : null}
       </View>
     </TouchableOpacity>

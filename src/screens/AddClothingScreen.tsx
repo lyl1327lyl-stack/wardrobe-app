@@ -13,6 +13,7 @@ import {
   BackHandler,
   Modal,
   KeyboardAvoidingView,
+  useWindowDimensions,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
@@ -25,33 +26,57 @@ import { processImage } from '../utils/imageUtils';
 import { ClothingItem, COLORS, FIT_OPTIONS, THICKNESS_OPTIONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { OverflowScrollView } from '../components/OverflowScrollView';
 import { Theme } from '../utils/theme';
 
 type RouteParams = { EditClothing?: { id: number; isDraft?: boolean; prefilledImageUri?: string } };
 
-// 父分类图标映射 - 更匹配的图标
-const PARENT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  '上装': 'shirt-outline',
-  '下装': 'layers-outline',
-  '外套': 'snow-outline',
-  '鞋': 'footsteps-outline',
-  '配饰': 'sparkles-outline',
-  '包包': 'bag-outline',
-};
-
 const COLOR_MAP: Record<string, string> = {
-  '黑色': '#2D2A26', '白色': '#F5F5F0', '灰色': '#9CA3AF',
-  '红色': '#C47D5A', '蓝色': '#6B8FA3', '绿色': '#8B9B7A',
-  '黄色': '#D4B896', '紫色': '#8B7B9B', '粉色': '#C9A0A0',
-  '棕色': '#8B7355', '米色': '#D4C4B0', '橙色': '#C9A06A',
-  '青色': '#7AA3A3', '咖啡色': '#6B5B4E', '酒红色': '#8B5A5A',
-  '藏青色': '#4A5568', '卡其色': '#B8A88A', '军绿色': '#6B7B5A',
-  '其他': '#9CA3AF',
+  // 黑灰白
+  '黑色': '#2D2A26', '深灰': '#6B6B6B', '浅灰': '#B8B8B8', '灰色': '#8B8B8B', '银灰色': '#A8A8A8',
+  '白色': '#F5F5F0', '米白': '#F0EDE4', '米色': '#E8D5B7', '奶油色': '#F5E6C8', '杏色': '#F0D5B0',
+  // 红
+  '红色': '#C44E4E', '酒红色': '#8B3A3A', '砖红色': '#A0522D', '粉红': '#E8A0B0',
+  '玫红色': '#D44A6E', '桃红色': '#F0A0A0', '橘红色': '#E07040',
+  // 蓝
+  '蓝色': '#5B8DB8', '深蓝': '#3A5A8C', '浅蓝': '#8EB8D8', '藏青色': '#4A5568',
+  '天蓝色': '#7EB8D8', '宝蓝色': '#3B6FA0', '湖蓝色': '#5F9EA0', '牛仔蓝': '#5B7FA5', '靛蓝色': '#3D5A80', '水洗蓝': '#8EB0C8',
+  // 绿
+  '绿色': '#6B8B6B', '军绿色': '#5C6B4E', '墨绿色': '#3D5C3D', '薄荷绿': '#8BC4A8',
+  '翠绿色': '#4CAF6E', '草绿色': '#8BAA4E',
+  // 黄橙
+  '黄色': '#D4B896', '姜黄色': '#C9A040', '橙色': '#D48B4E', '金色': '#C8A040',
+  // 紫粉
+  '紫色': '#8B7B9B', '薰衣草': '#A08CB8', '粉色': '#D4A0A0', '紫红色': '#9B4A7B',
+  // 棕卡
+  '棕色': '#8B7355', '咖啡色': '#6B5B4E', '卡其色': '#B8A88A', '驼色': '#C4AA82',
+  // 其他
+  '青色': '#7AA3A3', '香槟色': '#EDE0C8', '银色': '#C0C0C0', '其他': '#A0A0A0',
 };
 
 function getColorHex(colorName: string): string {
   return COLOR_MAP[colorName] || '#9CA3AF';
 }
+
+function getColorLightness(hex: string): number {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return 0.299 * r + 0.587 * g + 0.114 * b; // perceived brightness, higher = lighter
+}
+
+const COLOR_FAMILIES: { name: string; colors: string[] }[] = [
+  { name: '黑灰白', colors: ['黑色', '深灰', '浅灰', '灰色', '银灰色', '白色', '米白', '米色', '奶油色', '杏色'] },
+  { name: '红色系', colors: ['红色', '酒红色', '砖红色', '粉红', '玫红色', '桃红色', '橘红色'] },
+  { name: '蓝色系', colors: ['蓝色', '深蓝', '浅蓝', '藏青色', '天蓝色', '宝蓝色', '湖蓝色', '牛仔蓝', '靛蓝色', '水洗蓝'] },
+  { name: '绿色系', colors: ['绿色', '军绿色', '墨绿色', '薄荷绿', '翠绿色', '草绿色'] },
+  { name: '黄橙系', colors: ['黄色', '姜黄色', '橙色', '金色'] },
+  { name: '紫粉系', colors: ['紫色', '薰衣草', '粉色', '紫红色'] },
+  { name: '棕卡系', colors: ['棕色', '咖啡色', '卡其色', '驼色'] },
+  { name: '其他', colors: ['青色', '香槟色', '银色', '其他'] },
+];
+
+const LIGHT_COLORS = ['白色', '米白', '奶油色', '浅灰', '米色', '杏色', '香槟色', '银色', '天蓝色', '水洗蓝', '草绿色', '桃红色'];
 
 function formatDate(date: Date | null): string {
   if (!date || isNaN(date.getTime())) return '';
@@ -410,23 +435,27 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.white,
       fontWeight: '600',
     },
-    colorScroll: {
-      marginHorizontal: -18,
-      paddingHorizontal: 18,
-    },
-    colorRow: {
+    colorScrollRow: {
       flexDirection: 'row',
-      gap: 8,
-      paddingRight: 18,
+      alignItems: 'center',
+    },
+    colorScrollFlex: {
+      flex: 1,
+    },
+    colorExpandedGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
     },
     colorItem: {
       alignItems: 'center',
-      gap: 5,
     },
     colorSwatch: {
       width: 36,
       height: 36,
       borderRadius: 18,
+      justifyContent: 'center',
+      alignItems: 'center',
     },
     colorSwatchWhite: {
       borderWidth: 1,
@@ -435,20 +464,29 @@ const makeStyles = (theme: Theme) =>
     colorSwatchActive: {
       borderWidth: 2.5,
       borderColor: theme.colors.primary,
-      shadowColor: theme.colors.primary,
-      shadowOffset: { width: 0, height: 0 },
-      shadowOpacity: 0.3,
-      shadowRadius: 6,
-      elevation: 4,
     },
-    colorName: {
-      fontSize: 10,
+    colorCheck: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      position: 'absolute',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    colorExpandBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: theme.colors.background,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    colorExpandBtnText: {
+      fontSize: 12,
       color: theme.colors.textTertiary,
-      fontWeight: '500',
-    },
-    colorNameActive: {
-      color: theme.colors.primary,
-      fontWeight: '700',
+      fontWeight: '600',
     },
     inputRow: {
       flexDirection: 'row',
@@ -467,6 +505,118 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
       backgroundColor: theme.colors.background,
       fontFamily: 'System',
+    },
+    brandDropdown: {
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.md,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      marginTop: 4,
+      overflow: 'hidden',
+      ...theme.shadows.md,
+    },
+    brandSuggestion: {
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
+    },
+    brandSuggestionText: {
+      fontSize: 14,
+      color: theme.colors.text,
+    },
+    brandSizeRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    halfField: {
+      flex: 1,
+    },
+    pickerBtn: {
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderRadius: theme.borderRadius.md,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      backgroundColor: theme.colors.background,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    pickerBtnText: {
+      fontSize: 15,
+      color: theme.colors.text,
+      flex: 1,
+    },
+    pickerBtnPlaceholder: {
+      color: theme.colors.textTertiary,
+    },
+    threeColRow: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    colField: {
+      flex: 1,
+    },
+    sizeModalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.4)',
+      justifyContent: 'flex-end',
+    },
+    sizeModalContent: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 16,
+      borderTopRightRadius: 16,
+      paddingTop: 16,
+      maxHeight: '60%',
+    },
+    sizeModalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    sizeModalTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    sizeModalClose: {
+      fontSize: 15,
+      color: theme.colors.primary,
+      fontWeight: '500',
+    },
+    sizeOptionList: {
+      paddingTop: 8,
+    },
+    sizeOption: {
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
+    },
+    sizeOptionText: {
+      fontSize: 15,
+      color: theme.colors.text,
+    },
+    sizeOptionActive: {
+      color: theme.colors.primary,
+      fontWeight: '600',
+    },
+    sizeModalManage: {
+      paddingVertical: 14,
+      paddingHorizontal: 16,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      marginTop: 8,
+    },
+    sizeModalManageText: {
+      fontSize: 14,
+      color: theme.colors.textTertiary,
+      textAlign: 'center',
     },
     dateWrapper: {
       flexDirection: 'row',
@@ -568,30 +718,20 @@ const makeStyles = (theme: Theme) =>
     },
     parentChipRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
       gap: 10,
       paddingRight: 18,
     },
     parentChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
       paddingHorizontal: 16,
       paddingVertical: 10,
       borderRadius: 12,
       backgroundColor: theme.colors.background,
       borderWidth: 1.5,
       borderColor: theme.colors.border,
-      gap: 6,
     },
     parentChipActive: {
       backgroundColor: theme.colors.primary,
       borderColor: theme.colors.primary,
-    },
-    parentChipIcon: {
-      width: 20,
-      height: 20,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     parentChipLabel: {
       fontSize: 14,
@@ -603,22 +743,17 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '600',
     },
     childCard: {
-      backgroundColor: theme.colors.background,
-      borderRadius: 12,
-      padding: 12,
       marginTop: 10,
-    },
-    childCardTitle: {
-      fontSize: 11,
-      color: theme.colors.textTertiary,
-      marginBottom: 10,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
     },
     childGrid: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
       gap: 8,
+      paddingRight: 18,
+      marginLeft: 4,
+      paddingLeft: 12,
+      borderLeftWidth: 2.5,
+      borderLeftColor: `${theme.colors.primary}40`,
+      borderRadius: 2,
     },
     childChip: {
       paddingHorizontal: 14,
@@ -646,7 +781,7 @@ const makeStyles = (theme: Theme) =>
 export function AddClothingScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'EditClothing'>>();
-  const { addClothing, updateClothing, loadData, currentWardrobeId, saveDraft, publishDraft, wardrobes } = useWardrobeStore();
+  const { addClothing, updateClothing, loadData, currentWardrobeId, saveDraft, publishDraft, wardrobes, getColorStats } = useWardrobeStore();
   const wardrobeIsLoading = useWardrobeStore(state => state.isLoading);
   const clothing = useWardrobeStore(state => state.clothing);
   const draftClothing = useWardrobeStore(state => state.draftClothing);
@@ -659,6 +794,39 @@ export function AddClothingScreen() {
   const load = useCustomOptionsStore(state => state.load);
   const customIsLoading = useCustomOptionsStore(state => state.isLoading);
   const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  // 颜色排序：常用色在前（按频率），其余按色系排列、同色系由浅到深
+  const sortedColors = useMemo(() => {
+    const stats = getColorStats();
+    const usedAll = COLORS.filter(c => stats[c]).sort((a, b) => (stats[b] || 0) - (stats[a] || 0));
+    // 常用只取前7个，其余回到各自色系按由深到浅排列
+    const top7 = usedAll.slice(0, 7);
+    const top7Set = new Set(top7);
+    const remaining: string[] = [];
+    for (const family of COLOR_FAMILIES) {
+      const familyColors = family.colors.filter(c => !top7Set.has(c));
+      familyColors.sort((a, b) => {
+        const la = getColorLightness(COLOR_MAP[a] || '#888');
+        const lb = getColorLightness(COLOR_MAP[b] || '#888');
+        return la - lb; // 由深到浅：深色在前
+      });
+      remaining.push(...familyColors);
+    }
+    return [...top7, ...remaining];
+  }, [clothing, getColorStats]);
+
+  // 根据屏幕宽度自适应收起模式显示几个色块（保证 + 展开按钮不溢出）
+  const { width: windowWidth } = useWindowDimensions();
+  const collapsedCount = useMemo(() => {
+    const formPad = 36;  // formCard padding
+    const btnWidth = 44; // 展开按钮
+    const gap = 6;       // 色块间距
+    const swatch = 36;   // 色块尺寸
+    const margin = 4;    // 安全边距
+    const available = windowWidth - formPad - btnWidth - margin;
+    return Math.max(3, Math.floor((available + gap) / (swatch + gap)));
+  }, [windowWidth]);
+
   const insets = useSafeAreaInsets();
 
   // 数据是否已加载完成
@@ -716,8 +884,31 @@ export function AddClothingScreen() {
   const [selectedParent, setSelectedParent] = useState<string>(getInitialParent(existingItem));
   const [selectedChild, setSelectedChild] = useState<string>(getInitialChild(existingItem));
   const [color, setColor] = useState(existingItem?.color || '');
+  const [colors, setColors] = useState<string[]>(
+    existingItem?.color ? existingItem.color.split(',').map(c => c.trim()).filter(Boolean) : []
+  );
+  const [colorExpanded, setColorExpanded] = useState(false);
   const [brand, setBrand] = useState(existingItem?.brand || '');
   const [size, setSize] = useState(existingItem?.size || '');
+
+  // 品牌历史记录
+  const brandList = useMemo(() => {
+    const brands = new Set<string>();
+    clothing.forEach(item => {
+      if (item.brand) brands.add(item.brand.trim());
+    });
+    return Array.from(brands).sort((a, b) => a.localeCompare(b, 'zh'));
+  }, [clothing]);
+
+  const [showBrandDropdown, setShowBrandDropdown] = useState(false);
+  const [showSizePicker, setShowSizePicker] = useState(false);
+  const [sizeDropdownCoords, setSizeDropdownCoords] = useState<{ x: number; y: number; w: number } | null>(null);
+  const sizeBtnRef = useRef<View>(null);
+  const brandSuggestions = useMemo(() => {
+    if (!brand.trim()) return brandList.slice(0, 8);
+    const q = brand.toLowerCase();
+    return brandList.filter(b => b.toLowerCase().includes(q)).slice(0, 8);
+  }, [brand, brandList]);
   const [seasons, setSeasons] = useState<string[]>(existingItem?.seasons || []);
   const [tags, setTags] = useState<string[]>(existingItem?.tags || []);
   const [fit, setFit] = useState<string>(existingItem?.fit || '');
@@ -772,6 +963,7 @@ export function AddClothingScreen() {
   useEffect(() => {
     if (existingItem) {
       setColor(existingItem.color || '');
+      setColors(existingItem.color ? existingItem.color.split(',').map(c => c.trim()).filter(Boolean) : []);
       setBrand(existingItem.brand || '');
       setSize(existingItem.size || '');
       setSeasons(existingItem.seasons || []);
@@ -855,10 +1047,12 @@ export function AddClothingScreen() {
   // 跟踪是否正在导航到选项管理页面（跳过未保存检查）
   const skipUnsavedCheck = useRef(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const brandGroupY = useRef(0);
+  const card2Y = useRef(0);
   const cropStateRef = useRef<CropState | null>(existingItem?.cropState ?? null);
 
   const currentState = {
-    imageUri, originalImageUri, type: selectedChild || selectedParent || '', color, brand, size, seasons, tags, fit, thickness,
+    imageUri, originalImageUri, type: selectedChild || selectedParent || '', color: colors.join(','), brand, size, seasons, tags, fit, thickness,
     purchaseDate: purchaseDate ? formatDate(purchaseDate) : '', price, remarks,
   };
 
@@ -941,6 +1135,10 @@ export function AddClothingScreen() {
     setThickness(prev => prev === t ? '' : t);
   };
 
+  const toggleColor = (c: string) => {
+    setColors(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c]);
+  };
+
   // 跳转到分类管理页面
   const openOptionManager = (field: 'categories' | 'seasons' | 'tags' | 'sizes') => {
     skipUnsavedCheck.current = true;
@@ -1020,7 +1218,7 @@ export function AddClothingScreen() {
         originalImageUri: currentOriginalUri,
         type: selectedChild || selectedParent || '',
         parentType: selectedChild ? selectedParent : (selectedParent || ''),
-        color: asDraft && !color ? '' : color,
+        color: asDraft && colors.length === 0 ? '' : colors.join(','),
         brand,
         size,
         seasons: seasons,
@@ -1164,6 +1362,19 @@ export function AddClothingScreen() {
           <View style={styles.formCard}>
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
+                <Text style={styles.labelText}>季节<Text style={styles.required}> *</Text></Text>
+              </View>
+              <View style={styles.chipRow}>
+                {(customSeasons || []).map(s => (
+                  <TouchableOpacity key={s} style={[styles.chip, seasons.includes(s) && styles.chipActive]} onPress={() => toggleSeason(s)}>
+                    <Text style={[styles.chipLabel, seasons.includes(s) && styles.chipLabelActive]}>{s}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+
+                        <View style={styles.formGroup}>
+              <View style={styles.labelRow}>
                 <Text style={styles.labelText}>类型<Text style={styles.required}> *</Text></Text>
                 <TouchableOpacity style={styles.addOptionBtn} onPress={() => openOptionManager('categories')} activeOpacity={0.7}>
                   <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
@@ -1188,35 +1399,29 @@ export function AddClothingScreen() {
                   </View>
                 )}
                 {/* 父分类选择 */}
-                <View style={styles.parentChipRow}>
-                  {getParents().map(parent => {
-                    const isActive = selectedParent === parent;
-                    return (
-                      <TouchableOpacity
-                        key={parent}
-                        style={[styles.parentChip, isActive && styles.parentChipActive]}
-                        onPress={() => {
-                          setSelectedParent(parent);
-                          setSelectedChild('');
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.parentChipIcon}>
-                          <Ionicons
-                            name={PARENT_ICONS[parent] || 'ellipse'}
-                            size={16}
-                            color={isActive ? theme.colors.white : theme.colors.textTertiary}
-                          />
-                        </View>
-                        <Text style={[styles.parentChipLabel, isActive && styles.parentChipLabelActive]}>{parent}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-                {/* 子分类卡片（仅当选择了父分类后显示） */}
-                {selectedParent && (
-                  <View style={styles.childCard}>
-                    <Text style={styles.childCardTitle}>选择{selectedParent}类型</Text>
+                <OverflowScrollView style={styles.chipScroll}>
+                  <View style={styles.parentChipRow}>
+                    {getParents().map(parent => {
+                      const isActive = selectedParent === parent;
+                      return (
+                        <TouchableOpacity
+                          key={parent}
+                          style={[styles.parentChip, isActive && styles.parentChipActive]}
+                          onPress={() => {
+                            setSelectedParent(parent);
+                            setSelectedChild('');
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.parentChipLabel, isActive && styles.parentChipLabelActive]}>{parent}</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                </OverflowScrollView>
+                {/* 子分类（仅当选择了父分类后显示） */}
+                {selectedParent && getChildrenOf(selectedParent).length > 0 && (
+                  <OverflowScrollView style={[styles.chipScroll, { marginTop: 8 }]}>
                     <View style={styles.childGrid}>
                       {getChildrenOf(selectedParent).map(child => {
                         const isActive = selectedChild === child;
@@ -1232,73 +1437,162 @@ export function AddClothingScreen() {
                         );
                       })}
                     </View>
-                  </View>
+                  </OverflowScrollView>
                 )}
               </View>
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>颜色</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorScroll}>
-                <View style={styles.colorRow}>
-                  {COLORS.filter(c => c !== '其他').map(c => (
-                    <TouchableOpacity key={c} style={styles.colorItem} onPress={() => setColor(color === c ? '' : c)}>
-                      <View style={[styles.colorSwatch, { backgroundColor: getColorHex(c) }, color === c && styles.colorSwatchActive, c === '白色' && styles.colorSwatchWhite]} />
-                      <Text style={[styles.colorName, color === c && styles.colorNameActive]}>{c}</Text>
-                    </TouchableOpacity>
-                  ))}
+              {colorExpanded ? (
+                <View style={styles.colorExpandedGrid}>
+                  {sortedColors.map(c => {
+                    const isSelected = colors.includes(c);
+                    const isLight = LIGHT_COLORS.includes(c);
+                    return (
+                      <TouchableOpacity key={c} style={styles.colorItem} onPress={() => toggleColor(c)} activeOpacity={0.7}>
+                        <View style={[styles.colorSwatch, { backgroundColor: getColorHex(c) }, isLight && styles.colorSwatchWhite, isSelected && styles.colorSwatchActive]}>
+                          {isSelected && (
+                            <Ionicons name="checkmark" size={18} color={isLight ? 'rgba(0,0,0,0.45)' : '#fff'} style={{ position: 'absolute' }} />
+                          )}
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <TouchableOpacity style={styles.colorItem} onPress={() => setColorExpanded(false)} activeOpacity={0.7}>
+                    <View style={styles.colorExpandBtn}>
+                      <Ionicons name="chevron-up" size={16} color={theme.colors.textTertiary} />
+                    </View>
+                  </TouchableOpacity>
                 </View>
-              </ScrollView>
+              ) : (
+                <View style={styles.colorScrollRow}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorScrollFlex} contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
+                    {sortedColors.slice(0, collapsedCount).map(c => {
+                      const isSelected = colors.includes(c);
+                      const isLight = LIGHT_COLORS.includes(c);
+                      return (
+                        <TouchableOpacity key={c} style={styles.colorItem} onPress={() => toggleColor(c)} activeOpacity={0.7}>
+                          <View style={[styles.colorSwatch, { backgroundColor: getColorHex(c) }, isLight && styles.colorSwatchWhite, isSelected && styles.colorSwatchActive]}>
+                            {isSelected && (
+                              <Ionicons name="checkmark" size={18} color={isLight ? 'rgba(0,0,0,0.45)' : '#fff'} style={{ position: 'absolute' }} />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                  <TouchableOpacity onPress={() => setColorExpanded(true)} activeOpacity={0.7}>
+                    <View style={[styles.colorExpandBtn, { borderRadius: 14, paddingHorizontal: 8, width: 44 }]}>
+                      <Text style={styles.colorExpandBtnText}>展开</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
-            <View style={styles.formGroup}>
-              <View style={styles.labelRow}>
-                <Text style={styles.labelText}>季节<Text style={styles.required}> *</Text></Text>
-                <TouchableOpacity style={styles.addOptionBtn} onPress={() => openOptionManager('seasons')} activeOpacity={0.7}>
-                  <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.chipRow}>
-                {(customSeasons || []).map(s => (
-                  <TouchableOpacity key={s} style={[styles.chip, seasons.includes(s) && styles.chipActive]} onPress={() => toggleSeason(s)}>
-                    <Text style={[styles.chipLabel, seasons.includes(s) && styles.chipLabelActive]}>{s}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
           </View>
 
           {/* Card 2: 详情 */}
-          <View style={styles.formCard}>
+          <View
+            style={styles.formCard}
+            onLayout={(e) => { card2Y.current = e.nativeEvent.layout.y; }}
+          >
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>品牌</Text>
-              <TextInput style={styles.textInput} value={brand} onChangeText={setBrand} placeholder="品牌（选填）" placeholderTextColor={theme.colors.textTertiary} />
-            </View>
-
-            <View style={styles.formGroup}>
-              <View style={styles.labelRow}>
-                <Text style={styles.labelText}>尺码</Text>
-                <TouchableOpacity style={styles.addOptionBtn} onPress={() => openOptionManager('sizes')} activeOpacity={0.7}>
-                  <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
-                </TouchableOpacity>
-              </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
-                <View style={styles.chipRow}>
-                  {(customSizes || []).map(s => (
-                    <TouchableOpacity key={s} style={[styles.chip, size === s && styles.chipActive]} onPress={() => setSize(size === s ? '' : s)}>
-                      <Text style={[styles.chipLabel, size === s && styles.chipLabelActive]}>{s}</Text>
-                    </TouchableOpacity>
-                  ))}
+              <View
+                style={styles.brandSizeRow}
+                onLayout={(e) => { brandGroupY.current = e.nativeEvent.layout.y; }}
+              >
+                <View style={styles.halfField}>
+                  <Text style={styles.formLabel}>品牌（选填）</Text>
+                  <TextInput
+                    style={styles.textInput}
+                    value={brand}
+                    onChangeText={setBrand}
+                    placeholder=""
+                    placeholderTextColor={theme.colors.textTertiary}
+                    onFocus={() => {
+                      setShowBrandDropdown(true);
+                      setTimeout(() => {
+                        const targetY = card2Y.current + brandGroupY.current + 18;
+                        scrollViewRef.current?.scrollTo({ y: Math.max(0, targetY - 40), animated: true });
+                      }, 200);
+                    }}
+                    onBlur={() => setTimeout(() => setShowBrandDropdown(false), 150)}
+                  />
+                  {showBrandDropdown && brandSuggestions.length > 0 && (
+                    <View style={styles.brandDropdown}>
+                      {brandSuggestions.map(b => (
+                        <TouchableOpacity
+                          key={b}
+                          style={styles.brandSuggestion}
+                          onPress={() => { setBrand(b); setShowBrandDropdown(false); }}
+                          activeOpacity={0.6}
+                        >
+                          <Text style={styles.brandSuggestionText}>{b}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  )}
                 </View>
-              </ScrollView>
+                <View style={styles.halfField}>
+                  <Text style={styles.formLabel}>尺码</Text>
+                  <View ref={sizeBtnRef} collapsable={false}>
+                    <TouchableOpacity
+                      style={styles.pickerBtn}
+                      onPress={() => {
+                        if (showSizePicker) {
+                          setShowSizePicker(false);
+                          setSizeDropdownCoords(null);
+                          return;
+                        }
+                        sizeBtnRef.current?.measureInWindow((x, y, w, h) => {
+                          setSizeDropdownCoords({ x, y: y + h, w });
+                          setShowSizePicker(true);
+                        });
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.pickerBtnText, !size && styles.pickerBtnPlaceholder]}>
+                        {size}
+                      </Text>
+                      <Ionicons name="chevron-down" size={16} color={theme.colors.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+                <View style={styles.halfField}>
+                  <Text style={styles.formLabel}>{isEditing ? '穿着次数' : '穿着次数（初始）'}</Text>
+                  <TextInput
+                    style={styles.wearCountInput}
+                    value={wearCount === 0 ? '' : String(wearCount)}
+                    onChangeText={v => setWearCount(parseInt(v) || 0)}
+                    placeholder="0"
+                    placeholderTextColor={theme.colors.textTertiary}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
             </View>
 
             <View style={styles.formGroup}>
-              <Text style={styles.formLabel}>购买日期</Text>
-              <TouchableOpacity style={styles.dateWrapper} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
-                <Text style={[styles.dateText, !displayDate && styles.datePlaceholder]}>{displayDate || '选择日期'}</Text>
-                <Ionicons name="calendar-outline" size={16} color={theme.colors.textTertiary} />
-              </TouchableOpacity>
+              <View style={styles.threeColRow}>
+                <View style={styles.colField}>
+                  <Text style={styles.formLabel}>购买日期</Text>
+                  <TouchableOpacity style={styles.dateWrapper} onPress={() => setShowDatePicker(true)} activeOpacity={0.7}>
+                    <Text style={[styles.dateText, !displayDate && styles.datePlaceholder]} numberOfLines={1}>
+                      {displayDate || '选择'}
+                    </Text>
+                    <Ionicons name="calendar-outline" size={14} color={theme.colors.textTertiary} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.colField}>
+                  <Text style={styles.formLabel}>价格</Text>
+                  <View style={styles.priceWrapper}>
+                    <Text style={styles.pricePrefix}>¥</Text>
+                    <TextInput style={styles.priceInput} value={price} onChangeText={setPrice} placeholder="0" placeholderTextColor={theme.colors.textTertiary} keyboardType="numeric" />
+                  </View>
+                </View>
+              </View>
             </View>
 
             {showDatePicker && (
@@ -1311,30 +1605,9 @@ export function AddClothingScreen() {
                 )}
               </View>
             )}
-
-            <View style={styles.inputRow}>
-              <View style={[styles.inputField, { flex: 2 }]}>
-                <Text style={styles.formLabel}>价格</Text>
-                <View style={styles.priceWrapper}>
-                  <Text style={styles.pricePrefix}>¥</Text>
-                  <TextInput style={styles.priceInput} value={price} onChangeText={setPrice} placeholder="0" placeholderTextColor={theme.colors.textTertiary} keyboardType="numeric" />
-                </View>
-              </View>
-              <View style={[styles.inputField, { flex: 1 }]}>
-                <Text style={styles.formLabel}>{isEditing ? '穿着次数' : '初始穿着次数'}</Text>
-                <TextInput
-                  style={styles.wearCountInput}
-                  value={wearCount === 0 ? '' : String(wearCount)}
-                  onChangeText={v => setWearCount(parseInt(v) || 0)}
-                  placeholder="0"
-                  placeholderTextColor={theme.colors.textTertiary}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
           </View>
 
-          {/* Card 3: 标签 */}
+          {/* Card 3: 风格属性 */}
           <View style={styles.formCard}>
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
@@ -1343,18 +1616,17 @@ export function AddClothingScreen() {
                   <Ionicons name="settings-outline" size={18} color={theme.colors.textSecondary} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.chipRow}>
-                {(customTags || []).map(t => (
-                  <TouchableOpacity key={t} style={[styles.chip, tags.includes(t) && styles.chipActive]} onPress={() => toggleTag(t)}>
-                    <Text style={[styles.chipLabel, tags.includes(t) && styles.chipLabelActive]}>{t}</Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+              <OverflowScrollView style={styles.chipScroll}>
+                <View style={styles.chipRow}>
+                  {(customTags || []).map(t => (
+                    <TouchableOpacity key={t} style={[styles.chip, tags.includes(t) && styles.chipActive]} onPress={() => toggleTag(t)}>
+                      <Text style={[styles.chipLabel, tags.includes(t) && styles.chipLabelActive]}>{t}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </OverflowScrollView>
             </View>
-          </View>
 
-          {/* Card 4: 版型 */}
-          <View style={styles.formCard}>
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.labelText}>版型</Text>
@@ -1367,10 +1639,7 @@ export function AddClothingScreen() {
                 ))}
               </View>
             </View>
-          </View>
 
-          {/* Card 5: 厚薄 */}
-          <View style={styles.formCard}>
             <View style={styles.formGroup}>
               <View style={styles.labelRow}>
                 <Text style={styles.labelText}>厚薄</Text>
@@ -1471,6 +1740,39 @@ export function AddClothingScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* 尺码下拉浮层 */}
+      <Modal visible={showSizePicker} transparent animationType="none" statusBarTranslucent>
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={() => { setShowSizePicker(false); setSizeDropdownCoords(null); }}
+        />
+        {sizeDropdownCoords && (
+          <View style={[styles.brandDropdown, { position: 'absolute', top: sizeDropdownCoords.y, left: sizeDropdownCoords.x, width: sizeDropdownCoords.w }]}>
+            {(customSizes || []).map(s => (
+              <TouchableOpacity
+                key={s}
+                style={styles.brandSuggestion}
+                onPress={() => { setSize(size === s ? '' : s); setShowSizePicker(false); setSizeDropdownCoords(null); }}
+                activeOpacity={0.6}
+              >
+                <Text style={[styles.brandSuggestionText, size === s && { color: theme.colors.primary, fontWeight: '600' }]}>
+                  {s}
+                </Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.brandSuggestion}
+              onPress={() => { setShowSizePicker(false); setSizeDropdownCoords(null); openOptionManager('sizes'); }}
+              activeOpacity={0.6}
+            >
+              <Text style={[styles.brandSuggestionText, { color: theme.colors.textTertiary }]}>管理尺码</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </Modal>
+
     </KeyboardAvoidingView>
   );
 }

@@ -33,12 +33,18 @@ type RouteParams = { ClothingDetail: { id: number; source?: DetailSource } };
 
 function getColorHex(colorName: string): string {
   const colorMap: Record<string, string> = {
-    '黑色': '#2D2A26', '白色': '#F5F5F0', '灰色': '#9CA3AF',
-    '红色': '#C47D5A', '蓝色': '#6B8FA3', '绿色': '#8B9B7A',
-    '黄色': '#D4B896', '紫色': '#8B7B9B', '粉色': '#C9A0A0',
-    '棕色': '#8B7355', '米色': '#D4C4B0', '橙色': '#C9A06A',
-    '青色': '#7AA3A3', '咖啡色': '#6B5B4E', '酒红色': '#8B5A5A',
-    '藏青色': '#4A5568', '卡其色': '#B8A88A', '军绿色': '#6B7B5A',
+    '黑色': '#2D2A26', '深灰': '#6B6B6B', '浅灰': '#B8B8B8', '灰色': '#8B8B8B', '银灰色': '#A8A8A8',
+    '白色': '#F5F5F0', '米白': '#F0EDE4', '米色': '#E8D5B7', '奶油色': '#F5E6C8', '杏色': '#F0D5B0',
+    '红色': '#C44E4E', '酒红色': '#8B3A3A', '砖红色': '#A0522D', '粉红': '#E8A0B0',
+    '玫红色': '#D44A6E', '桃红色': '#F0A0A0', '橘红色': '#E07040',
+    '蓝色': '#5B8DB8', '深蓝': '#3A5A8C', '浅蓝': '#8EB8D8', '藏青色': '#4A5568',
+    '天蓝色': '#7EB8D8', '宝蓝色': '#3B6FA0', '湖蓝色': '#5F9EA0', '牛仔蓝': '#5B7FA5', '靛蓝色': '#3D5A80', '水洗蓝': '#8EB0C8',
+    '绿色': '#6B8B6B', '军绿色': '#5C6B4E', '墨绿色': '#3D5C3D', '薄荷绿': '#8BC4A8',
+    '翠绿色': '#4CAF6E', '草绿色': '#8BAA4E',
+    '黄色': '#D4B896', '姜黄色': '#C9A040', '橙色': '#D48B4E', '金色': '#C8A040',
+    '紫色': '#8B7B9B', '薰衣草': '#A08CB8', '粉色': '#D4A0A0', '紫红色': '#9B4A7B',
+    '棕色': '#8B7355', '咖啡色': '#6B5B4E', '卡其色': '#B8A88A', '驼色': '#C4AA82',
+    '青色': '#7AA3A3', '香槟色': '#EDE0C8', '银色': '#C0C0C0', '其他': '#A0A0A0',
   };
   return colorMap[colorName] || '#9CA3AF';
 }
@@ -134,14 +140,18 @@ const makeStyles = (theme: Theme) =>
       width: '100%',
       height: '100%',
     },
-    colorDot: {
+    colorDotWrap: {
       position: 'absolute',
       bottom: 16,
       right: 16,
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      borderWidth: 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    colorDot: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 3,
       borderColor: theme.colors.white,
       shadowColor: theme.colors.shadow,
       shadowOffset: { width: 0, height: 3 },
@@ -1057,7 +1067,17 @@ export function ClothingDetailScreen() {
                 item.imageUri?.endsWith('.png') && { resizeMode: 'contain' }
               ]}
             />
-            {item.color && <View style={[styles.colorDot, { backgroundColor: getColorHex(item.color) }]} />}
+            {item.color && (() => {
+              const colorList = item.color.split(',').map(c => c.trim()).filter(Boolean);
+              const primary = colorList[0];
+              return (
+                <View style={styles.colorDotWrap}>
+                  {colorList.slice(0, 3).map((c, i) => (
+                    <View key={c} style={[styles.colorDot, { backgroundColor: getColorHex(c), marginLeft: i > 0 ? -6 : 0, zIndex: 3 - i }]} />
+                  ))}
+                </View>
+              );
+            })()}
           </TouchableOpacity>
         </View>
 

@@ -347,6 +347,7 @@ export function CustomOptionsScreen() {
   const route = useRoute<RouteProp<RouteParams, 'CustomOptions'>>();
   const { clothing } = useWardrobeStore();
   const migrateClothingType = useWardrobeStore(state => state.migrateClothingType);
+  const migrateClothingParentType = useWardrobeStore(state => state.migrateClothingParentType);
 
   // Zustand selectors
   const categories = useCustomOptionsStore(state => state.categories);
@@ -594,6 +595,7 @@ export function CustomOptionsScreen() {
           // 编辑父分类
           if (parent !== trimmed) {
             await renameParent(parent, trimmed);
+            await migrateClothingParentType(parent, trimmed);
           }
         }
       }
