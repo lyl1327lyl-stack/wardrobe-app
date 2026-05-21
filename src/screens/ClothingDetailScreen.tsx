@@ -444,89 +444,54 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.textTertiary,
     },
     bottomPadding: {
-      height: 100,
+      height: 40,
     },
-    bottomBar: {
+    // 管理按钮（页面底部，需滑动才能看到）
+    mgmtSection: {
+      marginHorizontal: 20,
+      marginTop: 16,
+    },
+    mgmtBtnRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingTop: 12,
-      paddingBottom: 36,
-      backgroundColor: theme.colors.card,
-      shadowColor: theme.colors.shadow,
-      shadowOffset: { width: 0, height: -4 },
-      shadowOpacity: 0.08,
-      shadowRadius: 12,
-      elevation: 8,
-      gap: 8,
+      gap: 12,
     },
-    primaryAction: {
-      flex: 2,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.primary,
-      paddingVertical: 14,
-      borderRadius: 14,
-      gap: 8,
-    },
-    primaryActionText: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: theme.colors.white,
-    },
-    secondaryAction: {
+    mgmtBtn: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.borderLight,
       paddingVertical: 14,
       borderRadius: 14,
       gap: 6,
     },
-    secondaryActionText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.primary,
+    mgmtBtnTrash: {
+      backgroundColor: theme.colors.danger + '15',
     },
-    iconAction: {
-      width: 48,
-      height: 48,
-      borderRadius: 14,
+    mgmtBtnSell: {
+      backgroundColor: theme.colors.success + '15',
+    },
+    mgmtBtnRestore: {
+      backgroundColor: theme.colors.success + '15',
+    },
+    mgmtBtnPublish: {
+      backgroundColor: theme.colors.primary + '15',
+    },
+    mgmtBtnDelete: {
       backgroundColor: theme.colors.borderLight,
-      justifyContent: 'center',
-      alignItems: 'center',
     },
-    restoreAction: {
-      flex: 2,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.success,
-      paddingVertical: 14,
-      borderRadius: 14,
-      gap: 8,
-    },
-    restoreActionText: {
-      fontSize: 15,
+    mgmtBtnText: {
+      fontSize: 14,
       fontWeight: '600',
-      color: theme.colors.white,
+      color: theme.colors.text,
     },
-    deleteAction: {
-      flex: 1.5,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.colors.danger,
-      paddingVertical: 14,
-      borderRadius: 14,
-      gap: 8,
+    mgmtBtnTextDanger: {
+      color: theme.colors.danger,
     },
-    deleteActionText: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: theme.colors.white,
+    mgmtBtnTextSuccess: {
+      color: theme.colors.success,
+    },
+    mgmtBtnTextPrimary: {
+      color: theme.colors.primary,
     },
   });
 
@@ -848,39 +813,6 @@ export function ClothingDetailScreen() {
       </View>
     );
   }
-
-  const handleWear = async () => {
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-
-    // 检查今天是否已记录
-    if (wearDates.includes(dateStr)) {
-      Alert.alert('提示', '今天已记录过穿着，无需重复记录');
-      return;
-    }
-
-    Alert.alert(
-      '确认记录',
-      '确认记录今天的穿着吗？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确认',
-          onPress: () => {
-            (async () => {
-              try {
-                await addWearRecord(item.id, dateStr);
-                await loadWearDates();
-                Alert.alert('已记录穿着');
-              } catch (e) {
-                console.error('记录穿着失败:', e);
-              }
-            })();
-          },
-        },
-      ]
-    );
-  };
 
   const handleTrash = () => {
     setShowDiscardSheet(true);
@@ -1359,81 +1291,70 @@ export function ClothingDetailScreen() {
           </View>
         )}
 
+        {/* 管理按钮 */}
+        <View style={styles.mgmtSection}>
+          {isDraft ? (
+            <TouchableOpacity style={[styles.mgmtBtn, styles.mgmtBtnPublish]} onPress={handlePublish} activeOpacity={0.8}>
+              <Ionicons name="cloud-upload-outline" size={18} color={theme.colors.primary} />
+              <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextPrimary]}>发布到衣柜</Text>
+            </TouchableOpacity>
+          ) : isTrash || isSold ? (
+            <View style={styles.mgmtBtnRow}>
+              <TouchableOpacity style={[styles.mgmtBtn, styles.mgmtBtnRestore]} onPress={handleRestore} activeOpacity={0.8}>
+                <Ionicons name="refresh" size={18} color={theme.colors.success} />
+                <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextSuccess]}>恢复</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.mgmtBtn, styles.mgmtBtnDelete]} onPress={() => {
+                const { count, outfits } = getOutfitWarningForDeletion([item.id]);
+                const doDelete = () => {
+                  deleteImage(item.imageUri, item.thumbnailUri, item.id)
+                    .then(() => permanentDelete(item.id))
+                    .then(() => navigation.goBack())
+                    .catch(e => {
+                      console.error('删除失败:', e);
+                      Alert.alert('删除失败，请重试');
+                    });
+                };
+                if (count > 0) {
+                  setOutfitWarning({
+                    title: '确认彻底删除',
+                    message: `此操作不可恢复。\n\n该单品存在于以下 ${count} 个搭配中：`,
+                    outfits,
+                    confirmLabel: '彻底删除',
+                    description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
+                    onConfirm: doDelete,
+                  });
+                } else {
+                  Alert.alert(
+                    '确认彻底删除',
+                    '确定要永久删除这件衣服吗？此操作不可恢复。',
+                    [
+                      { text: '取消', style: 'cancel' },
+                      { text: '彻底删除', style: 'destructive', onPress: doDelete },
+                    ]
+                  );
+                }
+              }} activeOpacity={0.8}>
+                <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+                <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextDanger]}>彻底删除</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.mgmtBtnRow}>
+              <TouchableOpacity style={[styles.mgmtBtn, styles.mgmtBtnTrash]} onPress={handleTrash} activeOpacity={0.8}>
+                <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+                <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextDanger]}>移入废衣篓</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.mgmtBtn, styles.mgmtBtnSell]} onPress={handleSell} activeOpacity={0.8}>
+                <Ionicons name="card-outline" size={18} color={theme.colors.success} />
+                <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextSuccess]}>卖出</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
         <View style={styles.bottomPadding} />
       </ScrollView>
-
-      {/* 底栏 */}
-      <View style={styles.bottomBar}>
-        {isDraft ? (
-          <>
-            <TouchableOpacity style={styles.primaryAction} onPress={handlePublish} activeOpacity={0.8}>
-              <Ionicons name="cloud-upload-outline" size={20} color={theme.colors.white} />
-              <Text style={styles.primaryActionText}>发布到衣柜</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.iconAction} onPress={() => {
-              navigation.navigate('EditClothing', { id: item.id });
-            }} activeOpacity={0.7}>
-              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
-            </TouchableOpacity>
-          </>
-        ) : isTrash || isSold ? (
-          <>
-            <TouchableOpacity style={styles.restoreAction} onPress={handleRestore} activeOpacity={0.8}>
-              <Ionicons name="refresh" size={20} color={theme.colors.white} />
-              <Text style={styles.restoreActionText}>恢复</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.deleteAction} onPress={() => {
-              const { count, outfits } = getOutfitWarningForDeletion([item.id]);
-              const doDelete = () => {
-                deleteImage(item.imageUri, item.thumbnailUri, item.id)
-                  .then(() => permanentDelete(item.id))
-                  .then(() => navigation.goBack())
-                  .catch(e => {
-                    console.error('删除失败:', e);
-                    Alert.alert('删除失败，请重试');
-                  });
-              };
-              if (count > 0) {
-                setOutfitWarning({
-                  title: '确认彻底删除',
-                  message: `此操作不可恢复。\n\n该单品存在于以下 ${count} 个搭配中：`,
-                  outfits,
-                  confirmLabel: '彻底删除',
-                  description: '删除后这些搭配的画板中仍会保留图片，你可以进入搭配编辑器手动清除已删除的单品。',
-                  onConfirm: doDelete,
-                });
-              } else {
-                Alert.alert(
-                  '确认彻底删除',
-                  '确定要永久删除这件衣服吗？此操作不可恢复。',
-                  [
-                    { text: '取消', style: 'cancel' },
-                    { text: '彻底删除', style: 'destructive', onPress: doDelete },
-                  ]
-                );
-              }
-            }} activeOpacity={0.8}>
-              <Ionicons name="trash-outline" size={20} color={theme.colors.white} />
-              <Text style={styles.deleteActionText}>彻底删除</Text>
-            </TouchableOpacity>
-          </>
-        ) : (
-          <>
-            <TouchableOpacity style={styles.primaryAction} onPress={handleWear} activeOpacity={0.8}>
-              <Ionicons name="checkmark-done" size={20} color={theme.colors.white} />
-              <Text style={styles.primaryActionText}>记录穿着</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconAction} onPress={handleTrash} activeOpacity={0.7}>
-              <Ionicons name="trash-outline" size={20} color={theme.colors.danger} />
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.iconAction} onPress={handleSell} activeOpacity={0.7}>
-              <Ionicons name="card-outline" size={20} color={theme.colors.success} />
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
 
       <DiscardReasonSheet
         visible={showDiscardSheet}

@@ -136,6 +136,16 @@ export async function getWearCountFromRecords(clothingId: number): Promise<numbe
   return result?.count ?? 0;
 }
 
+// 获取日期范围内的所有穿着记录
+export async function getWearRecordsByDateRange(startDate: string, endDate: string): Promise<WearRecord[]> {
+  const db = await getDatabase();
+  const result = await db.getAllAsync<WearRecord>(
+    'SELECT * FROM wear_records WHERE wornDate >= ? AND wornDate <= ? ORDER BY wornDate DESC',
+    [startDate, endDate]
+  );
+  return result.map(parseWearRecordRow);
+}
+
 // 获取最后穿着日期（从穿着记录计算，只统计截至今天的记录）
 export async function getLastWornDateFromRecords(clothingId: number): Promise<string | null> {
   const db = await getDatabase();

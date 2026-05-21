@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
   Dimensions,
+  Alert,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -15,8 +16,8 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
 import { generateRecommendations } from '../services/outfitRecommender';
 import { getWeather } from '../services/weatherService';
-import { getWearRecordsByDate } from '../db/wearRecords';
-import { OutfitRecommendation, Weather, WearRecord } from '../types';
+import { getWearRecordsByDate, getWearRecordsByDateRange } from '../db/wearRecords';
+import { ClothingItem, OutfitRecommendation, Weather, WearRecord } from '../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
@@ -57,6 +58,32 @@ function todayDateStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
+
+function daysAgo(dateStr: string): number {
+  const d = new Date(dateStr);
+  const now = new Date();
+  return Math.floor((now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+/** 查询最近 7 天穿着记录，返回 clothingId → 最近一次距今几天 */
+async function buildRecentlyWornDays(): Promise<Map<number, number>> {
+  const d = new Date();
+  const endDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  d.setDate(d.getDate() - 7);
+  const startDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const records = await getWearRecordsByDateRange(startDate, endDate);
+  const map = new Map<number, number>();
+  for (const r of records) {
+    const ago = daysAgo(r.wornDate);
+    const existing = map.get(r.clothingId);
+    if (existing === undefined || ago < existing) {
+      map.set(r.clothingId, ago);
+    }
+  }
+  return map;
+}
+
+
 
 // Illustration aspect ratio: 1536 / 1024 = 1.5
 const ILLUSTRATION_ASPECT = 1536 / 1024;
@@ -358,9 +385,11 @@ export function HomeScreen() {
     const w = await getWeather();
     setWeather(w);
     setRecLoading(true);
+    const recentlyWornDays = await buildRecentlyWornDays();
     const s = useWardrobeStore.getState();
     const recs = generateRecommendations(s.clothing, s.outfits, w, {
       recentRecommendedItemIds: getRecentIdsSet(),
+      recentlyWornDays,
     });
     const allIds: number[] = [];
     for (const rec of recs) {
@@ -377,6 +406,59 @@ export function HomeScreen() {
     setTodayRecords(records);
   }, []);
 
+  /** 将当前推荐保存为搭配 */
+  /** 跳转搭配画板，将推荐单品预置到画布上 */
+  const handleSaveAsOutfit = useCallback(() => {
+    if (!recommendation) return;
+    const ids = [...recommendation.items.map(i => i.id)].sort((a, b) => a - b);
+    // 检查是否已存在相同单品的搭配
+    const exists = outfits.some(o => {
+      const oIds = [...o.itemIds].sort((a, b) => a - b);
+      return oIds.length === ids.length && oIds.every((v, i) => v === ids[i]);
+    });
+
+    if (exists) {
+      Alert.alert('搭配已存在', '这套搭配已经在「我的搭配」中了，是否查看？', [
+        { text: '不了', style: 'cancel' },
+        { text: '查看', onPress: () => {
+          const match = outfits.find(o => {
+            const oIds = [...o.itemIds].sort((a, b) => a - b);
+            return oIds.length === ids.length && oIds.every((v, i) => v === ids[i]);
+          });
+          if (match) {
+            navigation.navigate('OutfitDetail', { outfitId: match.id });
+          }
+        }},
+      ]);
+      return;
+    }
+
+    Alert.alert('添加搭配', '将推荐单品添加到我的搭配？', [
+      { text: '取消', style: 'cancel' },
+      { text: '添加', onPress: () => {
+        const outfitStore = require('../store/outfitStore').useOutfitStore.getState();
+        outfitStore.reset();
+        outfitStore.setSelectedClothings(recommendation.items);
+        navigation.navigate('OutfitEditor', {
+          selectedIds: ids,
+          exitTo: { screen: 'Home' },
+        });
+      }},
+    ]);
+  }, [recommendation, navigation, outfits]);
+
+  /** 替换推荐中的某件单品 */
+  const handleReplaceItem = useCallback((index: number, newItem: ClothingItem) => {
+    setRecommendations(prev => {
+      const updated = prev.map(rec => {
+        const newItems = [...rec.items];
+        newItems[index] = newItem;
+        return { ...rec, items: newItems };
+      });
+      return updated;
+    });
+  }, []);
+
   useEffect(() => {
     const init = async () => {
       const s = useWardrobeStore.getState();
@@ -384,26 +466,42 @@ export function HomeScreen() {
       if (s.clothing.length === 0) {
         await s.loadData();
       }
+      const s2 = useWardrobeStore.getState();
+      lastSnapshotRef.current = { clothingCount: s2.clothing.length, outfitCount: s2.outfits.length };
       await refreshTodayRecords();
       await loadRecommendations();
     };
     init();
   }, []);
 
-  // 每次页面获得焦点时刷新今日记录（用户可能在日历页清空了记录）
+  // 记录上次推荐时的数据快照，用于检测变更
+  const lastSnapshotRef = useRef({ clothingCount: 0, outfitCount: 0 });
+
+  // 每次页面获得焦点时刷新今日记录，并在数据变更时自动刷新推荐
   useFocusEffect(
     useCallback(() => {
       refreshTodayRecords();
-    }, [refreshTodayRecords])
+      const s = useWardrobeStore.getState();
+      const prev = lastSnapshotRef.current;
+      if (s.clothing.length !== prev.clothingCount || s.outfits.length !== prev.outfitCount) {
+        if (prev.clothingCount > 0) {
+          // 非首次加载，数据确实变了才刷新推荐
+          loadRecommendations();
+        }
+        lastSnapshotRef.current = { clothingCount: s.clothing.length, outfitCount: s.outfits.length };
+      }
+    }, [refreshTodayRecords, loadRecommendations])
   );
 
-  const handleRefresh = useCallback(() => {
+  const handleRefresh = useCallback(async () => {
     if (recIndex < recommendations.length - 1) {
       setRecIndex(recIndex + 1);
     } else {
+      const recentlyWornDays = await buildRecentlyWornDays();
       const s = useWardrobeStore.getState();
       const recs = generateRecommendations(s.clothing, s.outfits, weather, {
         recentRecommendedItemIds: getRecentIdsSet(),
+        recentlyWornDays,
       });
       if (recs.length > 0) {
         const allIds: number[] = [];
@@ -424,12 +522,13 @@ export function HomeScreen() {
       await deleteWearRecordsByDate(todayDateStr());
     }
     await addWearRecords(ids, todayDateStr());
-    // 重新加载今日记录以获取最新状态
     const records = await getWearRecordsByDate(todayDateStr());
     setTodayRecords(records);
+    const recentlyWornDays = await buildRecentlyWornDays();
     const s = useWardrobeStore.getState();
     const recs = generateRecommendations(s.clothing, s.outfits, weather, {
       recentRecommendedItemIds: getRecentIdsSet(),
+      recentlyWornDays,
     });
     if (recs.length > 0) {
       const allIds: number[] = [];
@@ -440,7 +539,22 @@ export function HomeScreen() {
       setRecommendations(recs);
       setRecIndex(0);
     }
-  }, [recommendation, addWearRecords, deleteWearRecordsByDate, weather]);
+    setTimeout(() => {
+      const sortedIds = [...recommendation.items.map(i => i.id)].sort((a, b) => a - b);
+      const outfitExists = useWardrobeStore.getState().outfits.some(o => {
+        const oIds = [...o.itemIds].sort((a, b) => a - b);
+        return oIds.length === sortedIds.length && oIds.every((v, i) => v === sortedIds[i]);
+      });
+      if (outfitExists) {
+        Alert.alert('记录成功', '今日穿搭已记录');
+      } else {
+        Alert.alert('记录成功', '是否将这套搭配添加到「我的搭配」？', [
+          { text: '以后再说', style: 'cancel' },
+          { text: '添加', onPress: () => handleSaveAsOutfit() },
+        ]);
+      }
+    }, 400);
+  }, [recommendation, addWearRecords, deleteWearRecordsByDate, weather, handleSaveAsOutfit]);
 
   const goToWardrobe = () => navigation.navigate('衣橱');
   const goToCalendar = () => navigation.navigate('WearCalendar');
@@ -519,10 +633,15 @@ export function HomeScreen() {
         ) : recommendation ? (
           <OutfitRecommendationCard
             recommendation={recommendation}
+            allClothing={clothing}
             onRefresh={handleRefresh}
             onWear={handleWearRecommendation}
             onCalendar={goToCalendar}
+            onSaveAsOutfit={handleSaveAsOutfit}
+            onReplaceItem={handleReplaceItem}
             todayThumbnails={todayRecords.map(r => ({ uri: r.clothingThumbnailUri, type: r.clothingType, id: r.clothingId }))}
+            recTotal={recommendations.length}
+            recIndex={recIndex}
           />
         ) : (
           <View style={styles.recEmpty}>

@@ -188,17 +188,6 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'flex-end',
       padding: 12,
     },
-    bgRemovalRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 10,
-      gap: 8,
-    },
-    bgRemovalText: {
-      fontSize: 14,
-      color: theme.colors.textSecondary,
-    },
     // 衣橱选择居中对话框
     dialogOverlay: {
       flex: 1,
@@ -293,21 +282,6 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '500',
       color: theme.colors.textSecondary,
     },
-    editBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 5,
-      backgroundColor: 'rgba(255,255,255,0.9)',
-      opacity: 0.95,
-      borderRadius: 20,
-      paddingHorizontal: 12,
-      paddingVertical: 7,
-    },
-    editBadgeText: {
-      fontSize: 12,
-      fontWeight: '600',
-      color: theme.colors.primaryDark,
-    },
     // 图片操作按钮（裁剪/抠图/更换照片）
     imageActionRow: {
       flexDirection: 'row',
@@ -397,9 +371,9 @@ const makeStyles = (theme: Theme) =>
       textTransform: 'uppercase',
     },
     addOptionBtn: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
       backgroundColor: theme.colors.background,
       justifyContent: 'center',
       alignItems: 'center',
@@ -465,14 +439,6 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 2.5,
       borderColor: theme.colors.primary,
     },
-    colorCheck: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      position: 'absolute',
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
     colorExpandBtn: {
       width: 36,
       height: 36,
@@ -487,13 +453,6 @@ const makeStyles = (theme: Theme) =>
       fontSize: 12,
       color: theme.colors.textTertiary,
       fontWeight: '600',
-    },
-    inputRow: {
-      flexDirection: 'row',
-      gap: 10,
-    },
-    inputField: {
-      flex: 1,
     },
     textInput: {
       borderWidth: 1.5,
@@ -557,66 +516,6 @@ const makeStyles = (theme: Theme) =>
     },
     colField: {
       flex: 1,
-    },
-    sizeModalOverlay: {
-      flex: 1,
-      backgroundColor: 'rgba(0,0,0,0.4)',
-      justifyContent: 'flex-end',
-    },
-    sizeModalContent: {
-      backgroundColor: theme.colors.card,
-      borderTopLeftRadius: 16,
-      borderTopRightRadius: 16,
-      paddingTop: 16,
-      maxHeight: '60%',
-    },
-    sizeModalHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 16,
-      paddingBottom: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-    },
-    sizeModalTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    sizeModalClose: {
-      fontSize: 15,
-      color: theme.colors.primary,
-      fontWeight: '500',
-    },
-    sizeOptionList: {
-      paddingTop: 8,
-    },
-    sizeOption: {
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.colors.border,
-    },
-    sizeOptionText: {
-      fontSize: 15,
-      color: theme.colors.text,
-    },
-    sizeOptionActive: {
-      color: theme.colors.primary,
-      fontWeight: '600',
-    },
-    sizeModalManage: {
-      paddingVertical: 14,
-      paddingHorizontal: 16,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
-      marginTop: 8,
-    },
-    sizeModalManageText: {
-      fontSize: 14,
-      color: theme.colors.textTertiary,
-      textAlign: 'center',
     },
     dateWrapper: {
       flexDirection: 'row',

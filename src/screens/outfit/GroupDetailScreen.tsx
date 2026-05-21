@@ -230,7 +230,7 @@ export function GroupDetailScreen() {
       : 0;
     const bg = (item as any).canvasBackground;
     const frameColor = bg?.type === 'color' ? bg.value : theme.colors.card;
-    const totalPrice = canvasData
+    const totalPrice = Array.isArray(canvasData)
       ? canvasData.reduce((sum: number, ci: any) => {
           const c = clothing.find(cl => cl.id === ci.clothingId);
           return sum + (c?.price || 0);

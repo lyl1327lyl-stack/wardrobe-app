@@ -9,50 +9,54 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { OutfitRecommendation } from '../types';
+import { ClothingItem, OutfitRecommendation } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { OutfitConfirmModal } from './OutfitConfirmModal';
 
 interface Props {
   recommendation: OutfitRecommendation;
+  allClothing: ClothingItem[];
   onRefresh: () => void;
   onWear: (mode: 'append' | 'replace') => void;
   onCalendar: () => void;
+  onSaveAsOutfit: () => void;
+  onReplaceItem: (index: number, newItem: ClothingItem) => void;
   todayThumbnails: Array<{ uri: string; type: string; id: number }>;
+  recTotal: number;
+  recIndex: number;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_MARGIN = 16;
 const CARD_PADDING = 20;
+const GAP = 8;
 const CONTENT_WIDTH = SCREEN_WIDTH - CARD_MARGIN * 2 - CARD_PADDING * 2;
-const RATIO = 3 / 5;
-const GRID_GAP = 10;
-const GRID_WIDTH = CONTENT_WIDTH * RATIO;
 
-function getCalendarGrid(year: number, month: number) {
-  const firstDay = new Date(year, month - 1, 1).getDay();
-  const daysInMonth = new Date(year, month, 0).getDate();
-  const startOffset = firstDay === 0 ? 6 : firstDay - 1;
+// 左 72% 网格 + 右 28% 替换栏
+const GRID_W = Math.floor(CONTENT_WIDTH * 0.72);
+const REPLACE_W = CONTENT_WIDTH - GRID_W - GAP;
+const CELL_W = (GRID_W - GAP) / 2;
+const CELL_H = CELL_W * 1.1;
+const GRID_H = CELL_H * 2 + 5;
 
-  const weeks: (number | null)[][] = [];
-  let day = 1;
-  for (let w = 0; w < 6; w++) {
-    const week: (number | null)[] = [];
-    for (let d = 0; d < 7; d++) {
-      if ((w === 0 && d < startOffset) || day > daysInMonth) {
-        week.push(null);
-      } else {
-        week.push(day++);
-      }
-    }
-    weeks.push(week);
-    if (day > daysInMonth) break;
-  }
-  return weeks;
+const SCENE_CONFIG: Record<string, { icon: string; color: string; bg: string; label: string }> = {
+  '工作': { icon: 'briefcase-outline', color: '#5B7BA0', bg: '#EDF2F8', label: '工作' },
+  '运动': { icon: 'fitness-outline', color: '#8BA888', bg: '#EDF5EC', label: '运动' },
+  '约会': { icon: 'heart-outline', color: '#D4A99A', bg: '#FDF0ED', label: '约会' },
+  '宅家': { icon: 'home-outline', color: '#C4B098', bg: '#F7F2EC', label: '宅家' },
+};
+
+function inferCategory(type: string): string {
+  if (['T恤', '衬衫', '卫衣', '毛衣', '针织衫', 'Polo衫', 'POLO衫', '背心', '打底衫', '长袖', '短袖', '雪纺衫', '马甲'].includes(type)) return '上装';
+  if (['连衣裙', '连体裤', '吊带裙', '背带裙', '长裙', '短裙', '旗袍'].includes(type)) return '连衣裙';
+  if (['牛仔裤', '休闲裤', '西裤', '运动裤', '短裤', '工装裤', '阔腿裤', '直筒裤', '九分裤', '裙子', '半身裙', '长裤'].includes(type)) return '下装';
+  if (['外套', '夹克', '风衣', '大衣', '羽绒服', '棉服', '西装', '棒球服', '牛仔外套', '皮衣', '针织开衫', '派克大衣'].includes(type)) return '外套';
+  if (['运动鞋', '休闲鞋', '皮鞋', '靴子', '凉鞋', '帆布鞋', '高跟鞋', '拖鞋', '板鞋', '乐福鞋', '马丁靴'].includes(type)) return '鞋';
+  if (['包包', '背包', '手提包', '斜挎包', '双肩包', '单肩包', '钱包', '腰包'].includes(type)) return '包包';
+  if (['帽子', '围巾', '手套', '腰带', '眼镜', '首饰', '手表', '项链', '耳环', '手链', '戒指'].includes(type)) return '配饰';
+  return '上装';
 }
-
-const WEEK_HEADERS = ['一', '二', '三', '四', '五', '六', '日'];
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
@@ -65,61 +69,96 @@ const makeStyles = (theme: Theme) =>
       overflow: 'visible' as const,
       ...theme.shadows.lg,
     },
+    // ── Header ──
     header: {
       flexDirection: 'row',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       justifyContent: 'space-between',
-      marginBottom: 6,
+      marginBottom: 14,
     },
     headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
       flex: 1,
-      marginRight: 12,
     },
+    titleIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      backgroundColor: theme.colors.primary + '15',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    titleGroup: { gap: 2 },
     titleRow: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginBottom: 4,
-    },
-    titleIcon: {
-      width: 28,
-      height: 28,
-      borderRadius: 8,
-      backgroundColor: theme.colors.primary + '18',
-      justifyContent: 'center',
-      alignItems: 'center',
     },
     title: {
-      fontSize: 20,
+      fontSize: 18,
       fontWeight: '700',
       color: theme.colors.text,
       letterSpacing: -0.3,
     },
-    subtitle: {
-      fontSize: 12,
+    sceneBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 8,
+      gap: 2,
+    },
+    sceneBadgeText: { fontSize: 10, fontWeight: '600' },
+    subtitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    scoreText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.colors.primary,
+    },
+    reasonText: {
+      fontSize: 11,
       color: theme.colors.textTertiary,
-      fontWeight: '400',
-      marginLeft: 34,
     },
     headerRefresh: {
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: theme.colors.borderLight || theme.colors.border + '40',
+      backgroundColor: theme.colors.background,
       justifyContent: 'center',
       alignItems: 'center',
-      marginTop: 2,
     },
-    // ── 长方形印章（双层边框，溢出卡片）──
+    refreshBadge: {
+      position: 'absolute',
+      top: -4,
+      right: -4,
+      backgroundColor: theme.colors.primary,
+      borderRadius: 8,
+      paddingHorizontal: 4,
+      paddingVertical: 1,
+      minWidth: 18,
+      alignItems: 'center',
+    },
+    refreshBadgeText: {
+      fontSize: 8,
+      fontWeight: '700',
+      color: theme.colors.white,
+    },
+    // ── 印章 ──
     stampWrap: {
       position: 'absolute',
-      top: 0,
-      left: 140,
+      top: 4,
+      right: 60,
       zIndex: 10,
     },
     stampOuter: {
       paddingHorizontal: 10,
-      paddingVertical: 6,
+      paddingVertical: 5,
       borderWidth: 2,
       borderColor: '#C4545A',
       borderRadius: 5,
@@ -135,155 +174,124 @@ const makeStyles = (theme: Theme) =>
       opacity: 0.5,
     },
     stampText: {
-      fontSize: 12,
+      fontSize: 11,
       fontWeight: '800',
       color: '#C4545A',
       letterSpacing: 2,
     },
-    contentRow: {
+    // ── 主体：左网格 + 右替换栏 ──
+    body: {
       flexDirection: 'row',
-      gap: 16,
-      marginTop: 16,
+      gap: GAP,
+      height: GRID_H,
     },
     grid: {
-      width: GRID_WIDTH,
+      width: GRID_W,
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: GRID_GAP,
+      columnGap: 5,
+      rowGap: 5,
     },
-    gridImage: {
+    cell: {
+      width: CELL_W,
+      height: CELL_H,
       borderRadius: 12,
-      resizeMode: 'cover',
+      overflow: 'hidden',
     },
-    actionsColumn: {
-      flex: 1,
+    cellImage: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'contain',
+    },
+    // ── 右侧替换栏 ──
+    replaceCol: {
+      width: REPLACE_W,
       justifyContent: 'center',
-      gap: 10,
-    },
-    wearButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 8,
-      backgroundColor: theme.colors.primary,
-      paddingVertical: 16,
-      borderRadius: 16,
-      ...theme.shadows.md,
-    },
-    wearButtonDisabled: {
-      opacity: 0.5,
-    },
-    wearButtonText: {
-      color: theme.colors.white,
-      fontSize: 16,
-      fontWeight: '700',
-      letterSpacing: 0.3,
-    },
-
-    // ── 日历按钮 ──
-    calendarWrap: {
-      // 自然高度，不拉伸
-    },
-    calendarRings: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      gap: 18,
-      marginBottom: -4,
-      zIndex: 1,
-    },
-    calendarRing: {
-      width: 7,
-      height: 7,
-      borderRadius: 4,
-      backgroundColor: theme.colors.border,
-    },
-    calendarBody: {
-      backgroundColor: theme.colors.white,
-      borderRadius: 12,
-      paddingHorizontal: 8,
-      paddingVertical: 6,
-      ...theme.shadows.sm,
-      borderWidth: StyleSheet.hairlineWidth,
-      borderColor: theme.colors.borderLight,
-    },
-    calendarMonthRow: {
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 3,
       gap: 6,
     },
-    calMonthText: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.text,
-    },
-    calDivider: {
-      width: 18,
-      height: 2,
-      borderRadius: 1,
-      backgroundColor: theme.colors.accent,
-    },
-    calWeekRow: {
-      flexDirection: 'row',
-      marginBottom: 0,
-    },
-    calWeekCell: {
-      flex: 1,
-      alignItems: 'center',
-      paddingVertical: 0,
-    },
-    calWeekText: {
-      fontSize: 7,
+    replaceTitle: {
+      fontSize: 11,
       fontWeight: '600',
       color: theme.colors.textTertiary,
-    },
-    calDateRow: {
-      flexDirection: 'row',
-    },
-    calDateCell: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 0,
-    },
-    calDateText: {
-      fontSize: 8,
-      color: theme.colors.textSecondary,
-      lineHeight: 14,
-    },
-    calDateTextToday: {
-      fontSize: 8,
-      fontWeight: '700',
-      color: theme.colors.white,
-    },
-    calTodayDot: {
-      width: 13,
-      height: 13,
-      borderRadius: 7,
-      backgroundColor: theme.colors.primary,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    calendarLabel: {
       textAlign: 'center',
-      fontSize: 10,
-      color: theme.colors.textSecondary,
-      fontWeight: '500',
-      marginTop: 3,
+      marginBottom: 2,
+    },
+    replaceItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingVertical: 6,
+      paddingHorizontal: 8,
+      borderRadius: 10,
+      backgroundColor: theme.colors.background,
+    },
+    replaceItemThumb: {
+      width: 32,
+      height: 32,
+      borderRadius: 8,
+      resizeMode: 'contain',
+    },
+    replaceArrow: {
+      padding: 2,
+    },
+    // ── 底部操作区 ──
+    actionsRow: {
+      flexDirection: 'row',
+      gap: 8,
+      marginTop: 14,
+    },
+    wearButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 7,
+      backgroundColor: theme.colors.primary,
+      paddingVertical: 13,
+      borderRadius: 14,
+      ...theme.shadows.md,
+    },
+    wearButtonDisabled: { opacity: 0.5 },
+    wearButtonText: {
+      color: theme.colors.white,
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    iconBtn: {
+      width: 46,
+      height: 46,
+      borderRadius: 14,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.card,
+    },
+    iconBtnPrimary: {
+      borderColor: theme.colors.primary + '40',
+      backgroundColor: theme.colors.primary + '08',
     },
   });
 
-export function OutfitRecommendationCard({ recommendation, onRefresh, onWear, onCalendar, todayThumbnails }: Props) {
+export function OutfitRecommendationCard({
+  recommendation,
+  allClothing,
+  onRefresh,
+  onWear,
+  onCalendar,
+  onSaveAsOutfit,
+  onReplaceItem,
+  todayThumbnails,
+  recTotal,
+  recIndex,
+}: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { items } = recommendation;
+  const { items, scene, reason, score } = recommendation;
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
 
   const hasTodayRecord = todayThumbnails.length > 0;
-
-  // 推荐单品都是今日已记录的子集时，视为重复
   const todayIdSet = useMemo(() => new Set(todayThumbnails.map(t => t.id)), [todayThumbnails]);
   const isDuplicate = hasTodayRecord && items.length > 0 && items.every(i => todayIdSet.has(i.id));
 
@@ -305,23 +313,61 @@ export function OutfitRecommendationCard({ recommendation, onRefresh, onWear, on
     }
   };
 
-  const gridItems = items.slice(0, 6);
-  const gridCols = gridItems.length > 4 ? 3 : 2;
-  const gridColSize = (GRID_WIDTH - GRID_GAP * (gridCols - 1)) / gridCols;
+  // 4 个单品时按品类固定位置，不足 4 个时按左列优先顺序填充
+  const gridItems = useMemo(() => {
+    const slots: (ClothingItem | null)[] = [null, null, null, null];
+    const filtered = items.slice(0, 4);
 
-  // 固定网格高度：始终按 2×2 大图布局预留空间，避免卡片高度跳动
-  const baseColSize = (GRID_WIDTH - GRID_GAP) / 2;
-  const gridHeight = 2 * baseColSize * 1.25 + GRID_GAP;
+    if (filtered.length === 4) {
+      const extras: ClothingItem[] = [];
+      for (const item of filtered) {
+        const cat = item.parentType || inferCategory(item.type);
+        if ((cat === '上装' || cat === '连衣裙') && !slots[0]) slots[0] = item;
+        else if ((cat === '包包' || cat === '配饰') && !slots[1]) slots[1] = item;
+        else if (cat === '下装' && !slots[2]) slots[2] = item;
+        else if (cat === '鞋' && !slots[3]) slots[3] = item;
+        else extras.push(item);
+      }
+      let ei = 0;
+      for (let i = 0; i < 4 && ei < extras.length; i++) {
+        if (!slots[i]) slots[i] = extras[ei++];
+      }
+    } else {
+      const order = [0, 2, 1, 3];
+      for (let i = 0; i < filtered.length; i++) {
+        slots[order[i]] = filtered[i];
+      }
+    }
+    return slots;
+  }, [items]);
 
-  const today = new Date();
-  const todayDate = today.getDate();
-  const calYear = today.getFullYear();
-  const calMonth = today.getMonth() + 1;
-  const calWeeks = useMemo(() => getCalendarGrid(calYear, calMonth), [calYear, calMonth]);
+  const alternatives = useMemo(() => {
+    return gridItems.map(item => {
+      if (!item) return [];
+      const cat = item.parentType || inferCategory(item.type);
+      return allClothing.filter(c =>
+        c.id !== item.id && (c.parentType || inferCategory(c.type)) === cat,
+      );
+    });
+  }, [gridItems, allClothing]);
+
+  const handleReplace = (slotIndex: number) => {
+    const item = gridItems[slotIndex];
+    if (!item) return;
+    const alts = alternatives[slotIndex];
+    if (!alts || alts.length === 0) {
+      Alert.alert('没有更多', `没有其他同类型的${item.type}可替换`);
+      return;
+    }
+    const pick = alts[Math.floor(Math.random() * alts.length)];
+    const originalIdx = items.indexOf(item);
+    onReplaceItem(originalIdx >= 0 ? originalIdx : slotIndex, pick);
+  };
+
+  const sceneCfg = SCENE_CONFIG[scene] || SCENE_CONFIG['工作'];
 
   return (
     <View style={styles.container}>
-      {/* ── 印章（溢出在卡片右上角）── */}
       {hasTodayRecord && (
         <View style={styles.stampWrap} pointerEvents="none">
           <View style={styles.stampOuter}>
@@ -332,99 +378,92 @@ export function OutfitRecommendationCard({ recommendation, onRefresh, onWear, on
         </View>
       )}
 
-      {/* ── Header: 图标 + 标题, 右侧换一套按钮 ── */}
+      {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.titleRow}>
-            <View style={styles.titleIcon}>
-              <Ionicons name="sparkles" size={15} color={theme.colors.primary} />
+          <View style={styles.titleIcon}>
+            <Ionicons name="sparkles" size={15} color={theme.colors.primary} />
+          </View>
+          <View style={styles.titleGroup}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>今日推荐</Text>
+              <View style={[styles.sceneBadge, { backgroundColor: sceneCfg.bg }]}>
+                <Ionicons name={sceneCfg.icon as any} size={9} color={sceneCfg.color} />
+                <Text style={[styles.sceneBadgeText, { color: sceneCfg.color }]}>{sceneCfg.label}</Text>
+              </View>
             </View>
-            <Text style={styles.title}>今日推荐</Text>
+            <View style={styles.subtitleRow}>
+              <Text style={styles.scoreText}>{score}分</Text>
+              <Text style={styles.reasonText} numberOfLines={1}>{reason}</Text>
+            </View>
           </View>
         </View>
         <TouchableOpacity style={styles.headerRefresh} onPress={onRefresh} activeOpacity={0.7}>
           <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
+          <View style={styles.refreshBadge}>
+            <Text style={styles.refreshBadgeText}>{recIndex + 1}/{recTotal}</Text>
+          </View>
         </TouchableOpacity>
       </View>
 
-      {/* ── Body: 图片网格 + 操作区 ── */}
-      <View style={[styles.contentRow, { height: gridHeight }]}>
-        <View style={[styles.grid, { height: gridHeight }]}>
-          {gridItems.map(item => (
-            <Image
-              key={item.id}
-              source={{ uri: item.thumbnailUri || item.imageUri }}
-              style={[styles.gridImage, { width: gridColSize, height: gridColSize * 1.25 }]}
-            />
+      {/* ── 左网格 + 右替换栏 ── */}
+      <View style={styles.body}>
+        <View style={styles.grid}>
+          {gridItems.map((item, i) => (
+            <View key={item?.id ?? `empty-${i}`} style={styles.cell}>
+              {item && (
+                <Image
+                  source={{ uri: item.thumbnailUri || item.imageUri }}
+                  style={styles.cellImage}
+                />
+              )}
+            </View>
           ))}
         </View>
 
-        <View style={styles.actionsColumn}>
-          <TouchableOpacity
-            style={[
-              styles.wearButton,
-              isLoading && styles.wearButtonDisabled,
-            ]}
-            onPress={handlePressWear}
-            disabled={isLoading}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name="checkmark-outline"
-              size={16}
-              color={theme.colors.white}
-            />
-            <Text style={styles.wearButtonText}>
-              {isLoading ? '记录中...' : '就穿这套'}
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.calendarWrap} onPress={onCalendar} activeOpacity={0.7}>
-            {/* 日历活页环 */}
-            <View style={styles.calendarRings}>
-              <View style={styles.calendarRing} />
-              <View style={styles.calendarRing} />
-            </View>
-
-            {/* 日历主体 */}
-            <View style={styles.calendarBody}>
-              <View style={styles.calendarMonthRow}>
-                <Text style={styles.calMonthText}>{calMonth}月</Text>
-                <View style={styles.calDivider} />
-              </View>
-
-              <View style={styles.calWeekRow}>
-                {WEEK_HEADERS.map((d, i) => (
-                  <View key={i} style={styles.calWeekCell}>
-                    <Text style={styles.calWeekText}>{d}</Text>
-                  </View>
-                ))}
-              </View>
-
-              {calWeeks.map((week, wi) => (
-                <View key={wi} style={styles.calDateRow}>
-                  {week.map((d, di) => (
-                    <View key={di} style={styles.calDateCell}>
-                      {d !== null ? (
-                        d === todayDate ? (
-                          <View style={styles.calTodayDot}>
-                            <Text style={styles.calDateTextToday}>{d}</Text>
-                          </View>
-                        ) : (
-                          <Text style={styles.calDateText}>{d}</Text>
-                        )
-                      ) : (
-                        <Text style={styles.calDateText}> </Text>
-                      )}
-                    </View>
-                  ))}
+        <View style={styles.replaceCol}>
+          <Text style={styles.replaceTitle}>换一件</Text>
+          {gridItems.map((item, i) => {
+            if (!item) return null;
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.replaceItem}
+                onPress={() => handleReplace(i)}
+                activeOpacity={0.7}
+              >
+                <Image
+                  source={{ uri: item.thumbnailUri || item.imageUri }}
+                  style={styles.replaceItemThumb}
+                />
+                <View style={styles.replaceArrow}>
+                  <Ionicons name="refresh" size={12} color={theme.colors.textTertiary} />
                 </View>
-              ))}
-
-              <Text style={styles.calendarLabel}>穿着日历</Text>
-            </View>
-          </TouchableOpacity>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+      </View>
+
+      {/* ── 操作按钮 ── */}
+      <View style={styles.actionsRow}>
+        <TouchableOpacity
+          style={[styles.wearButton, isLoading && styles.wearButtonDisabled]}
+          onPress={handlePressWear}
+          disabled={isLoading}
+          activeOpacity={0.85}
+        >
+          <Ionicons name="checkmark-outline" size={16} color={theme.colors.white} />
+          <Text style={styles.wearButtonText}>{isLoading ? '记录中...' : '就穿这套'}</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.iconBtn} onPress={onSaveAsOutfit} activeOpacity={0.7}>
+          <Ionicons name="bookmark-outline" size={18} color={theme.colors.textSecondary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.iconBtn, styles.iconBtnPrimary]} onPress={onCalendar} activeOpacity={0.7}>
+          <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
+        </TouchableOpacity>
       </View>
 
       <OutfitConfirmModal

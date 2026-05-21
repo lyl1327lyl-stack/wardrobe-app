@@ -5,6 +5,41 @@ import {
   Weather,
 } from '../types';
 
+// ── 色相家族（HSL 回退用） ──
+const HUE_FAMILY: Record<string, string> = {
+  '红色': 'red', '酒红色': 'red', '砖红色': 'red', '粉红': 'red',
+  '玫红色': 'red', '桃红色': 'red', '橘红色': 'red', '紫红色': 'red',
+  '橙色': 'orange', '金色': 'orange',
+  '黄色': 'yellow', '姜黄色': 'yellow',
+  '绿色': 'green', '军绿色': 'green', '墨绿色': 'green', '薄荷绿': 'green',
+  '翠绿色': 'green', '草绿色': 'green',
+  '蓝色': 'blue', '深蓝': 'blue', '浅蓝': 'blue', '藏青色': 'blue',
+  '天蓝色': 'blue', '宝蓝色': 'blue', '湖蓝色': 'blue', '牛仔蓝': 'blue',
+  '靛蓝色': 'blue', '水洗蓝': 'blue', '青色': 'blue',
+  '紫色': 'purple', '薰衣草': 'purple', '粉色': 'purple',
+  '棕色': 'brown', '咖啡色': 'brown', '卡其色': 'brown', '驼色': 'brown',
+  '杏色': 'brown', '米色': 'brown', '米白': 'brown', '奶油色': 'brown', '香槟色': 'brown',
+  '黑色': 'neutral', '白色': 'neutral', '深灰': 'neutral', '浅灰': 'neutral',
+  '灰色': 'neutral', '银灰色': 'neutral', '银色': 'neutral', '其他': 'neutral',
+};
+
+// 互补色对（时尚进阶搭配）：红↔绿, 蓝↔橙, 紫↔黄
+const COMPLEMENTARY: Record<string, string> = {
+  red: 'green', green: 'red', blue: 'orange', orange: 'blue',
+  purple: 'yellow', yellow: 'purple',
+};
+
+// 相邻色族（柔和过渡）
+const ADJACENT: Record<string, string[]> = {
+  red: ['orange', 'purple', 'brown'],
+  orange: ['red', 'yellow', 'brown'],
+  yellow: ['orange', 'green'],
+  green: ['yellow', 'blue'],
+  blue: ['green', 'purple'],
+  purple: ['blue', 'red'],
+  brown: ['red', 'orange'],
+};
+
 // ── 颜色协调规则 ──
 const COLOR_HARMONY: Record<string, string[]> = {
   // 黑灰白系
@@ -91,6 +126,37 @@ const CLASH_PAIRS: [string, string][] = [
   ['橘红色', '宝蓝色'],
 ];
 
+// ── 共现矩阵缓存（模块级，outfits 不变时复用） ──
+let _cachedPairFreq: Map<string, number> | null = null;
+let _cachedItemDiversity: Map<number, number> | null = null;
+let _cacheOutfitKey = '';
+
+function getCachedMatrices(outfits: Outfit[]): {
+  pairFreq: Map<string, number>;
+  itemDiversity: Map<number, number>;
+} {
+  // 用 outfit ID 序列 + 数量做简易 digest
+  const key = outfits.length + '|' + outfits.map(o => o.id).sort((a, b) => a - b).join(',');
+  if (key !== _cacheOutfitKey) {
+    _cachedPairFreq = buildPairFrequency(outfits);
+    _cachedItemDiversity = buildItemDiversity(outfits);
+    _cacheOutfitKey = key;
+    console.log(`[cache] rebuilt matrices for ${outfits.length} outfits`);
+  } else {
+    console.log(`[cache] reusing cached matrices`);
+  }
+  return { pairFreq: _cachedPairFreq!, itemDiversity: _cachedItemDiversity! };
+}
+
+/** Fisher-Yates 洗牌（原地） */
+function shuffle<T>(arr: T[]): T[] {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
 // ── 天气 → 季节映射 ──
 function getSeasonFromTemp(temperature: number): string {
   if (temperature < 10) return '冬';
@@ -129,11 +195,23 @@ function colorsCompatible(c1: string, c2: string): boolean {
 
 function singleColorsCompatible(c1: string, c2: string): boolean {
   if (!c1 || !c2 || c1 === c2) return true;
+  // 先查精确规则表
   const allowed = COLOR_HARMONY[c1];
   if (allowed) return allowed.includes(c2);
   const reverse = COLOR_HARMONY[c2];
   if (reverse) return reverse.includes(c1);
-  return true;
+  // HSL 色相族回退：不再对未知颜色一律放行
+  const f1 = HUE_FAMILY[c1];
+  const f2 = HUE_FAMILY[c2];
+  if (!f1 || !f2) return true; // 完全未知则保守放行
+  if (f1 === f2) return true;  // 同族协调
+  if (f1 === 'neutral' || f2 === 'neutral') return true; // 中性色百搭
+  // 互补色（红↔绿, 蓝↔橙, 紫↔黄）在时尚中可大胆搭配
+  if (COMPLEMENTARY[f1] === f2) return true;
+  // 相邻色族柔和过渡
+  if (ADJACENT[f1]?.includes(f2)) return true;
+  // 其他跨族组合保守拒绝
+  return false;
 }
 
 // ═════════════════════════════════════════════════
@@ -143,8 +221,9 @@ function filterByWeather(items: ClothingItem[], weather: Weather | null): Clothi
   if (!weather) return items;
   const t = weather.temperature;
   const season = getSeasonFromTemp(t);
+  const isRainy = weather.condition === '雨' || weather.condition === '雪';
 
-  console.log(`[filterByWeather] temp=${t}°C season=${season} total=${items.length}`);
+  console.log(`[filterByWeather] temp=${t}°C season=${season} rainy=${isRainy} total=${items.length}`);
 
   // 温和温度 (15–25°C): 不硬过滤季节，小衣橱经不起砍 2/3
   // 只根据厚薄排除明显不合时宜的单品
@@ -243,6 +322,24 @@ function buildItemDiversity(outfits: Outfit[]): Map<number, number> {
   return diversity;
 }
 
+/**
+ * 穿着间隔权重：最近穿过的单品降低推荐优先级。
+ * 窗口随季节变化 — 夏长（出汗多）冬短（外套可重复穿）。
+ */
+function recencyMultiplier(
+  id: number,
+  recentlyWornDays?: Map<number, number>,
+  season?: string,
+): number {
+  if (!recentlyWornDays) return 1.0;
+  const daysAgo = recentlyWornDays.get(id);
+  if (daysAgo === undefined) return 1.0; // 没穿过，满分
+  if (daysAgo === 0) return 0.01;        // 今天刚穿，几乎不推荐
+  const window = season === '夏' ? 7 : season === '冬' ? 4 : 5;
+  if (daysAgo >= window) return 1.0;      // 超出窗口，不受影响
+  return daysAgo / window;                // 线性恢复：1天前 → 0.14~0.25, 越靠近窗口越接近 1.0
+}
+
 /** 获取有效的分类：parentType 优先，为空时用 type 推断 */
 function effectiveParent(item: ClothingItem): string {
   if (item.parentType) return item.parentType;
@@ -275,6 +372,7 @@ function generateCandidates(
   itemDiversity?: Map<number, number>,
   pairFreq?: Map<string, number>,
   season?: string,
+  recentlyWornDays?: Map<number, number>,
 ): ClothingItem[][] {
   const tops = items.filter(i => effectiveParent(i) === '上装');
   const bottoms = items.filter(i => effectiveParent(i) === '下装');
@@ -306,11 +404,12 @@ function generateCandidates(
     }
   }
 
-  // 组合权重：新鲜度 × 搭配广度
+  // 组合权重：新鲜度 × 穿着间隔 × 搭配广度
   function fw(id: number): number {
     const fresh = recentRecommendedItemIds?.has(id) ? 0.05 : 1.0;
     const diversity = 1 + (itemDiversity?.get(id) || 0);
-    return fresh * diversity;
+    const recency = recencyMultiplier(id, recentlyWornDays, season);
+    return fresh * recency * diversity;
   }
 
   // 兼容性过滤：只保留历史上与 targetId 搭配过的单品
@@ -466,6 +565,7 @@ interface ScoredOutfit {
   weatherScore: number;
   favoriteScore: number;
   freshnessScore: number;
+  recencyScore: number;
   userOutfitBoost: number;
   totalScore: number;
 }
@@ -478,6 +578,7 @@ function scoreOutfits(
   userOutfitSets: Set<string>,
   currentSeason: string,
   recentRecommendedItemIds?: Set<number>,
+  recentlyWornDays?: Map<number, number>,
 ): ScoredOutfit[] {
   return candidates.map(items => {
     // 1. 共现频率 (0.15) — 历史仅供参考，不作为主导
@@ -495,8 +596,11 @@ function scoreOutfits(
     // 5. 偏好单品 (0.10)
     const favoriteScore = computeFavoriteScore(items, favoriteSet);
 
-    // 6. 新鲜度 (0.25) — 最近没推荐过的搭配得分高
+    // 6. 新鲜度 (0.20) — 最近没推荐过的搭配得分高
     const freshnessScore = computeFreshnessScore(items, recentRecommendedItemIds);
+
+    // 7. 穿着间隔 (0.05) — 最近没穿过的搭配优先
+    const recencyScore = computeRecencyScore(items, recentlyWornDays, currentSeason);
 
     // 用户自定义搭配加成
     const key = [...items.map(i => i.id)].sort((a, b) => a - b).join(',');
@@ -508,10 +612,11 @@ function scoreOutfits(
       0.15 * colorScore +
       0.10 * weatherScore +
       0.10 * favoriteScore +
-      0.25 * freshnessScore +
+      0.20 * freshnessScore +
+      0.05 * recencyScore +
       userOutfitBoost;
 
-    return { items, pairFreqScore, styleScore, colorScore, weatherScore, favoriteScore, freshnessScore, userOutfitBoost, totalScore };
+    return { items, pairFreqScore, styleScore, colorScore, weatherScore, favoriteScore, freshnessScore, recencyScore, userOutfitBoost, totalScore };
   });
 }
 
@@ -602,12 +707,17 @@ function computeWeatherScore(items: ClothingItem[], weather: Weather | null, cur
 
   for (const item of items) {
     let itemScore = 0.5;
+    const ep = effectiveParent(item);
     // 厚薄 vs 温度
     if (t < 10 && (item.thickness === '厚款' || item.thickness === '加厚')) itemScore += 0.3;
     if (t > 28 && item.thickness === '薄款') itemScore += 0.3;
     if (t >= 15 && t <= 25 && item.thickness === '适中') itemScore += 0.2;
-    // 雨天外套加分
-    if (isRainy && effectiveParent(item) === '外套') itemScore += 0.2;
+    // 雨雪天：外套 +0.3，不防水的薄下装/短裤扣分
+    if (isRainy) {
+      if (ep === '外套') itemScore += 0.3;
+      if (ep === '下装' && item.type.includes('短')) itemScore -= 0.25;
+      if (ep === '鞋' && (item.type.includes('凉') || item.type.includes('拖'))) itemScore -= 0.3;
+    }
     // 季节兼容
     if (item.seasons.includes(currentSeason)) itemScore += 0.2;
     // 温度不适配扣分
@@ -631,6 +741,28 @@ function computeFreshnessScore(items: ClothingItem[], recentRecommendedItemIds?:
   if (!recentRecommendedItemIds || recentRecommendedItemIds.size === 0) return 0.5;
   const freshCount = items.filter(i => !recentRecommendedItemIds.has(i.id)).length;
   return freshCount / items.length;
+}
+
+/** 穿着间隔分：最近实际穿过的单品越少分越高，避免短期内重复推荐 */
+function computeRecencyScore(
+  items: ClothingItem[],
+  recentlyWornDays?: Map<number, number>,
+  season?: string,
+): number {
+  if (!recentlyWornDays || recentlyWornDays.size === 0) return 0.5;
+  const window = season === '夏' ? 7 : season === '冬' ? 4 : 5;
+  let sum = 0;
+  for (const item of items) {
+    const daysAgo = recentlyWornDays.get(item.id);
+    if (daysAgo === undefined || daysAgo >= window) {
+      sum += 1.0; // 没穿过或已过窗口，满分
+    } else if (daysAgo === 0) {
+      sum += 0.0; // 今天刚穿，零分
+    } else {
+      sum += daysAgo / window; // 线性恢复
+    }
+  }
+  return sum / items.length;
 }
 
 // ═════════════════════════════════════════════════
@@ -661,6 +793,7 @@ export function generateRecommendations(
     selectedItem?: ClothingItem;
     topN?: number;
     recentRecommendedItemIds?: Set<number>;
+    recentlyWornDays?: Map<number, number>;
   },
 ): OutfitRecommendation[] {
   if (clothing.length === 0) return [];
@@ -674,9 +807,8 @@ export function generateRecommendations(
     return generateRecommendationsFallback(clothing, weather);
   }
 
-  // 准备数据
-  const pairFreq = buildPairFrequency(outfits);
-  const itemDiversity = buildItemDiversity(outfits);
+  // 准备数据（模块级缓存，outfits 不变时复用）
+  const { pairFreq, itemDiversity } = getCachedMatrices(outfits);
   const currentSeason = weather ? getSeasonFromTemp(weather.temperature) : '春';
 
   // 偏好单品：穿着次数前 25%
@@ -696,23 +828,24 @@ export function generateRecommendations(
   }
 
   // Step 2 & 3: 生成候选 + 评分
-  const candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq, currentSeason);
+  const candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq, currentSeason, options?.recentlyWornDays);
 
   // 候选太少则回退到简单生成
   if (candidates.length === 0) {
     return generateRecommendationsFallback(clothing, weather);
   }
 
-  const scored = scoreOutfits(candidates, pairFreq, weather, favoriteSet, userOutfitSets, currentSeason, options?.recentRecommendedItemIds);
+  const scored = scoreOutfits(candidates, pairFreq, weather, favoriteSet, userOutfitSets, currentSeason, options?.recentRecommendedItemIds, options?.recentlyWornDays);
 
   // 排序，去重（同一件上装不出现太多次）
   scored.sort((a, b) => b.totalScore - a.totalScore);
 
-  // 确保多样性：同一 parentType 核心单品不重复出现超过 2 次
+  // 确保多样性：同一单品最多出现在 Math.max(2, ceil(topN * 0.6)) 个结果中
+  const dedupLimit = Math.max(2, Math.ceil(topN * 0.6));
   const diverse: ScoredOutfit[] = [];
   const itemUsageCount = new Map<number, number>();
   for (const s of scored) {
-    const overused = s.items.some(i => (itemUsageCount.get(i.id) || 0) >= 3);
+    const overused = s.items.some(i => (itemUsageCount.get(i.id) || 0) >= dedupLimit);
     if (!overused || diverse.length < topN / 2) {
       diverse.push(s);
       s.items.forEach(i => itemUsageCount.set(i.id, (itemUsageCount.get(i.id) || 0) + 1));
@@ -773,37 +906,39 @@ function generateRecommendationsFallback(
 
   const categories = [...allByCategory.keys()];
 
-  // 尝试生成完整搭配
+  // Fisher-Yates 洗牌后生成搭配，避免小衣橱每次看到相同顺序
+  const shuffledTops = shuffle([...tops]);
+  const shuffledBottoms = shuffle([...bottoms]);
+  const shuffledShoes = shuffle([...shoes]);
+  const shuffledDresses = shuffle([...dresses]);
+  const shuffledOuters = shuffle([...outers]);
+
   for (let k = 0; k < 5; k++) {
     let items: ClothingItem[] = [];
-    if (dresses.length > 0 && (k >= tops.length || tops.length === 0 || Math.random() < 0.3)) {
-      items = [dresses[k % dresses.length]];
-      if (hasShoes) items.push(shoes[k % shoes.length]);
-      if (outers.length > 0 && Math.random() < 0.35) items.push(outers[k % outers.length]);
-    } else if (tops.length > 0) {
-      items = [tops[k % tops.length]];
-      if (bottoms.length > 0) items.push(bottoms[k % bottoms.length]);
-      if (hasShoes) items.push(shoes[k % shoes.length]);
-      if (outers.length > 0 && Math.random() < 0.35) items.push(outers[k % outers.length]);
+    if (shuffledDresses.length > 0 && (k >= shuffledTops.length || shuffledTops.length === 0 || Math.random() < 0.3)) {
+      items = [shuffledDresses[k % shuffledDresses.length]];
+      if (hasShoes) items.push(shuffledShoes[k % shuffledShoes.length]);
+      if (shuffledOuters.length > 0 && Math.random() < 0.35) items.push(shuffledOuters[k % shuffledOuters.length]);
+    } else if (shuffledTops.length > 0) {
+      items = [shuffledTops[k % shuffledTops.length]];
+      if (shuffledBottoms.length > 0) items.push(shuffledBottoms[k % shuffledBottoms.length]);
+      if (hasShoes) items.push(shuffledShoes[k % shuffledShoes.length]);
+      if (shuffledOuters.length > 0 && Math.random() < 0.35) items.push(shuffledOuters[k % shuffledOuters.length]);
     } else if (categories.length >= 2) {
-      // 没有标准分类但有多个不同类别，直接按类别配对
       const picks: ClothingItem[] = [];
       for (const cat of categories.slice(0, 3)) {
         const pool = allByCategory.get(cat)!;
-        picks.push(pool[k % pool.length]);
+        picks.push(pool[Math.floor(Math.random() * pool.length)]);
       }
       items = picks;
     } else if (clothing.length >= 2) {
-      // 只有一种类型：两两随机搭配
-      const a = clothing[k % clothing.length];
-      const b = clothing[(k + 1) % clothing.length];
-      if (a.id !== b.id) items = [a, b];
+      const shuffled = shuffle([...clothing]);
+      if (shuffled[0].id !== shuffled[1].id) items = [shuffled[0], shuffled[1]];
     }
 
     if (items.length >= 2) {
       results.push({ items, scene, reason: '根据你的衣橱生成', score: 70 });
     }
-    // 不 break，继续尝试后续 k（不同索引可能产生有效组合）
   }
 
   // 最后手段：无法构成任何搭配时，至少展示已有单品
