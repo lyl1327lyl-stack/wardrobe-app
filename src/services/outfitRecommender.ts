@@ -579,46 +579,130 @@ function scoreOutfits(
   currentSeason: string,
   recentRecommendedItemIds?: Set<number>,
   recentlyWornDays?: Map<number, number>,
+  likedItemIds?: Set<number>,
+  preferredStyles?: string[],
+  preferredColors?: string[],
+  comfortVsAppearance?: 'comfort' | 'balanced' | 'appearance',
+  preferredScenes?: string[],
 ): ScoredOutfit[] {
+  // 权重方案：根据用户舒适/外观偏好调整
+  const w = getWeights(comfortVsAppearance);
+
   return candidates.map(items => {
-    // 1. 共现频率 (0.15) — 历史仅供参考，不作为主导
+    // 1. 共现频率
     const pairFreqScore = computePairFreqScore(items, pairFreq);
 
-    // 2. 风格一致性 (0.25)
+    // 2. 风格一致性
     const styleScore = computeStyleScore(items);
 
-    // 3. 颜色协调度 (0.15)
+    // 3. 颜色协调度
     const colorScore = computeColorScore(items);
 
-    // 4. 天气匹配度 (0.10)
+    // 4. 天气匹配度
     const weatherScore = computeWeatherScore(items, weather, currentSeason);
 
-    // 5. 偏好单品 (0.10)
+    // 5. 偏好单品
     const favoriteScore = computeFavoriteScore(items, favoriteSet);
 
-    // 6. 新鲜度 (0.20) — 最近没推荐过的搭配得分高
+    // 6. 新鲜度
     const freshnessScore = computeFreshnessScore(items, recentRecommendedItemIds);
 
-    // 7. 穿着间隔 (0.05) — 最近没穿过的搭配优先
+    // 7. 穿着间隔
     const recencyScore = computeRecencyScore(items, recentlyWornDays, currentSeason);
 
     // 用户自定义搭配加成
     const key = [...items.map(i => i.id)].sort((a, b) => a - b).join(',');
     const userOutfitBoost = userOutfitSets.has(key) ? 0.30 : 0;
 
+    // 用户喜欢单品加成
+    const likedBoost = computeLikedBoost(items, likedItemIds);
+
+    // 用户风格偏好加成
+    const stylePrefBoost = computeStylePrefBoost(items, preferredStyles);
+
+    // 用户色系偏好加成
+    const colorPrefBoost = computeColorPrefBoost(items, preferredColors);
+
+    // 用户场景偏好加成
+    const sceneBoost = computeSceneBoost(preferredScenes, weather);
+
     const totalScore =
-      0.15 * pairFreqScore +
-      0.25 * styleScore +
-      0.15 * colorScore +
-      0.10 * weatherScore +
-      0.10 * favoriteScore +
-      0.20 * freshnessScore +
-      0.05 * recencyScore +
-      userOutfitBoost;
+      w.pairFreq * pairFreqScore +
+      w.style * styleScore +
+      w.color * colorScore +
+      w.weather * weatherScore +
+      w.favorite * favoriteScore +
+      w.freshness * freshnessScore +
+      w.recency * recencyScore +
+      userOutfitBoost +
+      likedBoost +
+      stylePrefBoost +
+      colorPrefBoost +
+      sceneBoost;
 
     return { items, pairFreqScore, styleScore, colorScore, weatherScore, favoriteScore, freshnessScore, recencyScore, userOutfitBoost, totalScore };
   });
 }
+
+function getWeights(preference?: 'comfort' | 'balanced' | 'appearance') {
+  switch (preference) {
+    case 'comfort':    return { pairFreq: 0.15, style: 0.20, color: 0.15, weather: 0.15, favorite: 0.10, freshness: 0.20, recency: 0.05 };
+    case 'appearance': return { pairFreq: 0.15, style: 0.30, color: 0.15, weather: 0.05, favorite: 0.10, freshness: 0.20, recency: 0.05 };
+    default:           return { pairFreq: 0.15, style: 0.25, color: 0.15, weather: 0.10, favorite: 0.10, freshness: 0.20, recency: 0.05 };
+  }
+}
+
+function computeLikedBoost(items: ClothingItem[], likedItemIds?: Set<number>): number {
+  if (!likedItemIds || likedItemIds.size === 0) return 0;
+  const likedCount = items.filter(i => likedItemIds.has(i.id)).length;
+  return items.length > 0 ? (likedCount / items.length) * 0.15 : 0;
+}
+
+function computeStylePrefBoost(items: ClothingItem[], preferredStyles?: string[]): number {
+  if (!preferredStyles || preferredStyles.length === 0) return 0;
+  const prefSet = new Set(preferredStyles);
+  let matchCount = 0;
+  let totalTags = 0;
+  for (const item of items) {
+    for (const tag of item.tags) {
+      totalTags++;
+      if (prefSet.has(tag)) matchCount++;
+    }
+  }
+  return totalTags > 0 ? (matchCount / totalTags) * 0.10 : 0;
+}
+
+function computeColorPrefBoost(items: ClothingItem[], preferredColors?: string[]): number {
+  if (!preferredColors || preferredColors.length === 0) return 0;
+  // 将色系名称展开为具体颜色
+  const expanded = new Set<string>();
+  for (const family of preferredColors) {
+    const colors = COLOR_FAMILY_MAP[family];
+    if (colors) for (const c of colors) expanded.add(c);
+  }
+  if (expanded.size === 0) return 0;
+  let matchCount = 0;
+  for (const item of items) {
+    const colors = (item.color || '').split(',').map(c => c.trim()).filter(Boolean);
+    if (colors.some(c => expanded.has(c))) matchCount++;
+  }
+  return items.length > 0 ? (matchCount / items.length) * 0.08 : 0;
+}
+
+function computeSceneBoost(preferredScenes?: string[], weather?: Weather | null): number {
+  if (!preferredScenes || preferredScenes.length === 0 || !weather) return 0;
+  const currentScene = inferScene(weather);
+  return preferredScenes.includes(currentScene) ? 0.05 : 0;
+}
+
+const COLOR_FAMILY_MAP: Record<string, string[]> = {
+  '黑灰白系': ['黑色', '白色', '灰色', '深灰', '浅灰', '米白', '米色', '银灰色'],
+  '红色系': ['红色', '酒红色', '砖红色', '粉红', '玫红色'],
+  '蓝色系': ['蓝色', '深蓝', '浅蓝', '藏青色', '天蓝色', '牛仔蓝'],
+  '绿色系': ['绿色', '军绿色', '墨绿色', '薄荷绿'],
+  '棕卡系': ['棕色', '咖啡色', '卡其色', '驼色'],
+  '彩色系': ['黄色', '橙色', '紫色', '粉色'],
+};
 
 /** 共现频率分：outfit 内所有 pair 的平均共现概率 */
 function computePairFreqScore(items: ClothingItem[], pairFreq: Map<string, number>): number {
@@ -794,6 +878,12 @@ export function generateRecommendations(
     topN?: number;
     recentRecommendedItemIds?: Set<number>;
     recentlyWornDays?: Map<number, number>;
+    blacklistPairs?: Set<string>;
+    likedItemIds?: Set<number>;
+    preferredStyles?: string[];
+    preferredColors?: string[];
+    comfortVsAppearance?: 'comfort' | 'balanced' | 'appearance';
+    preferredScenes?: string[];
   },
 ): OutfitRecommendation[] {
   if (clothing.length === 0) return [];
@@ -828,14 +918,22 @@ export function generateRecommendations(
   }
 
   // Step 2 & 3: 生成候选 + 评分
-  const candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq, currentSeason, options?.recentlyWornDays);
+  let candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq, currentSeason, options?.recentlyWornDays);
 
   // 候选太少则回退到简单生成
   if (candidates.length === 0) {
     return generateRecommendationsFallback(clothing, weather);
   }
 
-  const scored = scoreOutfits(candidates, pairFreq, weather, favoriteSet, userOutfitSets, currentSeason, options?.recentRecommendedItemIds, options?.recentlyWornDays);
+  // 黑名单过滤：排除用户标记为不喜欢的组合
+  if (options?.blacklistPairs && options.blacklistPairs.size > 0) {
+    candidates = candidates.filter(items => {
+      const key = [...items.map(i => i.id)].sort((a, b) => a - b).join(',');
+      return !options.blacklistPairs!.has(key);
+    });
+  }
+
+  const scored = scoreOutfits(candidates, pairFreq, weather, favoriteSet, userOutfitSets, currentSeason, options?.recentRecommendedItemIds, options?.recentlyWornDays, options?.likedItemIds, options?.preferredStyles, options?.preferredColors, options?.comfortVsAppearance, options?.preferredScenes);
 
   // 排序，去重（同一件上装不出现太多次）
   scored.sort((a, b) => b.totalScore - a.totalScore);

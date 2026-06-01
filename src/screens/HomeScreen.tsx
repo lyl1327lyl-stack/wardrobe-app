@@ -13,8 +13,12 @@ import {
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { usePreferenceStore } from '../store/preferenceStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
+import { PreferenceSurveySheet } from '../components/PreferenceSurveySheet';
+import { AttributeTipIcon } from '../components/AttributeTipBanner';
 import { generateRecommendations } from '../services/outfitRecommender';
+import { analyzeAttributeGaps, AttributeTip } from '../services/attributeTips';
 import { getWeather } from '../services/weatherService';
 import { getWearRecordsByDate, getWearRecordsByDateRange } from '../db/wearRecords';
 import { ClothingItem, OutfitRecommendation, Weather, WearRecord } from '../types';
@@ -338,6 +342,7 @@ export function HomeScreen() {
   const [recIndex, setRecIndex] = useState(0);
   const [recLoading, setRecLoading] = useState(true);
   const [todayRecords, setTodayRecords] = useState<WearRecord[]>([]);
+  const [showSurveySheet, setShowSurveySheet] = useState(false);
 
   // 最近推荐过的单品 ID（有上限滑动窗口，避免集合膨胀导致新鲜度失效）
   const recentRecommendedIdsRef = useRef<number[]>([]);
@@ -381,15 +386,24 @@ export function HomeScreen() {
     [clothing],
   );
 
+  const attributeTips = useMemo(() => analyzeAttributeGaps(clothing), [clothing]);
+
   const loadRecommendations = useCallback(async () => {
     const w = await getWeather();
     setWeather(w);
     setRecLoading(true);
     const recentlyWornDays = await buildRecentlyWornDays();
     const s = useWardrobeStore.getState();
+    const prefs = usePreferenceStore.getState();
     const recs = generateRecommendations(s.clothing, s.outfits, w, {
       recentRecommendedItemIds: getRecentIdsSet(),
       recentlyWornDays,
+      blacklistPairs: prefs.blacklist,
+      likedItemIds: prefs.likedItemIds,
+      preferredStyles: prefs.preferredStyles,
+      preferredColors: prefs.preferredColors,
+      comfortVsAppearance: prefs.comfortVsAppearance,
+      preferredScenes: prefs.preferredScenes,
     });
     const allIds: number[] = [];
     for (const rec of recs) {
@@ -406,12 +420,11 @@ export function HomeScreen() {
     setTodayRecords(records);
   }, []);
 
-  /** 将当前推荐保存为搭配 */
-  /** 跳转搭配画板，将推荐单品预置到画布上 */
-  const handleSaveAsOutfit = useCallback(() => {
-    if (!recommendation) return;
-    const ids = [...recommendation.items.map(i => i.id)].sort((a, b) => a - b);
-    // 检查是否已存在相同单品的搭配
+  /** 跳转搭配画板，将单品预置到画布上 */
+  const handleSaveAsOutfit = useCallback((overrideItems?: ClothingItem[]) => {
+    const saveItems = overrideItems || recommendation?.items;
+    if (!saveItems || saveItems.length === 0) return;
+    const ids = [...saveItems.map(i => i.id)].sort((a, b) => a - b);
     const exists = outfits.some(o => {
       const oIds = [...o.itemIds].sort((a, b) => a - b);
       return oIds.length === ids.length && oIds.every((v, i) => v === ids[i]);
@@ -433,12 +446,12 @@ export function HomeScreen() {
       return;
     }
 
-    Alert.alert('添加搭配', '将推荐单品添加到我的搭配？', [
+    Alert.alert('添加搭配', '将搭配单品添加到我的搭配？', [
       { text: '取消', style: 'cancel' },
       { text: '添加', onPress: () => {
         const outfitStore = require('../store/outfitStore').useOutfitStore.getState();
         outfitStore.reset();
-        outfitStore.setSelectedClothings(recommendation.items);
+        outfitStore.setSelectedClothings(saveItems);
         navigation.navigate('OutfitEditor', {
           selectedIds: ids,
           exitTo: { screen: 'Home' },
@@ -461,6 +474,7 @@ export function HomeScreen() {
 
   useEffect(() => {
     const init = async () => {
+      await usePreferenceStore.getState().load();
       const s = useWardrobeStore.getState();
       // 确保数据已加载（其他 tab 的 loadData 可能尚未执行）
       if (s.clothing.length === 0) {
@@ -499,9 +513,16 @@ export function HomeScreen() {
     } else {
       const recentlyWornDays = await buildRecentlyWornDays();
       const s = useWardrobeStore.getState();
+      const prefs = usePreferenceStore.getState();
       const recs = generateRecommendations(s.clothing, s.outfits, weather, {
         recentRecommendedItemIds: getRecentIdsSet(),
         recentlyWornDays,
+        blacklistPairs: prefs.blacklist,
+        likedItemIds: prefs.likedItemIds,
+        preferredStyles: prefs.preferredStyles,
+        preferredColors: prefs.preferredColors,
+        comfortVsAppearance: prefs.comfortVsAppearance,
+        preferredScenes: prefs.preferredScenes,
       });
       if (recs.length > 0) {
         const allIds: number[] = [];
@@ -515,9 +536,10 @@ export function HomeScreen() {
     }
   }, [recIndex, recommendations.length, weather]);
 
-  const handleWearRecommendation = useCallback(async (mode: 'append' | 'replace') => {
+  const handleWearRecommendation = useCallback(async (mode: 'append' | 'replace', overrideItems?: ClothingItem[]) => {
     if (!recommendation) return;
-    const ids = recommendation.items.map(i => i.id);
+    const wearItems = overrideItems || recommendation.items;
+    const ids = wearItems.map(i => i.id);
     if (mode === 'replace') {
       await deleteWearRecordsByDate(todayDateStr());
     }
@@ -526,9 +548,16 @@ export function HomeScreen() {
     setTodayRecords(records);
     const recentlyWornDays = await buildRecentlyWornDays();
     const s = useWardrobeStore.getState();
+    const prefs = usePreferenceStore.getState();
     const recs = generateRecommendations(s.clothing, s.outfits, weather, {
       recentRecommendedItemIds: getRecentIdsSet(),
       recentlyWornDays,
+      blacklistPairs: prefs.blacklist,
+      likedItemIds: prefs.likedItemIds,
+      preferredStyles: prefs.preferredStyles,
+      preferredColors: prefs.preferredColors,
+      comfortVsAppearance: prefs.comfortVsAppearance,
+      preferredScenes: prefs.preferredScenes,
     });
     if (recs.length > 0) {
       const allIds: number[] = [];
@@ -540,7 +569,7 @@ export function HomeScreen() {
       setRecIndex(0);
     }
     setTimeout(() => {
-      const sortedIds = [...recommendation.items.map(i => i.id)].sort((a, b) => a - b);
+      const sortedIds = [...wearItems.map(i => i.id)].sort((a, b) => a - b);
       const outfitExists = useWardrobeStore.getState().outfits.some(o => {
         const oIds = [...o.itemIds].sort((a, b) => a - b);
         return oIds.length === sortedIds.length && oIds.every((v, i) => v === sortedIds[i]);
@@ -550,7 +579,7 @@ export function HomeScreen() {
       } else {
         Alert.alert('记录成功', '是否将这套搭配添加到「我的搭配」？', [
           { text: '以后再说', style: 'cancel' },
-          { text: '添加', onPress: () => handleSaveAsOutfit() },
+          { text: '添加', onPress: () => handleSaveAsOutfit(wearItems) },
         ]);
       }
     }, 400);
@@ -558,6 +587,21 @@ export function HomeScreen() {
 
   const goToWardrobe = () => navigation.navigate('衣橱');
   const goToCalendar = () => navigation.navigate('WearCalendar');
+
+  const surveyPrefs = useMemo(() => {
+    const s = usePreferenceStore.getState();
+    return {
+      preferredStyles: s.preferredStyles,
+      preferredColors: s.preferredColors,
+      comfortVsAppearance: s.comfortVsAppearance,
+      preferredScenes: s.preferredScenes,
+    };
+  }, [showSurveySheet]);
+
+  const handleSaveSurvey = useCallback(async (prefs: typeof surveyPrefs) => {
+    await usePreferenceStore.getState().setSurveyPreferences(prefs);
+    loadRecommendations();
+  }, [loadRecommendations]);
 
   return (
     <View style={styles.container}>
@@ -625,6 +669,16 @@ export function HomeScreen() {
         </View>
 
         {/* ── 今日穿搭推荐 ── */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <AttributeTipIcon tips={attributeTips} />
+            <TouchableOpacity onPress={() => setShowSurveySheet(true)} activeOpacity={0.7}>
+              <Text style={styles.sectionLink}>偏好设置</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {recLoading ? (
           <View style={styles.recLoading}>
             <ActivityIndicator size="small" color={PALETTE.primary} />
@@ -642,6 +696,7 @@ export function HomeScreen() {
             todayThumbnails={todayRecords.map(r => ({ uri: r.clothingThumbnailUri, type: r.clothingType, id: r.clothingId }))}
             recTotal={recommendations.length}
             recIndex={recIndex}
+            onSwitchToRecommend={() => {}}
           />
         ) : (
           <View style={styles.recEmpty}>
@@ -700,6 +755,13 @@ export function HomeScreen() {
           </View>
         )}
       </ScrollView>
+
+      <PreferenceSurveySheet
+        visible={showSurveySheet}
+        onClose={() => setShowSurveySheet(false)}
+        onSave={handleSaveSurvey}
+        initialPrefs={surveyPrefs}
+      />
     </View>
   );
 }

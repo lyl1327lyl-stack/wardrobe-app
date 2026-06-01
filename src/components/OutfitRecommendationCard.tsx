@@ -7,6 +7,8 @@ import {
   Image,
   Alert,
   Dimensions,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem, OutfitRecommendation } from '../types';
@@ -18,13 +20,14 @@ interface Props {
   recommendation: OutfitRecommendation;
   allClothing: ClothingItem[];
   onRefresh: () => void;
-  onWear: (mode: 'append' | 'replace') => void;
+  onWear: (mode: 'append' | 'replace', items?: ClothingItem[]) => void;
   onCalendar: () => void;
-  onSaveAsOutfit: () => void;
+  onSaveAsOutfit: (items?: ClothingItem[]) => void;
   onReplaceItem: (index: number, newItem: ClothingItem) => void;
   todayThumbnails: Array<{ uri: string; type: string; id: number }>;
   recTotal: number;
   recIndex: number;
+  onSwitchToRecommend: () => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -33,7 +36,6 @@ const CARD_PADDING = 20;
 const GAP = 8;
 const CONTENT_WIDTH = SCREEN_WIDTH - CARD_MARGIN * 2 - CARD_PADDING * 2;
 
-// 左 72% 网格 + 右 28% 替换栏
 const GRID_W = Math.floor(CONTENT_WIDTH * 0.72);
 const REPLACE_W = CONTENT_WIDTH - GRID_W - GAP;
 const CELL_W = (GRID_W - GAP) / 2;
@@ -47,6 +49,8 @@ const SCENE_CONFIG: Record<string, { icon: string; color: string; bg: string; la
   '宅家': { icon: 'home-outline', color: '#C4B098', bg: '#F7F2EC', label: '宅家' },
 };
 
+const SLOT_CATEGORIES = ['上装', '包包/配饰', '下装', '鞋'] as const;
+
 function inferCategory(type: string): string {
   if (['T恤', '衬衫', '卫衣', '毛衣', '针织衫', 'Polo衫', 'POLO衫', '背心', '打底衫', '长袖', '短袖', '雪纺衫', '马甲'].includes(type)) return '上装';
   if (['连衣裙', '连体裤', '吊带裙', '背带裙', '长裙', '短裙', '旗袍'].includes(type)) return '连衣裙';
@@ -57,6 +61,20 @@ function inferCategory(type: string): string {
   if (['帽子', '围巾', '手套', '腰带', '眼镜', '首饰', '手表', '项链', '耳环', '手链', '戒指'].includes(type)) return '配饰';
   return '上装';
 }
+
+function slotFilter(cat: string): (item: ClothingItem) => boolean {
+  return (item: ClothingItem) => {
+    const c = item.parentType || inferCategory(item.type);
+    if (cat === '上装') return c === '上装' || c === '连衣裙' || c === '外套';
+    if (cat === '包包/配饰') return c === '包包' || c === '配饰';
+    if (cat === '下装') return c === '下装';
+    if (cat === '鞋') return c === '鞋';
+    return false;
+  };
+}
+
+const PICKER_COLS = 4;
+const PICKER_ITEM_SIZE = (SCREEN_WIDTH - 80 - (PICKER_COLS - 1) * 8) / PICKER_COLS;
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
@@ -69,7 +87,6 @@ const makeStyles = (theme: Theme) =>
       overflow: 'visible' as const,
       ...theme.shadows.lg,
     },
-    // ── Header ──
     header: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -125,13 +142,20 @@ const makeStyles = (theme: Theme) =>
       fontSize: 11,
       color: theme.colors.textTertiary,
     },
-    headerRefresh: {
+    headerRight: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    headerBtn: {
       width: 36,
       height: 36,
       borderRadius: 18,
       backgroundColor: theme.colors.background,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    headerBtnActive: {
+      backgroundColor: theme.colors.primary + '20',
     },
     refreshBadge: {
       position: 'absolute',
@@ -149,7 +173,6 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '700',
       color: theme.colors.white,
     },
-    // ── 印章 ──
     stampWrap: {
       position: 'absolute',
       top: 4,
@@ -179,7 +202,6 @@ const makeStyles = (theme: Theme) =>
       color: '#C4545A',
       letterSpacing: 2,
     },
-    // ── 主体：左网格 + 右替换栏 ──
     body: {
       flexDirection: 'row',
       gap: GAP,
@@ -203,7 +225,30 @@ const makeStyles = (theme: Theme) =>
       height: '100%',
       resizeMode: 'contain',
     },
-    // ── 右侧替换栏 ──
+    cellEmpty: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      backgroundColor: theme.colors.background,
+    },
+    cellEmptyLabel: {
+      fontSize: 10,
+      color: theme.colors.textTertiary,
+      marginTop: 2,
+    },
+    cellRemove: {
+      position: 'absolute',
+      top: 4,
+      right: 4,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
     replaceCol: {
       width: REPLACE_W,
       justifyContent: 'center',
@@ -234,11 +279,41 @@ const makeStyles = (theme: Theme) =>
     replaceArrow: {
       padding: 2,
     },
-    // ── 底部操作区 ──
     actionsRow: {
       flexDirection: 'row',
       gap: 8,
       marginTop: 14,
+    },
+    previewActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: 14,
+    },
+    previewLeftActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    previewTextBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      borderRadius: 14,
+      backgroundColor: theme.colors.background,
+    },
+    previewTextBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.textSecondary,
+    },
+    previewGridFull: {
+      width: CONTENT_WIDTH,
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      columnGap: 5,
+      rowGap: 5,
     },
     wearButton: {
       flex: 1,
@@ -271,6 +346,78 @@ const makeStyles = (theme: Theme) =>
       borderColor: theme.colors.primary + '40',
       backgroundColor: theme.colors.primary + '08',
     },
+    // ── Picker Sheet ──
+    pickerOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    pickerBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    pickerSheet: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 50,
+      maxHeight: '60%',
+    },
+    pickerHandle: {
+      width: 36,
+      height: 4,
+      backgroundColor: theme.colors.border,
+      borderRadius: 2,
+      alignSelf: 'center',
+      marginTop: 12,
+    },
+    pickerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+    },
+    pickerTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    pickerClose: {
+      padding: 4,
+    },
+    pickerGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+      paddingHorizontal: 20,
+    },
+    pickerItem: {
+      width: PICKER_ITEM_SIZE,
+      height: PICKER_ITEM_SIZE,
+      borderRadius: 10,
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    pickerItemSelected: {
+      borderColor: theme.colors.primary,
+    },
+    pickerItemImg: {
+      width: '100%',
+      height: '100%',
+      resizeMode: 'contain',
+    },
+    pickerEmpty: {
+      width: PICKER_ITEM_SIZE,
+      height: PICKER_ITEM_SIZE,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: theme.colors.background,
+    },
   });
 
 export function OutfitRecommendationCard({
@@ -284,18 +431,30 @@ export function OutfitRecommendationCard({
   todayThumbnails,
   recTotal,
   recIndex,
+  onSwitchToRecommend,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { items, scene, reason, score } = recommendation;
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [diyMode, setDiyMode] = useState(false);
+  const [recMode, setRecMode] = useState(false);
+  const [diySlots, setDiySlots] = useState<(ClothingItem | null)[]>([null, null, null, null]);
+  const [pickerSlot, setPickerSlot] = useState<number | null>(null);
 
   const hasTodayRecord = todayThumbnails.length > 0;
+  const previewMode = hasTodayRecord && !diyMode && !recMode;
+
+  const activeItems = diyMode ? diySlots.filter(Boolean) as ClothingItem[] : items;
   const todayIdSet = useMemo(() => new Set(todayThumbnails.map(t => t.id)), [todayThumbnails]);
-  const isDuplicate = hasTodayRecord && items.length > 0 && items.every(i => todayIdSet.has(i.id));
+  const isDuplicate = hasTodayRecord && activeItems.length > 0 && activeItems.every(i => todayIdSet.has(i.id));
 
   const handlePressWear = () => {
+    if (activeItems.length < 2) {
+      Alert.alert('提示', '请至少选择 2 件单品');
+      return;
+    }
     if (isDuplicate) {
       Alert.alert('已记录', '这套搭配和今天已记录的一致，无需重复记录');
       return;
@@ -307,17 +466,17 @@ export function OutfitRecommendationCard({
     setShowModal(false);
     setIsLoading(true);
     try {
-      await onWear(mode);
+      const wearItems = diyMode ? diySlots.filter(Boolean) as ClothingItem[] : undefined;
+      await onWear(mode, wearItems);
     } finally {
       setIsLoading(false);
     }
   };
 
-  // 4 个单品时按品类固定位置，不足 4 个时按左列优先顺序填充
+  // 推荐模式的网格
   const gridItems = useMemo(() => {
     const slots: (ClothingItem | null)[] = [null, null, null, null];
     const filtered = items.slice(0, 4);
-
     if (filtered.length === 4) {
       const extras: ClothingItem[] = [];
       for (const item of filtered) {
@@ -364,115 +523,331 @@ export function OutfitRecommendationCard({
     onReplaceItem(originalIdx >= 0 ? originalIdx : slotIndex, pick);
   };
 
+  const enterDiy = () => {
+    setDiySlots([null, null, null, null]);
+    setDiyMode(true);
+  };
+
+  const exitDiy = () => {
+    setDiyMode(false);
+    setDiySlots([null, null, null, null]);
+  };
+
+  const openPicker = (slot: number) => setPickerSlot(slot);
+  const closePicker = () => setPickerSlot(null);
+
+  const pickItem = (item: ClothingItem) => {
+    if (pickerSlot === null) return;
+    setDiySlots(prev => {
+      const next = [...prev];
+      // 如果这个 item 已经在别的 slot 中，先清掉
+      const existingIdx = next.findIndex(s => s?.id === item.id);
+      if (existingIdx !== -1 && existingIdx !== pickerSlot) next[existingIdx] = null;
+      next[pickerSlot] = item;
+      return next;
+    });
+    closePicker();
+  };
+
+  const removeDiySlot = (slot: number) => {
+    setDiySlots(prev => {
+      const next = [...prev];
+      next[slot] = null;
+      return next;
+    });
+  };
+
+  // Picker 数据
+  const pickerItems = useMemo(() => {
+    if (pickerSlot === null) return [];
+    return allClothing.filter(slotFilter(SLOT_CATEGORIES[pickerSlot]));
+  }, [pickerSlot, allClothing]);
+
+  const displayGrid = diyMode ? diySlots : gridItems;
   const sceneCfg = SCENE_CONFIG[scene] || SCENE_CONFIG['工作'];
+
+  // Preview mode: show today's worn items in full-width grid
+  const previewItems = useMemo(() => {
+    return todayThumbnails.map(t => allClothing.find(c => c.id === t.id)).filter(Boolean) as ClothingItem[];
+  }, [todayThumbnails, allClothing]);
+
+  const enterRecommend = () => {
+    setRecMode(true);
+    onSwitchToRecommend();
+  };
 
   return (
     <View style={styles.container}>
-      {hasTodayRecord && (
-        <View style={styles.stampWrap} pointerEvents="none">
-          <View style={styles.stampOuter}>
-            <View style={styles.stampInner}>
-              <Text style={styles.stampText}>今日已记录</Text>
-            </View>
-          </View>
-        </View>
-      )}
-
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <View style={styles.titleIcon}>
-            <Ionicons name="sparkles" size={15} color={theme.colors.primary} />
-          </View>
-          <View style={styles.titleGroup}>
-            <View style={styles.titleRow}>
-              <Text style={styles.title}>今日推荐</Text>
-              <View style={[styles.sceneBadge, { backgroundColor: sceneCfg.bg }]}>
-                <Ionicons name={sceneCfg.icon as any} size={9} color={sceneCfg.color} />
-                <Text style={[styles.sceneBadgeText, { color: sceneCfg.color }]}>{sceneCfg.label}</Text>
+      {/* ── Preview Mode ── */}
+      {previewMode ? (
+        <>
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <View style={styles.titleIcon}>
+                <Ionicons name="checkmark-circle" size={15} color={theme.colors.primary} />
+              </View>
+              <View style={styles.titleGroup}>
+                <Text style={styles.title}>今日穿搭</Text>
+                <Text style={styles.reasonText}>已记录 {todayThumbnails.length} 件</Text>
               </View>
             </View>
-            <View style={styles.subtitleRow}>
-              <Text style={styles.scoreText}>{score}分</Text>
-              <Text style={styles.reasonText} numberOfLines={1}>{reason}</Text>
+            <TouchableOpacity style={[styles.iconBtn, styles.iconBtnPrimary]} onPress={onCalendar} activeOpacity={0.7}>
+              <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.previewGridFull}>
+            {previewItems.slice(0, 4).map((item, i) => (
+              <View key={item.id} style={styles.cell}>
+                <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.cellImage} />
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.previewActions}>
+            <TouchableOpacity style={styles.previewTextBtn} onPress={enterRecommend} activeOpacity={0.7}>
+              <Ionicons name="refresh" size={14} color={theme.colors.textSecondary} />
+              <Text style={styles.previewTextBtnText}>换一套</Text>
+            </TouchableOpacity>
+            <View style={styles.previewLeftActions}>
+              <TouchableOpacity style={styles.previewTextBtn} onPress={enterDiy} activeOpacity={0.7}>
+                <Ionicons name="color-wand-outline" size={14} color={theme.colors.textSecondary} />
+                <Text style={styles.previewTextBtnText}>自己搭</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => onSaveAsOutfit()} activeOpacity={0.7}>
+                <Ionicons name="bookmark-outline" size={18} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
             </View>
           </View>
-        </View>
-        <TouchableOpacity style={styles.headerRefresh} onPress={onRefresh} activeOpacity={0.7}>
-          <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
-          <View style={styles.refreshBadge}>
-            <Text style={styles.refreshBadgeText}>{recIndex + 1}/{recTotal}</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
+        </>
+      ) : (
+        <>
+          {!diyMode && hasTodayRecord && (
+            <View style={styles.stampWrap} pointerEvents="none">
+              <View style={styles.stampOuter}>
+                <View style={styles.stampInner}>
+                  <Text style={styles.stampText}>今日已记录</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
-      {/* ── 左网格 + 右替换栏 ── */}
-      <View style={styles.body}>
-        <View style={styles.grid}>
-          {gridItems.map((item, i) => (
-            <View key={item?.id ?? `empty-${i}`} style={styles.cell}>
-              {item && (
-                <Image
-                  source={{ uri: item.thumbnailUri || item.imageUri }}
-                  style={styles.cellImage}
+          {/* ── Header ── */}
+          <View style={styles.header}>
+            <View style={styles.headerLeft}>
+              <View style={styles.titleIcon}>
+                <Ionicons
+                  name={diyMode ? 'color-wand-outline' : 'sparkles'}
+                  size={15}
+                  color={theme.colors.primary}
                 />
+              </View>
+              <View style={styles.titleGroup}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.title}>{diyMode ? '自己搭配' : '今日推荐'}</Text>
+                  {!diyMode && (
+                    <View style={[styles.sceneBadge, { backgroundColor: sceneCfg.bg }]}>
+                      <Ionicons name={sceneCfg.icon as any} size={9} color={sceneCfg.color} />
+                      <Text style={[styles.sceneBadgeText, { color: sceneCfg.color }]}>{sceneCfg.label}</Text>
+                    </View>
+                  )}
+                </View>
+                {!diyMode && (
+                  <View style={styles.subtitleRow}>
+                    <Text style={styles.scoreText}>{score}分</Text>
+                    <Text style={styles.reasonText} numberOfLines={1}>{reason}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View style={styles.headerRight}>
+              {diyMode ? (
+                <TouchableOpacity style={[styles.headerBtn, styles.headerBtnActive]} onPress={exitDiy} activeOpacity={0.7}>
+                  <Ionicons name="close" size={18} color={theme.colors.primary} />
+                </TouchableOpacity>
+              ) : (
+                <>
+                  {hasTodayRecord && (
+                    <TouchableOpacity style={styles.headerBtn} onPress={() => setRecMode(false)} activeOpacity={0.7}>
+                      <Ionicons name="arrow-back" size={16} color={theme.colors.textSecondary} />
+                    </TouchableOpacity>
+                  )}
+                  <TouchableOpacity style={styles.headerBtn} onPress={enterDiy} activeOpacity={0.7}>
+                    <Ionicons name="color-wand-outline" size={16} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.headerBtn} onPress={onRefresh} activeOpacity={0.7}>
+                    <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
+                    <View style={styles.refreshBadge}>
+                      <Text style={styles.refreshBadgeText}>{recIndex + 1}/{recTotal}</Text>
+                    </View>
+                  </TouchableOpacity>
+                </>
               )}
             </View>
-          ))}
-        </View>
+          </View>
 
-        <View style={styles.replaceCol}>
-          <Text style={styles.replaceTitle}>换一件</Text>
-          {gridItems.map((item, i) => {
-            if (!item) return null;
-            return (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.replaceItem}
-                onPress={() => handleReplace(i)}
-                activeOpacity={0.7}
-              >
-                <Image
-                  source={{ uri: item.thumbnailUri || item.imageUri }}
-                  style={styles.replaceItemThumb}
-                />
-                <View style={styles.replaceArrow}>
-                  <Ionicons name="refresh" size={12} color={theme.colors.textTertiary} />
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-      </View>
+          {/* ── 左网格 + 右替换栏 ── */}
+          <View style={styles.body}>
+            <View style={styles.grid}>
+              {displayGrid.map((item, i) => {
+                if (diyMode) {
+                  if (item) {
+                    return (
+                      <View key={item.id} style={[styles.cell, { backgroundColor: theme.colors.background }]}>
+                        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.cellImage} />
+                        <TouchableOpacity style={styles.cellRemove} onPress={() => removeDiySlot(i)}>
+                          <Ionicons name="close" size={11} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    );
+                  }
+                  return (
+                    <TouchableOpacity
+                      key={`diy-${i}`}
+                      style={[styles.cell, styles.cellEmpty]}
+                      onPress={() => openPicker(i)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="add" size={20} color={theme.colors.textTertiary} />
+                      <Text style={styles.cellEmptyLabel}>{SLOT_CATEGORIES[i]}</Text>
+                    </TouchableOpacity>
+                  );
+                }
+                return (
+                  <View key={item?.id ?? `empty-${i}`} style={styles.cell}>
+                    {item && (
+                      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.cellImage} />
+                    )}
+                  </View>
+                );
+              })}
+            </View>
 
-      {/* ── 操作按钮 ── */}
-      <View style={styles.actionsRow}>
-        <TouchableOpacity
-          style={[styles.wearButton, isLoading && styles.wearButtonDisabled]}
-          onPress={handlePressWear}
-          disabled={isLoading}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="checkmark-outline" size={16} color={theme.colors.white} />
-          <Text style={styles.wearButtonText}>{isLoading ? '记录中...' : '就穿这套'}</Text>
-        </TouchableOpacity>
+            <View style={styles.replaceCol}>
+              {diyMode ? (
+                <>
+                  <Text style={styles.replaceTitle}>已选 {diySlots.filter(Boolean).length} 件</Text>
+                  {SLOT_CATEGORIES.map((cat, i) => {
+                    const item = diySlots[i];
+                    return (
+                      <TouchableOpacity
+                        key={i}
+                        style={styles.replaceItem}
+                        onPress={() => openPicker(i)}
+                        activeOpacity={0.7}
+                      >
+                        {item ? (
+                          <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.replaceItemThumb} />
+                        ) : (
+                          <View style={[styles.replaceItemThumb, { backgroundColor: theme.colors.background, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name="add" size={14} color={theme.colors.textTertiary} />
+                          </View>
+                        )}
+                        <View style={styles.replaceArrow}>
+                          <Ionicons name={item ? 'swap-horizontal' : 'add-circle-outline'} size={12} color={theme.colors.textTertiary} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              ) : (
+                <>
+                  <Text style={styles.replaceTitle}>换一件</Text>
+                  {gridItems.map((item, i) => {
+                    if (!item) return null;
+                    return (
+                      <TouchableOpacity
+                        key={item.id}
+                        style={styles.replaceItem}
+                        onPress={() => handleReplace(i)}
+                        activeOpacity={0.7}
+                      >
+                        <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.replaceItemThumb} />
+                        <View style={styles.replaceArrow}>
+                          <Ionicons name="refresh" size={12} color={theme.colors.textTertiary} />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </>
+              )}
+            </View>
+          </View>
 
-        <TouchableOpacity style={styles.iconBtn} onPress={onSaveAsOutfit} activeOpacity={0.7}>
-          <Ionicons name="bookmark-outline" size={18} color={theme.colors.textSecondary} />
-        </TouchableOpacity>
+          {/* ── 操作按钮 ── */}
+          <View style={styles.actionsRow}>
+            <TouchableOpacity
+              style={[styles.wearButton, isLoading && styles.wearButtonDisabled]}
+              onPress={handlePressWear}
+              disabled={isLoading}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="checkmark-outline" size={16} color={theme.colors.white} />
+              <Text style={styles.wearButtonText}>{isLoading ? '记录中...' : '就穿这套'}</Text>
+            </TouchableOpacity>
 
-        <TouchableOpacity style={[styles.iconBtn, styles.iconBtnPrimary]} onPress={onCalendar} activeOpacity={0.7}>
-          <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
-        </TouchableOpacity>
-      </View>
+            <TouchableOpacity style={styles.iconBtn} onPress={() => onSaveAsOutfit(diyMode ? diySlots.filter(Boolean) as ClothingItem[] : undefined)} activeOpacity={0.7}>
+              <Ionicons name="bookmark-outline" size={18} color={theme.colors.textSecondary} />
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.iconBtn, styles.iconBtnPrimary]} onPress={onCalendar} activeOpacity={0.7}>
+              <Ionicons name="calendar-outline" size={18} color={theme.colors.primary} />
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
 
       <OutfitConfirmModal
         visible={showModal}
         onClose={() => setShowModal(false)}
         onConfirm={handleWear}
         todayThumbnails={todayThumbnails}
-        recItems={items}
+        recItems={diyMode ? diySlots.filter(Boolean) as ClothingItem[] : items}
       />
+
+      {/* ── 单品选择器 ── */}
+      <Modal visible={pickerSlot !== null} animationType="slide" transparent onRequestClose={closePicker}>
+        <View style={styles.pickerOverlay}>
+          <TouchableOpacity style={styles.pickerBackdrop} activeOpacity={1} onPress={closePicker} />
+          <View style={styles.pickerSheet}>
+            <View style={styles.pickerHandle} />
+            <View style={styles.pickerHeader}>
+              <Text style={styles.pickerTitle}>选择{pickerSlot !== null ? SLOT_CATEGORIES[pickerSlot] : ''}</Text>
+              <TouchableOpacity style={styles.pickerClose} onPress={closePicker}>
+                <Ionicons name="close" size={22} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+              <View style={styles.pickerGrid}>
+                {/* 清空选项 */}
+                {diySlots[pickerSlot!] && (
+                  <TouchableOpacity
+                    style={styles.pickerEmpty}
+                    onPress={() => { removeDiySlot(pickerSlot!); closePicker(); }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name="remove-circle-outline" size={20} color={theme.colors.textTertiary} />
+                  </TouchableOpacity>
+                )}
+                {pickerItems.map(item => {
+                  const selected = diySlots.some(s => s?.id === item.id);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={[styles.pickerItem, selected && styles.pickerItemSelected]}
+                      onPress={() => pickItem(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Image source={{ uri: item.thumbnailUri || item.imageUri }} style={styles.pickerItemImg} />
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+              <View style={{ height: 20 }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
