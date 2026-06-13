@@ -47,18 +47,6 @@ const PALETTE = {
   warning:     '#D4A94A',
 };
 
-const PARENT_ICONS: Record<string, string> = {
-  '上装': 'shirt-outline',
-  '下装': 'layers-outline',
-  '外套': 'jacket-outline',
-  '连衣裙': 'woman-outline',
-  '鞋': 'footsteps-outline',
-  '配饰': 'glasses-outline',
-  '包包': 'bag-outline',
-};
-
-const CATEGORY_COLORS = [PALETTE.primary, PALETTE.accentRose, PALETTE.accentBlue, PALETTE.accentTaupe];
-
 /** 温度区间 → 宜穿提示文字（固定映射） */
 function getTempHint(temp: number): string {
   if (temp < 5) return '宜厚款';
@@ -308,64 +296,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
-
-  // ── Recent additions ──
-  recentStrip: {
-    paddingHorizontal: CARD_H_PADDING,
-    gap: 10,
-  },
-  recentItem: {
-    width: 80,
-    alignItems: 'center',
-    gap: 6,
-  },
-  recentImageWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 14,
-    backgroundColor: PALETTE.wardrobeBg,
-    overflow: 'hidden',
-    shadowColor: PALETTE.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  recentImage: {
-    width: 76,
-    height: 76,
-    borderRadius: 14,
-  },
-  recentPlaceholder: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: PALETTE.wardrobeBg,
-  },
-  recentLabel: {
-    fontSize: 11,
-    color: PALETTE.textSecondary,
-    textAlign: 'center',
-  },
-
-  // ── Empty state ──
-  emptyState: {
-    marginHorizontal: CARD_H_PADDING,
-    backgroundColor: PALETTE.white,
-    borderRadius: 16,
-    padding: 30,
-    alignItems: 'center',
-    gap: 8,
-    shadowColor: PALETTE.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: PALETTE.textTertiary,
-  },
 });
 
 export function HomeScreen() {
@@ -415,15 +345,6 @@ export function HomeScreen() {
   }, [clothing]);
 
   const totalCount = clothing.length;
-
-  // Recently added (newest 8)
-  const recentAdditions = useMemo(
-    () =>
-      [...clothing]
-        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 8),
-    [clothing],
-  );
 
   const attributeTips = useMemo(() => analyzeAttributeGaps(clothing), [clothing]);
 
@@ -641,7 +562,6 @@ export function HomeScreen() {
     }, 400);
   }, [recommendation, addWearRecords, deleteWearRecordsByDate, weather, handleSaveAsOutfit]);
 
-  const goToWardrobe = () => navigation.navigate('衣橱');
   const goToCalendar = () => navigation.navigate('WearCalendar');
 
   const surveyPrefs = useMemo(() => {
@@ -784,52 +704,6 @@ export function HomeScreen() {
                 ? '去添加你的第一件衣服吧'
                 : '需要更多类型单品（如上装+下装）来生成搭配'}
             </Text>
-          </View>
-        )}
-
-        {/* ── 最近添加 ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>最近添加</Text>
-          <TouchableOpacity onPress={goToWardrobe} activeOpacity={0.7}>
-            <Text style={styles.sectionLink}>更多 &gt;</Text>
-          </TouchableOpacity>
-        </View>
-        {recentAdditions.length > 0 ? (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.recentStrip}
-          >
-            {recentAdditions.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.recentItem}
-                activeOpacity={0.7}
-                onPress={() => navigation.navigate('ClothingDetail', { id: item.id })}
-              >
-                <View style={styles.recentImageWrap}>
-                  {item.thumbnailUri ? (
-                    <Image source={{ uri: item.thumbnailUri }} style={styles.recentImage} />
-                  ) : (
-                    <View style={styles.recentPlaceholder}>
-                      <Ionicons
-                        name={(PARENT_ICONS[item.parentType] || 'shirt-outline') as any}
-                        size={26}
-                        color={PALETTE.primaryLight}
-                      />
-                    </View>
-                  )}
-                </View>
-                <Text style={styles.recentLabel} numberOfLines={1}>
-                  {item.parentType || item.type || '单品'}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        ) : (
-          <View style={styles.emptyState}>
-            <Ionicons name="add-circle-outline" size={28} color={PALETTE.border} />
-            <Text style={styles.emptyText}>去添加你的第一件衣服吧</Text>
           </View>
         )}
       </ScrollView>
