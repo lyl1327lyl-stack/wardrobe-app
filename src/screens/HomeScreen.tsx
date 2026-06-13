@@ -58,6 +58,17 @@ const PARENT_ICONS: Record<string, string> = {
 
 const CATEGORY_COLORS = [PALETTE.primary, PALETTE.accentRose, PALETTE.accentBlue, PALETTE.accentTaupe];
 
+/** 温度区间 → 宜穿提示文字（固定映射） */
+function getTempHint(temp: number): string {
+  if (temp < 5) return '宜厚款';
+  if (temp < 10) return '宜厚款';
+  if (temp < 15) return '适中外套';
+  if (temp < 20) return '薄外套';
+  if (temp < 25) return '宜薄款';
+  if (temp < 30) return '清凉短袖';
+  return '透气清凉';
+}
+
 function todayDateStr(): string {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -625,7 +636,7 @@ export function HomeScreen() {
               size={14}
               color={PALETTE.textSecondary}
             />
-            <Text style={styles.headerWeatherText}>{weather.temperature}°C  {weather.city}</Text>
+            <Text style={styles.headerWeatherText}>{weather.temperature}°C · {getTempHint(weather.temperature)}</Text>
           </View>
         )}
       </View>
