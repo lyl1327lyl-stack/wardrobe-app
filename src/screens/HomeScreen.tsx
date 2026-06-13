@@ -100,9 +100,6 @@ async function buildRecentlyWornDays(): Promise<Map<number, number>> {
 
 
 
-// Illustration aspect ratio: 1536 / 1024 = 1.5
-const ILLUSTRATION_ASPECT = 1536 / 1024;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -168,7 +165,7 @@ const styles = StyleSheet.create({
   },
   illustration: {
     width: CARD_WIDTH,
-    height: CARD_WIDTH / ILLUSTRATION_ASPECT,
+    height: 80,
     resizeMode: 'cover',
   },
   illustrationOverlay: {
