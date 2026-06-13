@@ -44,6 +44,7 @@ const PALETTE = {
   accentRose:  '#D4A99A',
   accentBlue:  '#A0B4C8',
   accentTaupe: '#C4B098',
+  warning:     '#D4A94A',
 };
 
 const PARENT_ICONS: Record<string, string> = {
@@ -185,6 +186,35 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+  statsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 14,
+  },
+  statsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  statsHeaderIcon: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    backgroundColor: PALETTE.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  statsHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: PALETTE.text,
+  },
+  statsHeaderLink: {
+    fontSize: 12,
+    color: PALETTE.primary,
+    fontWeight: '500',
+  },
   categoryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -192,9 +222,6 @@ const styles = StyleSheet.create({
   categoryItem: {
     alignItems: 'center',
     flex: 1,
-  },
-  categoryIconWrap: {
-    display: 'none' as 'none',
   },
   categoryCount: {
     fontSize: 22,
@@ -211,20 +238,24 @@ const styles = StyleSheet.create({
     backgroundColor: PALETTE.border,
     marginVertical: 14,
   },
-  totalRow: {
+  insightsRow: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  insightItem: {
     alignItems: 'center',
-    gap: 6,
+    flex: 1,
   },
-  totalLabel: {
-    fontSize: 13,
-    color: PALETTE.textSecondary,
-  },
-  totalCount: {
-    fontSize: 16,
+  insightValue: {
+    fontSize: 15,
     fontWeight: '700',
     color: PALETTE.primary,
+  },
+  insightLabel: {
+    fontSize: 11,
+    color: PALETTE.textSecondary,
+    marginTop: 2,
   },
 
   // ── Section header ──
@@ -395,6 +426,23 @@ export function HomeScreen() {
   );
 
   const attributeTips = useMemo(() => analyzeAttributeGaps(clothing), [clothing]);
+
+  // 统计扩展维度：总价、平均穿着、沉睡件数
+  const wardrobeInsights = useMemo(() => {
+    const active = clothing.filter(c => !c.deletedAt);
+    const totalPrice = active.reduce((sum, c) => sum + (c.price || 0), 0);
+    const avgWearCount = active.length > 0
+      ? active.reduce((sum, c) => sum + (c.wearCount || 0), 0) / active.length
+      : 0;
+    const SLEEP_THRESHOLD_DAYS = 30;
+    const now = Date.now();
+    const sleepingCount = active.filter(c => {
+      if (!c.lastWornAt) return true; // 从未穿过
+      const days = Math.floor((now - new Date(c.lastWornAt).getTime()) / (1000 * 60 * 60 * 24));
+      return days > SLEEP_THRESHOLD_DAYS;
+    }).length;
+    return { totalPrice, avgWearCount, sleepingCount };
+  }, [clothing]);
 
   const loadRecommendations = useCallback(async () => {
     const w = await getWeather();
@@ -651,30 +699,52 @@ export function HomeScreen() {
           />
         </View>
 
-        {/* ── 数据统计条 ── */}
-        <View style={styles.statsCard}>
+        {/* ── 数据统计卡（可点击跳转统计页）── */}
+        <TouchableOpacity
+          style={styles.statsCard}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('统计')}
+        >
+          <View style={styles.statsHeader}>
+            <View style={styles.statsHeaderLeft}>
+              <View style={styles.statsHeaderIcon}>
+                <Ionicons name="bar-chart-outline" size={14} color={PALETTE.primary} />
+              </View>
+              <Text style={styles.statsHeaderTitle}>衣橱概况</Text>
+            </View>
+            <Text style={styles.statsHeaderLink}>查看详情 ›</Text>
+          </View>
+
           <View style={styles.categoryRow}>
-            {categoryStats.slice(0, 4).map(([cat, count], i) => (
+            {categoryStats.slice(0, 4).map(([cat, count]) => (
               <View key={cat} style={styles.categoryItem}>
-                <View style={[styles.categoryIconWrap, { backgroundColor: CATEGORY_COLORS[i % CATEGORY_COLORS.length] + '20' }]}>
-                  <Ionicons
-                    name={(PARENT_ICONS[cat] || 'grid-outline') as any}
-                    size={18}
-                    color={CATEGORY_COLORS[i % CATEGORY_COLORS.length]}
-                  />
-                </View>
                 <Text style={styles.categoryCount}>{count}</Text>
                 <Text style={styles.categoryName}>{cat}</Text>
               </View>
             ))}
           </View>
+
           <View style={styles.statsDivider} />
-          <View style={styles.totalRow}>
-            <Ionicons name="shirt-outline" size={14} color={PALETTE.primary} />
-            <Text style={styles.totalLabel}>衣橱总数</Text>
-            <Text style={styles.totalCount}>{totalCount} 件</Text>
+
+          <View style={styles.insightsRow}>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightValue}>¥{wardrobeInsights.totalPrice.toLocaleString()}</Text>
+              <Text style={styles.insightLabel}>总价</Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightValue}>{wardrobeInsights.avgWearCount.toFixed(1)}</Text>
+              <Text style={styles.insightLabel}>次/件</Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Text style={[styles.insightValue, { color: PALETTE.warning }]}>{wardrobeInsights.sleepingCount}</Text>
+              <Text style={styles.insightLabel}>沉睡件</Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightValue}>{totalCount}</Text>
+              <Text style={styles.insightLabel}>总数</Text>
+            </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* ── 今日穿搭推荐 ── */}
         <View style={styles.sectionHeader}>
