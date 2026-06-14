@@ -18,6 +18,7 @@ import {
   PanGestureHandler,
   PinchGestureHandler,
   RotationGestureHandler,
+  TapGestureHandler,
   State,
 } from 'react-native-gesture-handler';
 import { generateOutfitThumbnail } from '../../utils/generateOutfitThumbnail';
@@ -59,6 +60,7 @@ interface DraggableItemProps {
   onDelete: (clothingId: number) => void;
   isSelected: boolean;
   onSelect: () => void;
+  onGestureStart?: () => void;
   isDeleted?: boolean;
   styles: any;
   theme: any;
@@ -72,6 +74,7 @@ function DraggableItem({
   onDelete,
   isSelected,
   onSelect,
+  onGestureStart,
   isDeleted,
   styles,
   theme,
@@ -100,6 +103,12 @@ function DraggableItem({
     setRotation(item.rotation);
   }, [item.rotation]);
 
+  const onTapStateChange = useCallback((event: any) => {
+    if (event.nativeEvent.state === State.ACTIVE) {
+      onSelect();
+    }
+  }, [onSelect]);
+
   const onPanGestureEvent = useCallback((event: any) => {
     const maxSize = BASE_IMAGE_SIZE * scale;
     const newX = Math.max(0, Math.min(canvasWidth - maxSize, startPosition.current.x + event.nativeEvent.translationX));
@@ -109,12 +118,13 @@ function DraggableItem({
 
   const onPanHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
+      onGestureStart?.();
       onSelect();
       startPosition.current = { x: position.x, y: position.y };
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { x: position.x, y: position.y });
     }
-  }, [item.clothingId, position.x, position.y, onSelect, onUpdate]);
+  }, [item.clothingId, position.x, position.y, onSelect, onUpdate, onGestureStart]);
 
   const onPinchGestureEvent = useCallback((event: any) => {
     const newScale = Math.max(0.5, Math.min(3, startScale.current * event.nativeEvent.scale));
@@ -123,11 +133,12 @@ function DraggableItem({
 
   const onPinchHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
+      onGestureStart?.();
       startScale.current = scale;
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { scale });
     }
-  }, [item.clothingId, scale, onUpdate]);
+  }, [item.clothingId, scale, onUpdate, onGestureStart]);
 
   const onRotationGestureEvent = useCallback((event: any) => {
     const deg = startRotation.current + (event.nativeEvent.rotation * 180 / Math.PI);
@@ -136,11 +147,12 @@ function DraggableItem({
 
   const onRotationHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
+      onGestureStart?.();
       startRotation.current = rotation;
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { rotation: ((rotation % 360) + 360) % 360 });
     }
-  }, [item.clothingId, rotation, onUpdate]);
+  }, [item.clothingId, rotation, onUpdate, onGestureStart]);
 
   // Rotate handle — drag from bottom-right corner to rotate
   const handlePanRef = useRef<any>(null);
@@ -157,22 +169,24 @@ function DraggableItem({
 
   const onHandlePanStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
+      onGestureStart?.();
       onSelect();
       handleStartRotation.current = rotation;
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { rotation: ((rotation % 360) + 360) % 360 });
     }
-  }, [item.clothingId, rotation, onSelect, onUpdate]);
+  }, [item.clothingId, rotation, onSelect, onUpdate, onGestureStart]);
 
   const imageSize = BASE_IMAGE_SIZE * scale;
 
   return (
-    <RotationGestureHandler
-      ref={rotationRef}
-      simultaneousHandlers={[panRef, pinchRef]}
-      onGestureEvent={onRotationGestureEvent}
-      onHandlerStateChange={onRotationHandlerStateChange}
-    >
+    <TapGestureHandler onHandlerStateChange={onTapStateChange}>
+      <RotationGestureHandler
+        ref={rotationRef}
+        simultaneousHandlers={[panRef, pinchRef]}
+        onGestureEvent={onRotationGestureEvent}
+        onHandlerStateChange={onRotationHandlerStateChange}
+      >
       <PinchGestureHandler
         ref={pinchRef}
         simultaneousHandlers={[panRef, rotationRef]}
@@ -245,6 +259,7 @@ function DraggableItem({
         </PanGestureHandler>
       </PinchGestureHandler>
     </RotationGestureHandler>
+    </TapGestureHandler>
   );
 }
 
@@ -632,6 +647,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
                 onDelete={handleDelete}
                 isSelected={selectedItemId === item.clothingId}
                 onSelect={() => handleSelect(item.clothingId)}
+                onGestureStart={saveToHistory}
                 isDeleted={deletedClothingIds.includes(item.clothingId)}
                 styles={styles}
                 theme={theme}
