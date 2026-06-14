@@ -402,7 +402,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
             onPress: () => navigation.dispatch(e.data.action),
           },
           {
-            text: '保存',
+            text: '填写并保存',
             onPress: () => handleSaveRef.current(),
           },
         ],
