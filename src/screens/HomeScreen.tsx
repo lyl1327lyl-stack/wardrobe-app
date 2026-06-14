@@ -24,30 +24,12 @@ import { analyzeAttributeGaps, AttributeTip } from '../services/attributeTips';
 import { getWeather } from '../services/weatherService';
 import { getWearRecordsByDate, getWearRecordsByDateRange } from '../db/wearRecords';
 import { ClothingItem, OutfitRecommendation, Weather, WearRecord } from '../types';
+import { useTheme } from '../hooks/useTheme';
+import { Theme } from '../utils/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_H_PADDING * 2;
-
-// ── Warm MUJI-style palette ──
-const PALETTE = {
-  bg:          '#FAF7F2',
-  card:        '#FFFFFF',
-  text:        '#3D3226',
-  textSecondary: '#9B8E82',
-  textTertiary:  '#C4B8AB',
-  primary:     '#B8956A',
-  primaryLight:'#E8D5C0',
-  border:      '#E8DED2',
-  wardrobeBg:  '#F5EDE3',
-  shadow:      'rgba(139,115,85,0.10)',
-  white:       '#FFFFFF',
-  accentGreen: '#8BA888',
-  accentRose:  '#D4A99A',
-  accentBlue:  '#A0B4C8',
-  accentTaupe: '#C4B098',
-  warning:     '#D4A94A',
-};
 
 /** 温度区间 → 宜穿提示文字（固定映射） */
 function getTempHint(temp: number): string {
@@ -90,10 +72,10 @@ async function buildRecentlyWornDays(): Promise<Map<number, number>> {
 
 
 
-const styles = StyleSheet.create({
+const makeStyles = (theme: Theme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: PALETTE.bg,
+    backgroundColor: theme.colors.background,
   },
   scrollContent: {
     paddingBottom: 40,
@@ -107,7 +89,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: CARD_H_PADDING,
     paddingTop: 56,
     paddingBottom: 14,
-    backgroundColor: PALETTE.bg,
+    backgroundColor: theme.colors.background,
     zIndex: 10,
   },
   headerTitleRow: {
@@ -118,26 +100,26 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 22,
     fontWeight: '600',
-    color: PALETTE.text,
+    color: theme.colors.text,
     letterSpacing: -0.3,
   },
   headerWeather: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    backgroundColor: PALETTE.white,
+    backgroundColor: theme.colors.white,
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 16,
-    shadowColor: PALETTE.shadow,
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
   },
   headerWeatherText: {
     fontSize: 12,
-    color: PALETTE.textSecondary,
+    color: theme.colors.textSecondary,
     fontWeight: '500',
   },
 
@@ -145,12 +127,12 @@ const styles = StyleSheet.create({
   statsCard: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 16,
-    backgroundColor: PALETTE.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 16,
     padding: 18,
-    shadowColor: PALETTE.shadow,
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 3,
   },
@@ -169,18 +151,18 @@ const styles = StyleSheet.create({
     width: 26,
     height: 26,
     borderRadius: 8,
-    backgroundColor: PALETTE.primaryLight,
+    backgroundColor: theme.colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   statsHeaderTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: PALETTE.text,
+    color: theme.colors.text,
   },
   statsHeaderLink: {
     fontSize: 12,
-    color: PALETTE.primary,
+    color: theme.colors.primary,
     fontWeight: '500',
   },
   categoryRow: {
@@ -194,16 +176,16 @@ const styles = StyleSheet.create({
   categoryCount: {
     fontSize: 22,
     fontWeight: '700',
-    color: PALETTE.text,
+    color: theme.colors.text,
   },
   categoryName: {
     fontSize: 11,
-    color: PALETTE.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
   statsDivider: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: PALETTE.border,
+    backgroundColor: theme.colors.border,
     marginVertical: 14,
   },
   insightsRow: {
@@ -218,11 +200,11 @@ const styles = StyleSheet.create({
   insightValue: {
     fontSize: 15,
     fontWeight: '700',
-    color: PALETTE.primary,
+    color: theme.colors.primary,
   },
   insightLabel: {
     fontSize: 11,
-    color: PALETTE.textSecondary,
+    color: theme.colors.textSecondary,
     marginTop: 2,
   },
 
@@ -230,14 +212,14 @@ const styles = StyleSheet.create({
   quickActions: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 12,
-    backgroundColor: PALETTE.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 16,
     paddingVertical: 14,
     paddingHorizontal: 6,
     flexDirection: 'row',
-    shadowColor: PALETTE.shadow,
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 3,
   },
@@ -251,14 +233,14 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: PALETTE.primaryLight,
+    backgroundColor: theme.colors.primaryLight,
     justifyContent: 'center',
     alignItems: 'center',
   },
   quickActionLabel: {
     fontSize: 11,
     fontWeight: '500',
-    color: PALETTE.text,
+    color: theme.colors.text,
   },
 
   // ── Section header ──
@@ -273,12 +255,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 17,
     fontWeight: '600',
-    color: PALETTE.text,
+    color: theme.colors.text,
     letterSpacing: -0.2,
   },
   sectionLink: {
     fontSize: 13,
-    color: PALETTE.primary,
+    color: theme.colors.primary,
     fontWeight: '500',
   },
 
@@ -286,28 +268,28 @@ const styles = StyleSheet.create({
   recLoading: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 16,
-    backgroundColor: PALETTE.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 16,
     padding: 40,
     alignItems: 'center',
     gap: 10,
-    shadowColor: PALETTE.shadow,
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 3,
   },
   recEmpty: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 16,
-    backgroundColor: PALETTE.white,
+    backgroundColor: theme.colors.white,
     borderRadius: 16,
     padding: 30,
     alignItems: 'center',
     gap: 8,
-    shadowColor: PALETTE.shadow,
+    shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 1,
+    shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 3,
   },
@@ -315,6 +297,8 @@ const styles = StyleSheet.create({
 
 export function HomeScreen() {
   const navigation = useNavigation<any>();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const clothing = useWardrobeStore(s => s.clothing);
   const outfits = useWardrobeStore(s => s.outfits);
@@ -582,7 +566,7 @@ export function HomeScreen() {
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerTitleRow} activeOpacity={0.7}>
           <Text style={styles.headerTitle}>我的衣橱</Text>
-          <Ionicons name="chevron-down" size={16} color={PALETTE.textSecondary} />
+          <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
         </TouchableOpacity>
         {weather && (
           <View style={styles.headerWeather}>
@@ -596,7 +580,7 @@ export function HomeScreen() {
                 'cloudy'
               }
               size={14}
-              color={PALETTE.textSecondary}
+              color={theme.colors.textSecondary}
             />
             <Text style={styles.headerWeatherText}>{weather.temperature}°C · {getTempHint(weather.temperature)}</Text>
           </View>
@@ -617,7 +601,7 @@ export function HomeScreen() {
           <View style={styles.statsHeader}>
             <View style={styles.statsHeaderLeft}>
               <View style={styles.statsHeaderIcon}>
-                <Ionicons name="bar-chart-outline" size={14} color={PALETTE.primary} />
+                <Ionicons name="bar-chart-outline" size={14} color={theme.colors.primary} />
               </View>
               <Text style={styles.statsHeaderTitle}>衣橱概况</Text>
             </View>
@@ -645,7 +629,7 @@ export function HomeScreen() {
               <Text style={styles.insightLabel}>次/件</Text>
             </View>
             <View style={styles.insightItem}>
-              <Text style={[styles.insightValue, { color: PALETTE.warning }]}>{wardrobeInsights.sleepingCount}</Text>
+              <Text style={[styles.insightValue, { color: theme.colors.warning }]}>{wardrobeInsights.sleepingCount}</Text>
               <Text style={styles.insightLabel}>沉睡件</Text>
             </View>
             <View style={styles.insightItem}>
@@ -659,28 +643,28 @@ export function HomeScreen() {
         <View style={styles.quickActions}>
           <TouchableOpacity style={styles.quickAction} onPress={() => setShowWearPicker(true)} activeOpacity={0.7}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="create-outline" size={20} color={PALETTE.primary} />
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
             </View>
             <Text style={styles.quickActionLabel}>记录穿搭</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('AddClothing')} activeOpacity={0.7}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="add-circle-outline" size={20} color={PALETTE.primary} />
+              <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
             </View>
             <Text style={styles.quickActionLabel}>添加单品</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickAction} onPress={handleNewOutfit} activeOpacity={0.7}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="grid-outline" size={20} color={PALETTE.primary} />
+              <Ionicons name="grid-outline" size={20} color={theme.colors.primary} />
             </View>
             <Text style={styles.quickActionLabel}>新建搭配</Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('WearCalendar')} activeOpacity={0.7}>
             <View style={styles.quickActionIcon}>
-              <Ionicons name="calendar-outline" size={20} color={PALETTE.primary} />
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
             </View>
             <Text style={styles.quickActionLabel}>穿搭日历</Text>
           </TouchableOpacity>
@@ -694,8 +678,8 @@ export function HomeScreen() {
 
         {recLoading ? (
           <View style={styles.recLoading}>
-            <ActivityIndicator size="small" color={PALETTE.primary} />
-            <Text style={{ color: PALETTE.textTertiary, fontSize: 13 }}>正在生成推荐...</Text>
+            <ActivityIndicator size="small" color={theme.colors.primary} />
+            <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>正在生成推荐...</Text>
           </View>
         ) : recommendation ? (
           <OutfitRecommendationCard
@@ -712,8 +696,8 @@ export function HomeScreen() {
           />
         ) : (
           <View style={styles.recEmpty}>
-            <Ionicons name="shirt-outline" size={28} color={PALETTE.border} />
-            <Text style={{ color: PALETTE.textTertiary, fontSize: 13 }}>
+            <Ionicons name="shirt-outline" size={28} color={theme.colors.border} />
+            <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>
               {totalCount === 0
                 ? '去添加你的第一件衣服吧'
                 : '需要更多类型单品（如上装+下装）来生成搭配'}
