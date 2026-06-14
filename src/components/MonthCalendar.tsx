@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem } from '../types';
+import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -24,12 +25,10 @@ export interface MonthCalendarProps {
   onSelectDate: (dateStr: string) => void;
   onPrevMonth: () => void;
   onNextMonth: () => void;
-  theme: Theme;
-  /** 搭配匹配信息：dateStr → { outfitId, outfitName, outfitThumb } */
-  outfitMatchMap?: Record<string, { outfitId: number; outfitName: string; outfitThumb: string }>;
+  outfitMatchMap?: Record<string, { outfitId: number; outfitName: string; outfitThumb: string; extraItemIds?: number[] }>;
 }
 
-function getDaysInMonth(year: number, month: number): number {
+export function getDaysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }
 
@@ -171,9 +170,9 @@ export function MonthCalendar({
   onSelectDate,
   onPrevMonth,
   onNextMonth,
-  theme,
   outfitMatchMap,
 }: MonthCalendarProps) {
+  const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
   const weekDays = ['一', '二', '三', '四', '五', '六', '日'];
 

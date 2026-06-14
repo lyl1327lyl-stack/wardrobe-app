@@ -14,7 +14,7 @@ import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import * as wearRecordsDb from '../db/wearRecords';
-import { MonthCalendar } from '../components/MonthCalendar';
+import { MonthCalendar, getDaysInMonth } from '../components/MonthCalendar';
 import { WearCalendarSheet } from '../components/WearCalendarSheet';
 
 const makeStyles = (theme: Theme) =>
@@ -153,8 +153,6 @@ export function WearCalendarScreen() {
     }
     return map;
   }, [wearData, outfits]);
-
-  const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
 
   const loadMonthData = useCallback(async () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -312,7 +310,6 @@ export function WearCalendarScreen() {
           onSelectDate={handleDayPress}
           onPrevMonth={goToPrevMonth}
           onNextMonth={goToNextMonth}
-          theme={theme}
           outfitMatchMap={outfitMatchMap}
         />
 
