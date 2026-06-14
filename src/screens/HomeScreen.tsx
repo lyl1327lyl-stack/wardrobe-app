@@ -16,7 +16,6 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { usePreferenceStore } from '../store/preferenceStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
 import { RecentOutfitCard } from '../components/RecentOutfitCard';
-import { ClothingPickerModal } from '../components/ClothingPickerModal';
 import { PreferenceSurveySheet } from '../components/PreferenceSurveySheet';
 import { generateRecommendations } from '../services/outfitRecommender';
 import { analyzeAttributeGaps, AttributeTip } from '../services/attributeTips';
@@ -289,7 +288,6 @@ export function HomeScreen() {
   const [recLoading, setRecLoading] = useState(true);
   const [todayRecords, setTodayRecords] = useState<WearRecord[]>([]);
   const [showSurveySheet, setShowSurveySheet] = useState(false);
-  const [showWearPicker, setShowWearPicker] = useState(false);
 
   // 最近推荐过的单品 ID（有上限滑动窗口，避免集合膨胀导致新鲜度失效）
   const recentRecommendedIdsRef = useRef<number[]>([]);
@@ -503,17 +501,6 @@ export function HomeScreen() {
     setTodayRecords(records);
   }, [recommendation, addWearRecords, deleteWearRecordsByDate]);
 
-  /** 手动记录今日穿搭：用选择器选今天穿的单品，确认后替换今日记录 */
-  const handleManualWear = useCallback(async (selectedIds: number[]) => {
-    setShowWearPicker(false);
-    await deleteWearRecordsByDate(todayDateStr());
-    if (selectedIds.length > 0) {
-      await addWearRecords(selectedIds, todayDateStr());
-    }
-    const records = await getWearRecordsByDate(todayDateStr());
-    setTodayRecords(records);
-  }, [addWearRecords, deleteWearRecordsByDate]);
-
   /** 新建搭配：重置搭配编辑器 store 后跳转 */
   const handleNewOutfit = useCallback(() => {
     const outfitStore = require('../store/outfitStore').useOutfitStore.getState();
@@ -619,7 +606,7 @@ export function HomeScreen() {
 
         {/* ── 快捷入口 ── */}
         <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickAction} onPress={() => setShowWearPicker(true)} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('RecordWear')} activeOpacity={0.7}>
             <View style={styles.quickActionIcon}>
               <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
             </View>
@@ -692,12 +679,6 @@ export function HomeScreen() {
         initialPrefs={surveyPrefs}
       />
 
-      <ClothingPickerModal
-        visible={showWearPicker}
-        onClose={() => setShowWearPicker(false)}
-        onConfirm={handleManualWear}
-        alreadyAddedIds={todayRecords.map(r => r.clothingId)}
-      />
     </View>
   );
 }
