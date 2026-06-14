@@ -664,7 +664,7 @@ export function HomeScreen() {
             <Text style={styles.quickActionLabel}>记录穿搭</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('AddClothing')} activeOpacity={0.7}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('衣橱', { screen: 'AddClothing' })} activeOpacity={0.7}>
             <View style={styles.quickActionIcon}>
               <Ionicons name="add-circle-outline" size={20} color={PALETTE.primary} />
             </View>
