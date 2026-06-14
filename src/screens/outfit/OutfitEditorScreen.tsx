@@ -26,6 +26,9 @@ import { useTheme } from '../../hooks/useTheme';
 import { useOutfitStore, CanvasItem, CanvasBackground } from '../../store/outfitStore';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
+import { OutfitAttributesSheet, OutfitAttributes } from '../../components/OutfitAttributesSheet';
+import { useCustomOptionsStore } from '../../store/customOptionsStore';
+import { ClothingItem } from '../../types';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CANVAS_PADDING = 10;
@@ -282,6 +285,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
+  const [showAttrSheet, setShowAttrSheet] = useState(false);
+  const customSeasons = useCustomOptionsStore(s => s.seasons);
 
   // 检测画板中已删除的单品
   const deletedClothingIds = useMemo(() => {
@@ -293,6 +298,46 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const handleClearDeleted = useCallback(() => {
     deletedClothingIds.forEach(id => removeCanvasItem(id));
   }, [deletedClothingIds, removeCanvasItem]);
+
+  // 保存前预填属性：编辑模式读 outfit 现值；新建模式推断（季节交集、标签并集）
+  const prefillAttributes = useMemo<OutfitAttributes>(() => {
+    const getDefaultGroupId = () =>
+      groups.find(g => g.name === '未分组')?.id || groups[0]?.id || 0;
+    if (editingOutfitId) {
+      const existing = outfits.find(o => o.id === editingOutfitId);
+      return {
+        name: existing?.name || '',
+        groupId: selectedGroupId ?? existing?.groupId ?? getDefaultGroupId(),
+        seasons: existing?.seasons || [],
+        tags: existing?.tags || [],
+        notes: existing?.notes || '',
+      };
+    }
+    // 新建：推断
+    const clothings = canvasItems
+      .map(ci => clothing.find(c => c.id === ci.clothingId))
+      .filter((c): c is ClothingItem => !!c);
+    // 季节交集：所有单品都含的季
+    const seasonSets = clothings.map(c => new Set(c.seasons));
+    const intersected = customSeasons.filter(s =>
+      seasonSets.length > 0 && seasonSets.every(set => set.has(s)),
+    );
+    // 标签并集：去重合并
+    const tagUnion = Array.from(new Set(clothings.flatMap(c => c.tags)));
+    const gid = selectedGroupId ?? getDefaultGroupId();
+    const mainType =
+      clothings[0]?.parentType ||
+      clothings[0]?.type ||
+      groups.find(g => g.id === gid)?.name ||
+      '搭配';
+    return {
+      name: `${mainType}搭配`,
+      groupId: gid,
+      seasons: intersected,
+      tags: tagUnion,
+      notes: '',
+    };
+  }, [editingOutfitId, outfits, canvasItems, clothing, selectedGroupId, groups, customSeasons]);
   const canvasRef = useRef<View>(null);
   const captureTargetRef = useRef<View>(null);
 
@@ -435,128 +480,67 @@ export function OutfitEditorScreen({ onSave }: Props) {
     }
   }, [navigation, route.params?.exitTo]);
 
-  const handleSave = useCallback(async () => {
-    console.log('[handleSave] START - canvasItems:', canvasItems.length);
-    console.log('[handleSave] editingOutfitId:', editingOutfitId);
-
+  // 保存按钮：校验画板非空后打开属性 Sheet
+  const handleSave = useCallback(() => {
     if (canvasItems.length === 0) {
       Alert.alert('请添加衣物', '请至少添加一件衣物到画板');
       return;
     }
+    setShowAttrSheet(true);
+  }, [canvasItems.length]);
 
-    // Generate thumbnail from hidden clean canvas (no shadow, no border, no selection)
+  // Sheet 确认后：生成缩略图 + 写库（含完整属性）+ 退出
+  const handleConfirmAttributes = useCallback(async (attrs: OutfitAttributes) => {
+    setShowAttrSheet(false);
+
+    // 生成缩略图（隐藏画布，去除选中态）
     const fallbackUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
     let thumbnailUri = fallbackUri;
     try {
-      console.log('[handleSave] Capturing thumbnail from clean canvas...');
       thumbnailUri = await generateOutfitThumbnail(captureTargetRef, fallbackUri);
-      console.log('[handleSave] Thumbnail generated:', thumbnailUri);
     } catch (e: any) {
-      console.warn('[handleSave] Thumbnail generation failed:', e?.message || e);
       thumbnailUri = fallbackUri;
     }
 
-    console.log('[handleSave] Final thumbnailUri:', thumbnailUri);
-
-    // 获取 groupId 的优先级：
-    // 1. 编辑已有搭配时，保留原 groupId
-    // 2. 从 route params 获取（从 GroupDetailScreen 新建时传入）
-    // 3. "未分组" 默认分组
-    const getDefaultGroupId = () => {
-      const defaultGroup = groups.find(g => g.name === '未分组');
-      return defaultGroup?.id || groups[0]?.id || 0;
-    };
-
-    let groupId: number;
-    if (editingOutfitId) {
-      const existingOutfit = outfits.find(o => o.id === editingOutfitId);
-      groupId = selectedGroupId ?? existingOutfit?.groupId ?? getDefaultGroupId();
-    } else {
-      groupId = selectedGroupId ?? getDefaultGroupId();
-    }
-
     const outfitData = {
-      name: `${groups.find(g => g.id === groupId)?.name || '未分组'}搭配`,
+      name: attrs.name,
       itemIds: canvasItems.map(i => i.clothingId),
       canvasData: canvasItems,
       canvasBackground,
-      groupId,
+      groupId: attrs.groupId,
+      seasons: attrs.seasons,
+      tags: attrs.tags,
+      notes: attrs.notes,
       thumbnailUri,
       createdAt: new Date().toISOString(),
     };
 
-    console.log('[handleSave] Calling database - editingOutfitId:', editingOutfitId);
-
     try {
-      console.log('[handleSave] outfitData:', JSON.stringify(outfitData, null, 2));
       if (editingOutfitId) {
-        // Update existing outfit
+        // 编辑：更新后回详情页
         const updatedOutfit = { ...outfitData, id: editingOutfitId };
         await updateOutfit(updatedOutfit as any);
-        console.log('[handleSave] Updated outfit:', editingOutfitId);
-      } else {
-        // Add new outfit
-        const newId = await addOutfit(outfitData as any);
-        console.log('[handleSave] Added new outfit with id:', newId);
-
-        // Reset outfit store
         reset();
-
-        // 标记为保存退出，跳过 beforeRemove 拦截
         isSaving.current = true;
-
-        // 新建搭配 → 询问用户是否编辑其他属性
-        const gName = groups.find(g => g.id === groupId)?.name || '';
-        Alert.alert(
-          '搭配已创建',
-          '是否需要编辑搭配的季节、标签、备注等属性？',
-          [
-            {
-              text: '返回分组',
-              style: 'cancel',
-              onPress: () => {
-                navigation.reset({
-                  index: 1,
-                  routes: [
-                    { name: 'Main' as any, params: { screen: '搭配' } },
-                    { name: 'GroupDetail' as any, params: { groupId, groupName: gName } },
-                  ],
-                });
-              },
-            },
-            {
-              text: '编辑属性',
-              onPress: () => {
-                navigation.reset({
-                  index: 2,
-                  routes: [
-                    { name: 'Main' as any, params: { screen: '搭配' } },
-                    { name: 'GroupDetail' as any, params: { groupId, groupName: gName } },
-                    { name: 'OutfitDetail' as any, params: { outfitId: newId, groupId, groupName: gName } },
-                  ],
-                });
-              },
-            },
+        exitEditor();
+      } else {
+        // 新建：写入后 reset 到该搭配所在分组
+        await addOutfit(outfitData as any);
+        reset();
+        isSaving.current = true;
+        const gName = groups.find(g => g.id === attrs.groupId)?.name || '';
+        navigation.reset({
+          index: 1,
+          routes: [
+            { name: 'Main' as any, params: { screen: '搭配' } },
+            { name: 'GroupDetail' as any, params: { groupId: attrs.groupId, groupName: gName } },
           ],
-        );
-        return;
+        });
       }
-
-      console.log('[handleSave] Success, about to reset and navigate');
-
-      // Reset outfit store
-      reset();
-
-      // 标记为保存退出，跳过 beforeRemove 拦截
-      isSaving.current = true;
-
-      // 统一出口：回到 exitTo 指定的目标 Tab
-      exitEditor();
     } catch (error: any) {
-      console.error('[handleSave] Error saving outfit:', error?.message || error);
       Alert.alert('保存失败', error?.message || '请重试');
     }
-  }, [canvasItems, editingOutfitId, canvasBackground, navigation, addOutfit, updateOutfit, reset, exitEditor, selectedGroupId, groups, outfits]);
+  }, [canvasItems, canvasBackground, editingOutfitId, addOutfit, updateOutfit, reset, exitEditor, groups, navigation]);
   handleSaveRef.current = handleSave;
 
   const handleBackgroundPress = useCallback(() => {
@@ -748,6 +732,14 @@ export function OutfitEditorScreen({ onSave }: Props) {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <OutfitAttributesSheet
+        visible={showAttrSheet}
+        initial={prefillAttributes}
+        groups={groups}
+        onClose={() => setShowAttrSheet(false)}
+        onConfirm={handleConfirmAttributes}
+      />
 
       {/* 底部工具栏 */}
       <CanvasToolsBar
