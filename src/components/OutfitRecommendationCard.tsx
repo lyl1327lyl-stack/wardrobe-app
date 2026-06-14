@@ -14,6 +14,8 @@ import { ClothingItem, Outfit, OutfitRecommendation } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { OutfitConfirmModal } from './OutfitConfirmModal';
+import { AttributeTipIcon } from './AttributeTipBanner';
+import { AttributeTip } from '../services/attributeTips';
 
 interface Props {
   recommendation: OutfitRecommendation;
@@ -26,6 +28,7 @@ interface Props {
   todayWornIds: number[];
   recTotal: number;
   recIndex: number;
+  attributeTips?: AttributeTip[];
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -267,6 +270,7 @@ export function OutfitRecommendationCard({
   todayWornIds,
   recTotal,
   recIndex,
+  attributeTips,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -402,6 +406,9 @@ export function OutfitRecommendationCard({
                 </View>
               </View>
               <View style={styles.headerRight}>
+                {attributeTips && attributeTips.length > 0 && (
+                  <AttributeTipIcon tips={attributeTips} />
+                )}
                 <TouchableOpacity style={styles.headerBtn} onPress={onRefresh} activeOpacity={0.7}>
                   <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
                   <View style={styles.refreshBadge}>
@@ -505,6 +512,9 @@ export function OutfitRecommendationCard({
               </View>
             </View>
             <View style={styles.headerRight}>
+              {attributeTips && attributeTips.length > 0 && (
+                <AttributeTipIcon tips={attributeTips} />
+              )}
               <View style={styles.headerBtn}>
                 <Ionicons name="chevron-down" size={18} color={theme.colors.textSecondary} />
               </View>

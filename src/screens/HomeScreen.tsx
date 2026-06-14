@@ -18,7 +18,6 @@ import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard
 import { RecentOutfitCard } from '../components/RecentOutfitCard';
 import { ClothingPickerModal } from '../components/ClothingPickerModal';
 import { PreferenceSurveySheet } from '../components/PreferenceSurveySheet';
-import { AttributeTipIcon } from '../components/AttributeTipBanner';
 import { generateRecommendations } from '../services/outfitRecommender';
 import { analyzeAttributeGaps, AttributeTip } from '../services/attributeTips';
 import { getWeather } from '../services/weatherService';
@@ -241,27 +240,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     fontSize: 11,
     fontWeight: '500',
     color: theme.colors.text,
-  },
-
-  // ── Section header ──
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: CARD_H_PADDING,
-    paddingTop: 28,
-    paddingBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: theme.colors.text,
-    letterSpacing: -0.2,
-  },
-  sectionLink: {
-    fontSize: 13,
-    color: theme.colors.primary,
-    fontWeight: '500',
   },
 
   // ── Recommendation ──
@@ -670,12 +648,6 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── 今日穿搭推荐 ── */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
-          <AttributeTipIcon tips={attributeTips} />
-        </View>
-
         {recLoading ? (
           <View style={styles.recLoading}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -693,6 +665,7 @@ export function HomeScreen() {
             todayWornIds={todayRecords.map(r => r.clothingId)}
             recTotal={recommendations.length}
             recIndex={recIndex}
+            attributeTips={attributeTips}
           />
         ) : (
           <View style={styles.recEmpty}>
