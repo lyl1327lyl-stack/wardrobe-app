@@ -16,6 +16,7 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { usePreferenceStore } from '../store/preferenceStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
 import { RecentOutfitCard } from '../components/RecentOutfitCard';
+import { ClothingPickerModal } from '../components/ClothingPickerModal';
 import { PreferenceSurveySheet } from '../components/PreferenceSurveySheet';
 import { AttributeTipIcon } from '../components/AttributeTipBanner';
 import { generateRecommendations } from '../services/outfitRecommender';
@@ -225,6 +226,41 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  // ── Quick actions ──
+  quickActions: {
+    marginHorizontal: CARD_H_PADDING,
+    marginTop: 12,
+    backgroundColor: PALETTE.white,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 6,
+    flexDirection: 'row',
+    shadowColor: PALETTE.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  quickActionIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: PALETTE.primaryLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  quickActionLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: PALETTE.text,
+  },
+
   // ── Section header ──
   sectionHeader: {
     flexDirection: 'row',
@@ -291,6 +327,7 @@ export function HomeScreen() {
   const [recLoading, setRecLoading] = useState(true);
   const [todayRecords, setTodayRecords] = useState<WearRecord[]>([]);
   const [showSurveySheet, setShowSurveySheet] = useState(false);
+  const [showWearPicker, setShowWearPicker] = useState(false);
 
   // 最近推荐过的单品 ID（有上限滑动窗口，避免集合膨胀导致新鲜度失效）
   const recentRecommendedIdsRef = useRef<number[]>([]);
@@ -504,6 +541,24 @@ export function HomeScreen() {
     setTodayRecords(records);
   }, [recommendation, addWearRecords, deleteWearRecordsByDate]);
 
+  /** 手动记录今日穿搭：用选择器选今天穿的单品，确认后替换今日记录 */
+  const handleManualWear = useCallback(async (selectedIds: number[]) => {
+    setShowWearPicker(false);
+    await deleteWearRecordsByDate(todayDateStr());
+    if (selectedIds.length > 0) {
+      await addWearRecords(selectedIds, todayDateStr());
+    }
+    const records = await getWearRecordsByDate(todayDateStr());
+    setTodayRecords(records);
+  }, [addWearRecords, deleteWearRecordsByDate]);
+
+  /** 新建搭配：重置搭配编辑器 store 后跳转 */
+  const handleNewOutfit = useCallback(() => {
+    const outfitStore = require('../store/outfitStore').useOutfitStore.getState();
+    outfitStore.reset();
+    navigation.navigate('OutfitEditor', { exitTo: { screen: 'Home' } });
+  }, [navigation]);
+
   const goToCalendar = () => navigation.navigate('WearCalendar');
 
   const surveyPrefs = useMemo(() => {
@@ -600,6 +655,37 @@ export function HomeScreen() {
           </View>
         </TouchableOpacity>
 
+        {/* ── 快捷入口 ── */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => setShowWearPicker(true)} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="create-outline" size={20} color={PALETTE.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>记录穿搭</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('AddClothing')} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="add-circle-outline" size={20} color={PALETTE.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>添加单品</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={handleNewOutfit} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="grid-outline" size={20} color={PALETTE.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>新建搭配</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('WearCalendar')} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="calendar-outline" size={20} color={PALETTE.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>穿搭日历</Text>
+          </TouchableOpacity>
+        </View>
+
         {/* ── 今日穿搭推荐 ── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
@@ -647,6 +733,13 @@ export function HomeScreen() {
         onClose={() => setShowSurveySheet(false)}
         onSave={handleSaveSurvey}
         initialPrefs={surveyPrefs}
+      />
+
+      <ClothingPickerModal
+        visible={showWearPicker}
+        onClose={() => setShowWearPicker(false)}
+        onConfirm={handleManualWear}
+        alreadyAddedIds={todayRecords.map(r => r.clothingId)}
       />
     </View>
   );
