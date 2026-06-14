@@ -283,6 +283,8 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const { addOutfit, updateOutfit, outfits, groups, clothing } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
+  const canUndo = historyIndex > 0;
+  const canRedo = historyIndex < history.length - 1;
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
   const [showAttrSheet, setShowAttrSheet] = useState(false);
@@ -565,9 +567,27 @@ export function OutfitEditorScreen({ onSave }: Props) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>搭配画板</Text>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>保存</Text>
-        </TouchableOpacity>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.iconBtn, !canUndo && styles.iconBtnDisabled]}
+            onPress={undo}
+            disabled={!canUndo}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-undo-outline" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.iconBtn, !canRedo && styles.iconBtnDisabled]}
+            onPress={redo}
+            disabled={!canRedo}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-redo-outline" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <Text style={styles.saveButtonText}>保存</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* 已删除单品清除横幅 */}
@@ -790,6 +810,22 @@ const createStyles = (theme: any, insets: any) =>
       fontSize: 18,
       fontWeight: '600',
       color: theme.colors.text,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    iconBtn: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.colors.background,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    iconBtnDisabled: {
+      opacity: 0.3,
     },
     saveButton: {
       backgroundColor: theme.colors.primary,
