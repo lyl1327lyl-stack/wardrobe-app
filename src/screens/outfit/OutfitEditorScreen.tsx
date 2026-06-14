@@ -491,8 +491,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
   // Sheet 确认后：生成缩略图 + 写库（含完整属性）+ 退出
   const handleConfirmAttributes = useCallback(async (attrs: OutfitAttributes) => {
-    setShowAttrSheet(false);
-
     // 生成缩略图（隐藏画布，去除选中态）
     const fallbackUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
     let thumbnailUri = fallbackUri;
@@ -537,6 +535,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
           ],
         });
       }
+      setShowAttrSheet(false);
     } catch (error: any) {
       Alert.alert('保存失败', error?.message || '请重试');
     }
