@@ -155,11 +155,6 @@ export function WearCalendarScreen() {
   }, [wearData, outfits]);
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month, 0).getDate();
-  // 返回0-6，0=周一，6=周日
-  const getFirstDayOfMonth = (year: number, month: number) => {
-    const day = new Date(year, month - 1, 1).getDay();
-    return day === 0 ? 6 : day - 1;
-  };
 
   const loadMonthData = useCallback(async () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
