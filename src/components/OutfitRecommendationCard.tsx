@@ -9,6 +9,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ClothingItem, Outfit, OutfitRecommendation } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
@@ -219,10 +220,13 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
       justifyContent: 'center',
       gap: 7,
-      backgroundColor: theme.colors.primary,
       paddingVertical: 13,
       borderRadius: 14,
+      overflow: 'hidden',
       ...theme.shadows.md,
+    },
+    wearButtonBg: {
+      ...StyleSheet.absoluteFillObject,
     },
     wearButtonDisabled: { opacity: 0.5 },
     wearButtonText: {
@@ -453,6 +457,12 @@ export function OutfitRecommendationCard({
                 disabled={isLoading}
                 activeOpacity={0.85}
               >
+                <LinearGradient
+                  colors={[theme.colors.primary, theme.colors.primaryDark]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.wearButtonBg}
+                />
                 <Ionicons name="checkmark-outline" size={16} color={theme.colors.white} />
                 <Text style={styles.wearButtonText}>{isLoading ? '记录中...' : hasTodayRecord ? '换成这套' : '就穿这套'}</Text>
               </TouchableOpacity>
