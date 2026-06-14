@@ -144,32 +144,14 @@ const styles = StyleSheet.create({
   statsCard: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 16,
+    backgroundColor: PALETTE.white,
     borderRadius: 16,
     padding: 18,
-    overflow: 'hidden',
     shadowColor: PALETTE.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 10,
     elevation: 3,
-  },
-  statsBgImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  statsBgOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 253, 249, 0.82)',
   },
   statsHeader: {
     flexDirection: 'row',
@@ -571,19 +553,12 @@ export function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 数据统计卡（可点击跳转统计页，插画虚化背景）── */}
+        {/* ── 数据统计卡（可点击跳转统计页）── */}
         <TouchableOpacity
           style={styles.statsCard}
           activeOpacity={0.7}
           onPress={() => navigation.navigate('统计')}
         >
-          <Image
-            source={require('../../assets/wardrobe-illustration-handdrawn.png')}
-            style={styles.statsBgImage}
-            blurRadius={12}
-          />
-          <View style={styles.statsBgOverlay} />
-
           <View style={styles.statsHeader}>
             <View style={styles.statsHeaderLeft}>
               <View style={styles.statsHeaderIcon}>
