@@ -200,6 +200,15 @@ function AppNavigator() {
           }}
         />
         <RootStack.Screen
+          name="AddClothing"
+          component={AddClothingScreen}
+          options={{
+            title: '添加衣服',
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
           name="Trash"
           component={TrashScreen}
           options={{
