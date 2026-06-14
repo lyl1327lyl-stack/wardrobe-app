@@ -574,7 +574,7 @@ export function HomeScreen() {
         <TouchableOpacity
           style={styles.statsCard}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('统计')}
+          onPress={() => navigation.navigate('日历')}
         >
           <View style={styles.statsHeader}>
             <View style={styles.statsHeaderLeft}>

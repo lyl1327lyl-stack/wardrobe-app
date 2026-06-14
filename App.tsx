@@ -17,7 +17,6 @@ import { GroupDetailScreen } from './src/screens/outfit/GroupDetailScreen';
 import { ClothingSelectionScreen } from './src/screens/outfit/ClothingSelectionScreen';
 import { OutfitEditorScreen } from './src/screens/outfit/OutfitEditorScreen';
 import { OutfitDetailScreen } from './src/screens/outfit/OutfitDetailScreen';
-import { StatsScreen } from './src/screens/StatsScreen';
 import { StatsDetailScreen } from './src/screens/StatsDetailScreen';
 import { TrashScreen } from './src/screens/TrashScreen';
 import { SoldItemsScreen } from './src/screens/SoldItemsScreen';
@@ -42,7 +41,7 @@ function TabIcon({ name, focused, theme }: { name: string; focused: boolean; the
     '衣橱': { focused: 'shirt', unfocused: 'shirt-outline' },
     '搭配': { focused: 'grid', unfocused: 'grid-outline' },
     '主页': { focused: 'home', unfocused: 'home-outline' },
-    '统计': { focused: 'stats-chart', unfocused: 'stats-chart-outline' },
+    '日历': { focused: 'calendar', unfocused: 'calendar-outline' },
     '个人中心': { focused: 'person', unfocused: 'person-outline' },
   };
   const iconName = focused ? icons[name].focused : icons[name].unfocused;
@@ -120,7 +119,7 @@ function MainTabs() {
       <Tab.Screen name="衣橱" component={WardrobeStackScreen} />
       <Tab.Screen name="搭配" component={GroupListScreen} options={{ headerShown: false }} />
       <Tab.Screen name="主页" component={HomeScreen} options={{ headerShown: false }} />
-      <Tab.Screen name="统计" component={StatsScreen} options={{ headerShown: false }} />
+      <Tab.Screen name="日历" component={WearCalendarScreen} options={{ headerShown: false }} />
       <Tab.Screen name="个人中心" component={PersonalCenterScreen} options={{ headerShown: false }} />
     </Tab.Navigator>
   );
