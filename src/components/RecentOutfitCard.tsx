@@ -17,6 +17,11 @@ interface DayOutfit {
   thumbnails: Array<{ uri: string; type: string; id: number }>;
 }
 
+function todayDateStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function formatDateLabel(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00');
   const now = new Date();
@@ -105,6 +110,24 @@ const makeStyles = (theme: Theme) =>
     dayRowLast: {
       borderBottomWidth: 0,
     },
+    dayRowToday: {
+      backgroundColor: '#EDF5EC',
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      marginHorizontal: -2,
+      marginVertical: 2,
+    },
+    dayLabelToday: {
+      color: '#5D9E5D',
+      fontWeight: '700',
+    },
+    todayCount: {
+      fontSize: 10,
+      fontWeight: '600',
+      color: '#5D9E5D',
+      marginLeft: 'auto',
+    },
     dayLabel: {
       width: 36,
       fontSize: 12,
@@ -192,11 +215,14 @@ export function RecentOutfitCard({ todayRecords, onViewCalendar }: RecentOutfitC
 
       {historyDays.map((day, i) => {
         const isLast = i === historyDays.length - 1;
+        const isToday = day.date === todayDateStr();
         const maxShow = 5;
         const overflow = day.thumbnails.length - maxShow;
         return (
-          <View key={day.date} style={[styles.dayRow, isLast && styles.dayRowLast]}>
-            <Text style={styles.dayLabel}>{day.label}</Text>
+          <View key={day.date} style={[styles.dayRow, isLast && styles.dayRowLast, isToday && styles.dayRowToday]}>
+            <Text style={[styles.dayLabel, isToday && styles.dayLabelToday]}>
+              {isToday ? `今日 ✓` : day.label}
+            </Text>
             <View style={styles.dayThumbs}>
               {day.thumbnails.slice(0, maxShow).map(t => (
                 <View key={t.id} style={styles.thumbWrap}>
@@ -213,6 +239,9 @@ export function RecentOutfitCard({ todayRecords, onViewCalendar }: RecentOutfitC
                 <View style={styles.moreBadge}>
                   <Text style={styles.moreText}>+{overflow}</Text>
                 </View>
+              )}
+              {isToday && (
+                <Text style={styles.todayCount}>{day.thumbnails.length} 件</Text>
               )}
             </View>
           </View>
