@@ -337,34 +337,50 @@ export function RecordWearScreen() {
 
   // Load month data for date picker
   const loadMonthData = useCallback(async () => {
-    const daysInMonth = getDaysInMonth(calYear, calMonth);
-    const newData: Record<string, ClothingItem[]> = {};
-    const allClothingMap = new Map<number, ClothingItem>();
-    for (const c of clothing) allClothingMap.set(c.id, c);
+    try {
+      const daysInMonth = getDaysInMonth(calYear, calMonth);
+      const newData: Record<string, ClothingItem[]> = {};
+      const allClothingMap = new Map<number, ClothingItem>();
+      for (const c of clothing) allClothingMap.set(c.id, c);
 
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
-      const items = records
-        .map(r => allClothingMap.get(r.clothingId))
-        .filter((c): c is ClothingItem => c !== undefined);
-      if (items.length > 0) {
-        newData[dateStr] = items;
+      for (let day = 1; day <= daysInMonth; day++) {
+        const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
+        const items = records
+          .map(r => {
+            const live = allClothingMap.get(r.clothingId);
+            if (live) return live;
+            // Fallback: use stored thumbnail from wear record for deleted items
+            if (r.clothingThumbnailUri) {
+              return {
+                id: r.clothingId,
+                imageUri: r.clothingThumbnailUri,
+                thumbnailUri: r.clothingThumbnailUri,
+                originalImageUri: '',
+                type: r.clothingType || '已删除',
+                parentType: '',
+                color: '', brand: '', size: '', remarks: '',
+                seasons: [], tags: [], fit: '', thickness: '',
+                purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
+                createdAt: '', wardrobeId: 0,
+              } as ClothingItem;
+            }
+            return undefined;
+          })
+          .filter((c): c is ClothingItem => c !== undefined);
+        if (items.length > 0) {
+          newData[dateStr] = items;
+        }
       }
+      setDateWearData(newData);
+    } catch (error) {
+      console.error('RecordWearScreen loadMonthData failed:', error);
     }
-    setDateWearData(newData);
   }, [calYear, calMonth, clothing]);
 
   useEffect(() => {
     loadMonthData();
   }, [loadMonthData]);
-
-  // Reload when date picker opens
-  useEffect(() => {
-    if (showDatePicker) {
-      loadMonthData();
-    }
-  }, [showDatePicker, calYear, calMonth]);
 
   // When selectedDate changes, preload existing records
   useEffect(() => {
@@ -445,9 +461,14 @@ export function RecordWearScreen() {
       Alert.alert('提示', '请至少选择 2 件单品');
       return;
     }
-    await deleteWearRecordsByDate(selectedDate);
-    await addWearRecords(selectedIds, selectedDate);
-    navigation.goBack();
+    try {
+      await deleteWearRecordsByDate(selectedDate);
+      await addWearRecords(selectedIds, selectedDate);
+      navigation.goBack();
+    } catch (error) {
+      console.error('RecordWearScreen handleConfirm failed:', error);
+      Alert.alert('记录失败', '保存穿着记录时出错，请重试');
+    }
   };
 
   const handleDateSelect = (dateStr: string) => {
