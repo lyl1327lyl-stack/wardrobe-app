@@ -522,18 +522,29 @@ export function OutfitEditorScreen({ onSave }: Props) {
         isSaving.current = true;
         exitEditor();
       } else {
-        // 新建：写入后 reset 到该搭配所在分组
+        // 新建：写入后根据入口决定回哪
         await addOutfit(outfitData as any);
         reset();
         isSaving.current = true;
-        const gName = groups.find(g => g.id === attrs.groupId)?.name || '';
-        navigation.reset({
-          index: 1,
-          routes: [
-            { name: 'Main' as any, params: { screen: '搭配' } },
-            { name: 'GroupDetail' as any, params: { groupId: attrs.groupId, groupName: gName } },
-          ],
-        });
+        const exitTo = route.params?.exitTo;
+        const backToTab = exitTo?.tab || (exitTo?.screen === 'Home' ? '主页' : null);
+        if (backToTab) {
+          // 从首页/其他 tab 进入：回对应 tab
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Main' as any, params: { screen: backToTab } }],
+          });
+        } else {
+          // 从搭配 tab 进入：回 GroupDetail（所在分组）
+          const gName = groups.find(g => g.id === attrs.groupId)?.name || '';
+          navigation.reset({
+            index: 1,
+            routes: [
+              { name: 'Main' as any, params: { screen: '搭配' } },
+              { name: 'GroupDetail' as any, params: { groupId: attrs.groupId, groupName: gName } },
+            ],
+          });
+        }
       }
       setShowAttrSheet(false);
     } catch (error: any) {
