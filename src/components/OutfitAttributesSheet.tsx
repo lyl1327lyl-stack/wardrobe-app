@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -127,9 +127,11 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
   const [tagInput, setTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
 
-  // 每次打开或预填值变化时重置 local state
+  const wasVisibleRef = useRef(false);
+
+  // 只在 sheet 打开瞬间（false→true）重置一次，避免编辑中途被预填值变化覆盖
   useEffect(() => {
-    if (visible) {
+    if (visible && !wasVisibleRef.current) {
       setName(initial.name);
       setGroupId(initial.groupId);
       setSeasons(initial.seasons);
@@ -138,6 +140,7 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
       setTagInput('');
       setShowTagInput(false);
     }
+    wasVisibleRef.current = visible;
   }, [visible, initial]);
 
   const toggleSeason = (s: string) => {
@@ -185,6 +188,7 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
                 onChangeText={setName}
                 placeholder="给这套搭配起个名字"
                 placeholderTextColor={theme.colors.textTertiary}
+                maxLength={30}
               />
             </View>
 
@@ -282,6 +286,7 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
                 placeholder="添加备注（可选）"
                 placeholderTextColor={theme.colors.textTertiary}
                 multiline
+                maxLength={200}
               />
             </View>
           </ScrollView>
