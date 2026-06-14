@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { usePreferenceStore } from '../store/preferenceStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
+import { RecentOutfitCard } from '../components/RecentOutfitCard';
 import { PreferenceSurveySheet } from '../components/PreferenceSurveySheet';
 import { AttributeTipIcon } from '../components/AttributeTipBanner';
 import { generateRecommendations } from '../services/outfitRecommender';
@@ -523,44 +524,7 @@ export function HomeScreen() {
     await addWearRecords(ids, todayDateStr());
     const records = await getWearRecordsByDate(todayDateStr());
     setTodayRecords(records);
-    const recentlyWornDays = await buildRecentlyWornDays();
-    const s = useWardrobeStore.getState();
-    const prefs = usePreferenceStore.getState();
-    const recs = generateRecommendations(s.clothing, s.outfits, weather, {
-      recentRecommendedItemIds: getRecentIdsSet(),
-      recentlyWornDays,
-      blacklistPairs: prefs.blacklist,
-      likedItemIds: prefs.likedItemIds,
-      preferredStyles: prefs.preferredStyles,
-      preferredColors: prefs.preferredColors,
-      comfortVsAppearance: prefs.comfortVsAppearance,
-      preferredScenes: prefs.preferredScenes,
-    });
-    if (recs.length > 0) {
-      const allIds: number[] = [];
-      for (const rec of recs) {
-        for (const item of rec.items) allIds.push(item.id);
-      }
-      addToRecentIds(allIds);
-      setRecommendations(recs);
-      setRecIndex(0);
-    }
-    setTimeout(() => {
-      const sortedIds = [...wearItems.map(i => i.id)].sort((a, b) => a - b);
-      const outfitExists = useWardrobeStore.getState().outfits.some(o => {
-        const oIds = [...o.itemIds].sort((a, b) => a - b);
-        return oIds.length === sortedIds.length && oIds.every((v, i) => v === sortedIds[i]);
-      });
-      if (outfitExists) {
-        Alert.alert('记录成功', '今日穿搭已记录');
-      } else {
-        Alert.alert('记录成功', '是否将这套搭配添加到「我的搭配」？', [
-          { text: '以后再说', style: 'cancel' },
-          { text: '添加', onPress: () => handleSaveAsOutfit(wearItems) },
-        ]);
-      }
-    }, 400);
-  }, [recommendation, addWearRecords, deleteWearRecordsByDate, weather, handleSaveAsOutfit]);
+  }, [recommendation, addWearRecords, deleteWearRecordsByDate]);
 
   const goToCalendar = () => navigation.navigate('WearCalendar');
 
@@ -669,12 +633,7 @@ export function HomeScreen() {
         {/* ── 今日穿搭推荐 ── */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>今日穿搭推荐</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <AttributeTipIcon tips={attributeTips} />
-            <TouchableOpacity onPress={() => setShowSurveySheet(true)} activeOpacity={0.7}>
-              <Text style={styles.sectionLink}>偏好设置</Text>
-            </TouchableOpacity>
-          </View>
+          <AttributeTipIcon tips={attributeTips} />
         </View>
 
         {recLoading ? (
@@ -686,15 +645,14 @@ export function HomeScreen() {
           <OutfitRecommendationCard
             recommendation={recommendation}
             allClothing={clothing}
+            outfits={outfits}
             onRefresh={handleRefresh}
             onWear={handleWearRecommendation}
-            onCalendar={goToCalendar}
             onSaveAsOutfit={handleSaveAsOutfit}
             onReplaceItem={handleReplaceItem}
-            todayThumbnails={todayRecords.map(r => ({ uri: r.clothingThumbnailUri, type: r.clothingType, id: r.clothingId }))}
+            todayWornIds={todayRecords.map(r => r.clothingId)}
             recTotal={recommendations.length}
             recIndex={recIndex}
-            onSwitchToRecommend={() => {}}
           />
         ) : (
           <View style={styles.recEmpty}>
@@ -706,6 +664,12 @@ export function HomeScreen() {
             </Text>
           </View>
         )}
+
+        {/* ── 近期穿搭 ── */}
+        <RecentOutfitCard
+          todayRecords={todayRecords}
+          onViewCalendar={goToCalendar}
+        />
       </ScrollView>
 
       <PreferenceSurveySheet
