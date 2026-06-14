@@ -140,39 +140,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // ── Wardrobe illustration card ──
-  illustrationCard: {
-    marginHorizontal: CARD_H_PADDING,
-    backgroundColor: PALETTE.wardrobeBg,
-    borderRadius: 20,
-    overflow: 'hidden',
-    shadowColor: PALETTE.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 1,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  illustration: {
-    width: CARD_WIDTH,
-    height: 80,
-    resizeMode: 'cover',
-  },
-  illustrationOverlay: {
-    display: 'none' as 'none',
-  },
-
   // ── Category stats ──
   statsCard: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 16,
-    backgroundColor: PALETTE.white,
     borderRadius: 16,
     padding: 18,
+    overflow: 'hidden',
     shadowColor: PALETTE.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 1,
     shadowRadius: 10,
     elevation: 3,
+  },
+  statsBgImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  statsBgOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 253, 249, 0.82)',
   },
   statsHeader: {
     flexDirection: 'row',
@@ -574,20 +571,19 @@ export function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ── 核心视觉卡片：衣橱插画 ── */}
-        <View style={styles.illustrationCard}>
-          <Image
-            source={require('../../assets/wardrobe-illustration-handdrawn.png')}
-            style={styles.illustration}
-          />
-        </View>
-
-        {/* ── 数据统计卡（可点击跳转统计页）── */}
+        {/* ── 数据统计卡（可点击跳转统计页，插画虚化背景）── */}
         <TouchableOpacity
           style={styles.statsCard}
           activeOpacity={0.7}
           onPress={() => navigation.navigate('统计')}
         >
+          <Image
+            source={require('../../assets/wardrobe-illustration-handdrawn.png')}
+            style={styles.statsBgImage}
+            blurRadius={12}
+          />
+          <View style={styles.statsBgOverlay} />
+
           <View style={styles.statsHeader}>
             <View style={styles.statsHeaderLeft}>
               <View style={styles.statsHeaderIcon}>
