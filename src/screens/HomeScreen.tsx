@@ -50,7 +50,6 @@ const PALETTE = {
 
 /** 温度区间 → 宜穿提示文字（固定映射） */
 function getTempHint(temp: number): string {
-  if (temp < 5) return '宜厚款';
   if (temp < 10) return '宜厚款';
   if (temp < 15) return '适中外套';
   if (temp < 20) return '薄外套';
