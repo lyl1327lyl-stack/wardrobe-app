@@ -301,6 +301,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const [showTooltip, setShowTooltip] = useState(true);
   const [showAttrSheet, setShowAttrSheet] = useState(false);
   const [showBgPicker, setShowBgPicker] = useState(false);
+  const [isSavingOutfit, setIsSavingOutfit] = useState(false);
   const customSeasons = useCustomOptionsStore(s => s.seasons);
 
   // 检测画板中已删除的单品
@@ -513,6 +514,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
   // Sheet 确认后：生成缩略图 + 写库（含完整属性）+ 退出
   const handleConfirmAttributes = useCallback(async (attrs: OutfitAttributes) => {
+    setIsSavingOutfit(true);
     // 生成缩略图（隐藏画布，去除选中态）
     const fallbackUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
     let thumbnailUri = fallbackUri;
@@ -570,6 +572,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
       }
       setShowAttrSheet(false);
     } catch (error: any) {
+      setIsSavingOutfit(false);
       Alert.alert('保存失败', error?.message || '请重试');
     }
   }, [canvasItems, canvasBackground, editingOutfitId, addOutfit, updateOutfit, reset, exitEditor, groups, navigation]);
@@ -587,8 +590,13 @@ export function OutfitEditorScreen({ onSave }: Props) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>搭配画板</Text>
-        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-          <Text style={styles.saveButtonText}>保存</Text>
+        <TouchableOpacity
+          style={[styles.saveButton, isSavingOutfit && styles.saveButtonDisabled]}
+          onPress={handleSave}
+          disabled={isSavingOutfit}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.saveButtonText}>{isSavingOutfit ? '保存中…' : '保存'}</Text>
         </TouchableOpacity>
       </View>
 
@@ -857,6 +865,9 @@ const createStyles = (theme: any, insets: any) =>
       paddingHorizontal: 16,
       paddingVertical: 8,
       borderRadius: 20,
+    },
+    saveButtonDisabled: {
+      opacity: 0.5,
     },
     saveButtonText: {
       color: '#fff',
