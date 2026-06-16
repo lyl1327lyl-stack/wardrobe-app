@@ -62,7 +62,7 @@ export function ClothingSelectionScreen() {
 
   const filteredClothing = useMemo(() => {
     if (activeTab === '全部') return clothing;
-    return clothing.filter(item => item.type === activeTab);
+    return clothing.filter(item => item.parentType === activeTab);
   }, [clothing, activeTab]);
 
   const toggleSelection = useCallback((id: number) => {
