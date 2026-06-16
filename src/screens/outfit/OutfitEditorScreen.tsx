@@ -60,7 +60,6 @@ interface DraggableItemProps {
   onDelete: (clothingId: number) => void;
   isSelected: boolean;
   onSelect: () => void;
-  onGestureStart?: () => void;
   isDeleted?: boolean;
   styles: any;
   theme: any;
@@ -74,7 +73,6 @@ function DraggableItem({
   onDelete,
   isSelected,
   onSelect,
-  onGestureStart,
   isDeleted,
   styles,
   theme,
@@ -118,13 +116,12 @@ function DraggableItem({
 
   const onPanHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
-      onGestureStart?.();
       onSelect();
       startPosition.current = { x: position.x, y: position.y };
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { x: position.x, y: position.y });
     }
-  }, [item.clothingId, position.x, position.y, onSelect, onUpdate, onGestureStart]);
+  }, [item.clothingId, position.x, position.y, onSelect, onUpdate]);
 
   const onPinchGestureEvent = useCallback((event: any) => {
     const newScale = Math.max(0.5, Math.min(3, startScale.current * event.nativeEvent.scale));
@@ -133,12 +130,11 @@ function DraggableItem({
 
   const onPinchHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
-      onGestureStart?.();
       startScale.current = scale;
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { scale });
     }
-  }, [item.clothingId, scale, onUpdate, onGestureStart]);
+  }, [item.clothingId, scale, onUpdate]);
 
   const onRotationGestureEvent = useCallback((event: any) => {
     const deg = startRotation.current + (event.nativeEvent.rotation * 180 / Math.PI);
@@ -147,12 +143,11 @@ function DraggableItem({
 
   const onRotationHandlerStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
-      onGestureStart?.();
       startRotation.current = rotation;
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { rotation: ((rotation % 360) + 360) % 360 });
     }
-  }, [item.clothingId, rotation, onUpdate, onGestureStart]);
+  }, [item.clothingId, rotation, onUpdate]);
 
   // Rotate handle — drag from bottom-right corner to rotate
   const handlePanRef = useRef<any>(null);
@@ -169,13 +164,12 @@ function DraggableItem({
 
   const onHandlePanStateChange = useCallback((event: any) => {
     if (event.nativeEvent.state === State.BEGAN) {
-      onGestureStart?.();
       onSelect();
       handleStartRotation.current = rotation;
     } else if (event.nativeEvent.state === State.END) {
       onUpdate(item.clothingId, { rotation: ((rotation % 360) + 360) % 360 });
     }
-  }, [item.clothingId, rotation, onSelect, onUpdate, onGestureStart]);
+  }, [item.clothingId, rotation, onSelect, onUpdate]);
 
   const imageSize = BASE_IMAGE_SIZE * scale;
 
@@ -281,15 +275,10 @@ export function OutfitEditorScreen({ onSave }: Props) {
     sendBackward,
     bringToFront,
     sendToBack,
-    undo,
-    redo,
     clearCanvas,
     toggleGrid,
     showGrid,
     canvasBackground,
-    historyIndex,
-    history,
-    saveToHistory,
     loadFromOutfit,
     editingOutfitId,
     reset,
@@ -298,8 +287,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const { addOutfit, updateOutfit, outfits, groups, clothing } = useWardrobeStore();
 
   const [selectedItemId, setSelectedItemId] = useState<number | null>(null);
-  const canUndo = historyIndex > 0;
-  const canRedo = historyIndex < history.length - 1;
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
   const [showAttrSheet, setShowAttrSheet] = useState(false);
@@ -582,27 +569,9 @@ export function OutfitEditorScreen({ onSave }: Props) {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>搭配画板</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity
-            style={[styles.iconBtn, !canUndo && styles.iconBtnDisabled]}
-            onPress={undo}
-            disabled={!canUndo}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-undo-outline" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.iconBtn, !canRedo && styles.iconBtnDisabled]}
-            onPress={redo}
-            disabled={!canRedo}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="arrow-redo-outline" size={20} color={theme.colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>保存</Text>
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+          <Text style={styles.saveButtonText}>保存</Text>
+        </TouchableOpacity>
       </View>
 
       {/* 已删除单品清除横幅 */}
@@ -647,7 +616,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
                 onDelete={handleDelete}
                 isSelected={selectedItemId === item.clothingId}
                 onSelect={() => handleSelect(item.clothingId)}
-                onGestureStart={saveToHistory}
                 isDeleted={deletedClothingIds.includes(item.clothingId)}
                 styles={styles}
                 theme={theme}
@@ -826,22 +794,6 @@ const createStyles = (theme: any, insets: any) =>
       fontSize: 18,
       fontWeight: '600',
       color: theme.colors.text,
-    },
-    headerRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
-    iconBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.colors.background,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    iconBtnDisabled: {
-      opacity: 0.3,
     },
     saveButton: {
       backgroundColor: theme.colors.primary,
