@@ -175,9 +175,8 @@ export function ClothingSelectionScreen() {
         }
       />
 
-      {/* 底部渐变 + 按钮 */}
+      {/* 底部按钮 */}
       <View style={styles.footer}>
-        <View style={styles.footerGradient} pointerEvents="none" />
         <TouchableOpacity
           style={[styles.nextButton, selectedIds.length === 0 && styles.nextButtonDisabled]}
           onPress={handleNext}
@@ -322,15 +321,6 @@ const createStyles = (theme: any, insets: any) =>
       right: 0,
       alignItems: 'center',
       paddingBottom: 20,
-    },
-    footerGradient: {
-      position: 'absolute',
-      top: -60,
-      left: 0,
-      right: 0,
-      height: 80,
-      backgroundColor: theme.colors.background,
-      opacity: 0.9,
     },
     nextButton: {
       backgroundColor: theme.colors.primary,
