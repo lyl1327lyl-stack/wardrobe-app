@@ -52,9 +52,11 @@ const BG_PRESETS: { label: string; value: CanvasBackground }[] = [
   { label: '无', value: { type: 'none', value: '' } },
   { label: '白', value: { type: 'color', value: '#FFFFFF' } },
   { label: '米', value: { type: 'color', value: '#F5EDE3' } },
-  { label: '浅灰', value: { type: 'color', value: '#ECECEC' } },
-  { label: '深灰', value: { type: 'color', value: '#3D3D3D' } },
-  { label: '黑', value: { type: 'color', value: '#1A1A1A' } },
+  { label: '浅粉', value: { type: 'color', value: '#FDE7EC' } },
+  { label: '浅蓝', value: { type: 'color', value: '#E6F0FA' } },
+  { label: '浅绿', value: { type: 'color', value: '#E8F3E9' } },
+  { label: '浅黄', value: { type: 'color', value: '#FBF5DC' } },
+  { label: '浅紫', value: { type: 'color', value: '#EFE8F5' } },
 ];
 
 interface Props {
@@ -579,8 +581,12 @@ export function OutfitEditorScreen({ onSave }: Props) {
   handleSaveRef.current = handleSave;
 
   const handleBackgroundPress = useCallback(() => {
-    setSelectedItemId(null);
-  }, []);
+    if (canvasItems.length === 0) {
+      navigation.navigate('ClothingSelection', { source: 'Editor' });
+    } else {
+      setSelectedItemId(null);
+    }
+  }, [canvasItems.length, navigation]);
 
   return (
     <View style={styles.container}>
@@ -656,7 +662,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
             {canvasItems.length === 0 && (
               <View style={styles.canvasEmpty}>
                 <Ionicons name="image-outline" size={48} color={theme.colors.textTertiary} />
-                <Text style={styles.canvasEmptyText}>点击"+"添加衣物</Text>
+                <Text style={styles.canvasEmptyText}>点击画板添加衣物</Text>
               </View>
             )}
           </TouchableOpacity>
