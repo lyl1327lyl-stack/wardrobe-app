@@ -48,6 +48,15 @@ type RootStackParamList = {
   OutfitDetail: { outfitId: number; groupId?: number; groupName?: string };
 };
 
+const BG_PRESETS: { label: string; value: CanvasBackground }[] = [
+  { label: '无', value: { type: 'none', value: '' } },
+  { label: '白', value: { type: 'color', value: '#FFFFFF' } },
+  { label: '米', value: { type: 'color', value: '#F5EDE3' } },
+  { label: '浅灰', value: { type: 'color', value: '#ECECEC' } },
+  { label: '深灰', value: { type: 'color', value: '#3D3D3D' } },
+  { label: '黑', value: { type: 'color', value: '#1A1A1A' } },
+];
+
 interface Props {
   onSave?: (canvasData: CanvasItem[], style: string) => void;
 }
@@ -279,6 +288,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
     toggleGrid,
     showGrid,
     canvasBackground,
+    setCanvasBackground,
     loadFromOutfit,
     editingOutfitId,
     reset,
@@ -290,6 +300,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
   const [canvasDims, setCanvasDims] = useState({ width: CANVAS_WIDTH, height: CANVAS_WIDTH });
   const [showTooltip, setShowTooltip] = useState(true);
   const [showAttrSheet, setShowAttrSheet] = useState(false);
+  const [showBgPicker, setShowBgPicker] = useState(false);
   const customSeasons = useCustomOptionsStore(s => s.seasons);
 
   // 检测画板中已删除的单品
@@ -492,6 +503,13 @@ export function OutfitEditorScreen({ onSave }: Props) {
     }
     setShowAttrSheet(true);
   }, [canvasItems.length]);
+
+  const handleClearCanvas = useCallback(() => {
+    Alert.alert('清空画板', '确定清空所有衣物？此操作不可撤销。', [
+      { text: '取消', style: 'cancel' },
+      { text: '清空', style: 'destructive', onPress: () => clearCanvas() },
+    ]);
+  }, [clearCanvas]);
 
   // Sheet 确认后：生成缩略图 + 写库（含完整属性）+ 退出
   const handleConfirmAttributes = useCallback(async (attrs: OutfitAttributes) => {
@@ -755,11 +773,50 @@ export function OutfitEditorScreen({ onSave }: Props) {
         onConfirm={handleConfirmAttributes}
       />
 
+      <Modal visible={showBgPicker} transparent animationType="slide" onRequestClose={() => setShowBgPicker(false)}>
+        <View style={styles.bgPickerOverlay}>
+          <TouchableOpacity style={styles.bgPickerBackdrop} activeOpacity={1} onPress={() => setShowBgPicker(false)} />
+          <View style={styles.bgPickerCard}>
+            <Text style={styles.bgPickerTitle}>画布背景</Text>
+            <View style={styles.bgSwatchRow}>
+              {BG_PRESETS.map(preset => {
+                const isActive = canvasBackground.type === preset.value.type && canvasBackground.value === preset.value.value;
+                const isNone = preset.value.type === 'none';
+                return (
+                  <TouchableOpacity
+                    key={preset.label}
+                    style={[
+                      styles.bgSwatch,
+                      { backgroundColor: isNone ? theme.colors.card : preset.value.value },
+                      isActive && styles.bgSwatchActive,
+                    ]}
+                    onPress={() => {
+                      setCanvasBackground(preset.value);
+                      setShowBgPicker(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    {isNone && (
+                      <Ionicons name="ban-outline" size={18} color={theme.colors.textTertiary} />
+                    )}
+                    <Text style={[styles.bgSwatchLabel, isNone && { color: theme.colors.textTertiary }]}>
+                      {preset.label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       {/* 底部工具栏 */}
       <CanvasToolsBar
         onAdd={() => navigation.navigate('ClothingSelection', { source: 'Editor' })}
         selectedGroupName={groups.find(g => g.id === selectedGroupId)?.name}
         onSelectGroup={() => setShowGroupModal(true)}
+        onBackground={() => setShowBgPicker(true)}
+        onClear={handleClearCanvas}
       />
     </View>
   );
@@ -805,6 +862,50 @@ const createStyles = (theme: any, insets: any) =>
       color: '#fff',
       fontSize: 14,
       fontWeight: '500',
+    },
+    bgPickerOverlay: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    bgPickerBackdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+    },
+    bgPickerCard: {
+      backgroundColor: theme.colors.card,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 24,
+    },
+    bgPickerTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.colors.text,
+      marginBottom: 14,
+    },
+    bgSwatchRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 12,
+    },
+    bgSwatch: {
+      width: 64,
+      height: 64,
+      borderRadius: 12,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    bgSwatchActive: {
+      borderColor: theme.colors.primary,
+    },
+    bgSwatchLabel: {
+      fontSize: 11,
+      color: theme.colors.textSecondary,
+      marginTop: 2,
     },
     deletedBanner: {
       flexDirection: 'row',
