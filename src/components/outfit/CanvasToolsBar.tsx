@@ -7,12 +7,16 @@ interface Props {
   onAdd: () => void;
   selectedGroupName?: string;
   onSelectGroup: () => void;
+  onBackground: () => void;
+  onClear: () => void;
 }
 
 export function CanvasToolsBar({
   onAdd,
   selectedGroupName,
   onSelectGroup,
+  onBackground,
+  onClear,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -43,6 +47,20 @@ export function CanvasToolsBar({
           />
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.toolBtn, { backgroundColor: theme.colors.background }]}
+          onPress={onBackground}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="color-palette-outline" size={20} color={theme.colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.toolBtn, { backgroundColor: theme.colors.background }]}
+          onPress={onClear}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="trash-outline" size={20} color={theme.colors.text} />
+        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
           onPress={onAdd}
@@ -88,6 +106,14 @@ const createStyles = (theme: any) =>
       fontSize: 14,
       fontWeight: '500',
       flexShrink: 1,
+    },
+    toolBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 8,
     },
     addButton: {
       width: 44,
