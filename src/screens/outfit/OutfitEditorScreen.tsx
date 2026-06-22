@@ -276,7 +276,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
 
   const groupIdFromRoute = route.params?.groupId;
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(groupIdFromRoute ?? null);
-  const [showGroupModal, setShowGroupModal] = useState(false);
 
   const {
     canvasItems,
@@ -746,39 +745,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
       </View>
 
       {/* 分组选择 Modal */}
-      <Modal visible={showGroupModal} animationType="slide" transparent>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowGroupModal(false)}>
-          <View style={[styles.groupSheet, { backgroundColor: theme.colors.card, paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.groupSheetHandle} />
-            <Text style={[styles.groupSheetTitle, { color: theme.colors.text }]}>选择分组</Text>
-            <FlatList
-              data={groups}
-              keyExtractor={item => item.id.toString()}
-              style={styles.groupList}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.groupItem,
-                    { backgroundColor: theme.colors.background },
-                    selectedGroupId === item.id && { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary },
-                  ]}
-                  onPress={() => {
-                    setSelectedGroupId(item.id);
-                    setShowGroupModal(false);
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.groupItemText, { color: theme.colors.text }]}>{item.name}</Text>
-                  {selectedGroupId === item.id && (
-                    <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
-                  )}
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       <OutfitAttributesSheet
         visible={showAttrSheet}
         initial={prefillAttributes}
@@ -827,8 +793,6 @@ export function OutfitEditorScreen({ onSave }: Props) {
       {/* 底部工具栏 */}
       <CanvasToolsBar
         onAdd={() => navigation.navigate('ClothingSelection', { source: 'Editor' })}
-        selectedGroupName={groups.find(g => g.id === selectedGroupId)?.name}
-        onSelectGroup={() => setShowGroupModal(true)}
         onBackground={() => setShowBgPicker(true)}
         onClear={handleClearCanvas}
       />
@@ -1092,23 +1056,6 @@ const createStyles = (theme: any, insets: any) =>
     modalOverlay: {
       flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end',
     },
-    groupSheet: {
-      borderTopLeftRadius: 20, borderTopRightRadius: 20,
-      paddingHorizontal: 20, maxHeight: '50%',
-    },
-    groupSheetHandle: {
-      width: 40, height: 4, borderRadius: 2,
-      backgroundColor: '#ddd', alignSelf: 'center',
-      marginTop: 12, marginBottom: 16,
-    },
-    groupSheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 16 },
-    groupList: { marginBottom: 8 },
-    groupItem: {
-      flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-      paddingHorizontal: 16, paddingVertical: 14, borderRadius: 12, marginBottom: 8,
-      borderWidth: 2, borderColor: 'transparent',
-    },
-    groupItemText: { fontSize: 15, fontWeight: '500' },
     layerControls: {
       position: 'absolute',
       right: CANVAS_PADDING + 8,
