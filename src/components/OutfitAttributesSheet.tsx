@@ -15,6 +15,7 @@ import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
+import { useWardrobeStore } from '../store/wardrobeStore';
 import { OutfitGroup } from '../types';
 
 export interface OutfitAttributes {
@@ -118,6 +119,7 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const customSeasons = useCustomOptionsStore(s => s.seasons);
   const customTags = useCustomOptionsStore(s => s.tags);
+  const addGroup = useWardrobeStore(s => s.addGroup);
 
   const [name, setName] = useState(initial.name);
   const [groupId, setGroupId] = useState(initial.groupId);
@@ -126,6 +128,8 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
   const [notes, setNotes] = useState(initial.notes);
   const [tagInput, setTagInput] = useState('');
   const [showTagInput, setShowTagInput] = useState(false);
+  const [newGroupInput, setNewGroupInput] = useState('');
+  const [showNewGroupInput, setShowNewGroupInput] = useState(false);
 
   const wasVisibleRef = useRef(false);
 
@@ -139,6 +143,8 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
       setNotes(initial.notes);
       setTagInput('');
       setShowTagInput(false);
+      setNewGroupInput('');
+      setShowNewGroupInput(false);
     }
     wasVisibleRef.current = visible;
   }, [visible, initial]);
@@ -155,6 +161,14 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
     if (!tags.includes(t)) setTags(prev => [...prev, t]);
     setTagInput('');
     setShowTagInput(false);
+  };
+  const handleCreateGroup = async () => {
+    const gname = newGroupInput.trim();
+    if (!gname) { setShowNewGroupInput(false); return; }
+    const id = await addGroup(gname, '');
+    setGroupId(id);
+    setNewGroupInput('');
+    setShowNewGroupInput(false);
   };
   const handleSave = () => {
     onConfirm({ name: name.trim(), groupId, seasons, tags, notes: notes.trim() });
@@ -208,7 +222,28 @@ export function OutfitAttributesSheet({ visible, initial, groups, onClose, onCon
                     </TouchableOpacity>
                   );
                 })}
+                <TouchableOpacity style={styles.addTagChip} onPress={() => setShowNewGroupInput(true)}>
+                  <Ionicons name="add" size={14} color={theme.colors.textTertiary} />
+                  <Text style={styles.addTagText}>新建分组</Text>
+                </TouchableOpacity>
               </View>
+              {showNewGroupInput && (
+                <View style={styles.tagInputRow}>
+                  <TextInput
+                    style={styles.tagInput}
+                    value={newGroupInput}
+                    onChangeText={setNewGroupInput}
+                    placeholder="输入分组名"
+                    placeholderTextColor={theme.colors.textTertiary}
+                    autoFocus
+                    maxLength={20}
+                    onSubmitEditing={handleCreateGroup}
+                  />
+                  <TouchableOpacity style={[styles.chip, styles.chipActive]} onPress={handleCreateGroup}>
+                    <Text style={styles.chipTextActive}>创建</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             {/* 季节 */}
