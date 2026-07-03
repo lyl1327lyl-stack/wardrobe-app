@@ -13,6 +13,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
@@ -255,31 +256,45 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 10,
-      minHeight: 48,
+      minHeight: 50,
     },
-    selectedThumbs: {
-      flex: 1,
+    selectedThumbsContent: {
+      alignItems: 'center',
+      gap: 6,
+    },
+    selectedThumbWrap: {
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      overflow: 'hidden',
+      backgroundColor: theme.colors.background,
     },
     selectedThumb: {
-      width: 48,
-      height: 48,
-      borderRadius: 8,
-      backgroundColor: theme.colors.background,
-      marginRight: 6,
+      width: 46,
+      height: 46,
     },
     footerCountBadge: {
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 12,
-      backgroundColor: theme.colors.borderLight,
+      minWidth: 26,
+      paddingHorizontal: 9,
+      paddingVertical: 6,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.colors.primary + '18',
     },
     footerCountText: {
       fontSize: 12,
-      fontWeight: '600',
-      color: theme.colors.textSecondary,
+      fontWeight: '700',
+      color: theme.colors.primary,
+    },
+    footerEmpty: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
     },
     footerPlaceholder: {
-      flex: 1,
       fontSize: 13,
       color: theme.colors.textTertiary,
     },
@@ -290,11 +305,14 @@ const makeStyles = (theme: Theme) =>
     clearBtn: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'center',
       gap: 5,
       paddingHorizontal: 16,
-      paddingVertical: 12,
-      borderRadius: 10,
-      backgroundColor: theme.colors.borderLight,
+      paddingVertical: 13,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
     },
     clearBtnText: {
       fontSize: 13,
@@ -303,19 +321,26 @@ const makeStyles = (theme: Theme) =>
     },
     confirmBtn: {
       flex: 1,
-      paddingVertical: 13,
-      borderRadius: 10,
+      flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: theme.colors.primary,
-    },
-    confirmBtnDisabled: {
+      gap: 7,
+      paddingVertical: 14,
+      borderRadius: 14,
+      overflow: 'hidden',
       backgroundColor: theme.colors.borderLight,
+      ...theme.shadows.sm,
+    },
+    confirmBtnBg: {
+      ...StyleSheet.absoluteFillObject,
     },
     confirmBtnText: {
       color: theme.colors.white,
       fontSize: 15,
       fontWeight: '700',
+    },
+    confirmBtnTextDisabled: {
+      color: theme.colors.textTertiary,
     },
 
     dateModalOverlay: {
@@ -720,28 +745,32 @@ export function RecordWearScreen() {
         />
       )}
 
-      {/* Footer bar（两栏：已选 + 按钮） */}
+      {/* 浮起底栏（两栏：已选 + 按钮） */}
       <View style={styles.footer}>
         {/* 第一栏：已选衣物 */}
         <View style={styles.footerTopRow}>
           {selectedIds.length > 0 ? (
             <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedThumbs}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.selectedThumbsContent}>
                 {selectedItems.map(item => (
-                  <Image
-                    key={item.id}
-                    source={{ uri: item.thumbnailUri }}
-                    style={styles.selectedThumb}
-                    resizeMode="cover"
-                  />
+                  <View key={item.id} style={styles.selectedThumbWrap}>
+                    <Image
+                      source={{ uri: item.thumbnailUri }}
+                      style={styles.selectedThumb}
+                      resizeMode="cover"
+                    />
+                  </View>
                 ))}
               </ScrollView>
               <View style={styles.footerCountBadge}>
-                <Text style={styles.footerCountText}>{selectedIds.length} 件</Text>
+                <Text style={styles.footerCountText}>{selectedIds.length}</Text>
               </View>
             </>
           ) : (
-            <Text style={styles.footerPlaceholder}>请选择今天穿的衣物</Text>
+            <View style={styles.footerEmpty}>
+              <Ionicons name="shirt-outline" size={18} color={theme.colors.textTertiary} />
+              <Text style={styles.footerPlaceholder}>请选择今天穿的衣物</Text>
+            </View>
           )}
         </View>
 
@@ -749,18 +778,31 @@ export function RecordWearScreen() {
         <View style={styles.footerBtnRow}>
           {selectedIds.length > 0 && (
             <TouchableOpacity style={styles.clearBtn} onPress={() => setSelectedIds([])} activeOpacity={0.7}>
-              <Ionicons name="trash-outline" size={16} color={theme.colors.textSecondary} />
+              <Ionicons name="close" size={15} color={theme.colors.textSecondary} />
               <Text style={styles.clearBtnText}>清空</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity
-            style={[styles.confirmBtn, selectedIds.length === 0 && styles.confirmBtnDisabled]}
+            style={styles.confirmBtn}
             onPress={handleConfirm}
             disabled={selectedIds.length === 0}
-            activeOpacity={0.7}
+            activeOpacity={0.85}
           >
-            <Text style={styles.confirmBtnText}>
-              {mode === 'outfit' ? '记录这套搭配' : `记录 (${selectedIds.length})`}
+            {selectedIds.length > 0 && (
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.primaryDark]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.confirmBtnBg}
+              />
+            )}
+            <Ionicons
+              name="checkmark-circle"
+              size={17}
+              color={selectedIds.length > 0 ? theme.colors.white : theme.colors.textTertiary}
+            />
+            <Text style={[styles.confirmBtnText, selectedIds.length === 0 && styles.confirmBtnTextDisabled]}>
+              {mode === 'outfit' ? '记录这套搭配' : `记录穿搭 (${selectedIds.length})`}
             </Text>
           </TouchableOpacity>
         </View>
