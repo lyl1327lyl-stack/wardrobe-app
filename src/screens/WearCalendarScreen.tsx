@@ -99,6 +99,57 @@ const makeStyles = (theme: Theme) =>
     recentCountText: {
       fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary,
     },
+    // 月度概览统计卡片（N3）
+    statsCard: {
+      marginHorizontal: 20,
+      marginTop: 16,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: 18,
+      ...theme.shadows.sm,
+    },
+    statsHeader: {
+      flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14,
+    },
+    statsTitle: {
+      fontSize: 14, fontWeight: '600', color: theme.colors.text,
+    },
+    statsRow: {
+      flexDirection: 'row', justifyContent: 'space-around', marginBottom: 14,
+    },
+    statsItem: {
+      alignItems: 'center', flex: 1,
+    },
+    statsValue: {
+      fontSize: 22, fontWeight: '700', color: theme.colors.text,
+    },
+    statsDesc: {
+      fontSize: 11, color: theme.colors.textTertiary, marginTop: 2,
+    },
+    statsDivider: {
+      width: 1, height: 32, backgroundColor: theme.colors.border, alignSelf: 'center',
+    },
+    statsTopLabel: {
+      fontSize: 11, fontWeight: '600', color: theme.colors.textSecondary, marginBottom: 8,
+    },
+    topItemRow: {
+      flexDirection: 'row', gap: 10,
+    },
+    topItem: {
+      flex: 1, alignItems: 'center',
+    },
+    topItemThumb: {
+      width: 48, height: 48, borderRadius: 8, backgroundColor: theme.colors.borderLight,
+    },
+    topItemName: {
+      fontSize: 11, color: theme.colors.textSecondary, marginTop: 4, textAlign: 'center',
+    },
+    topItemCount: {
+      fontSize: 10, color: theme.colors.textTertiary, marginTop: 1,
+    },
+    statsEmpty: {
+      fontSize: 12, color: theme.colors.textTertiary, textAlign: 'center', paddingVertical: 8,
+    },
   });
 
 export function WearCalendarScreen() {
@@ -153,6 +204,24 @@ export function WearCalendarScreen() {
     }
     return map;
   }, [wearData, outfits]);
+
+  // 月度概览统计（N3）
+  const monthStats = useMemo(() => {
+    const daysWithRecords = Object.entries(wearData).filter(([_, items]) => items.length > 0);
+    const wearingDays = daysWithRecords.length;
+    const allIds = daysWithRecords.flatMap(([_, items]) => items.map(i => i.id));
+    const uniqueItems = new Set(allIds).size;
+    const freq = new Map<number, number>();
+    allIds.forEach(id => freq.set(id, (freq.get(id) || 0) + 1));
+    let maxFreq = 0;
+    freq.forEach(v => { if (v > maxFreq) maxFreq = v; });
+    const topItems = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([id, count]) => ({ item: allClothingMap.get(id), count }))
+      .filter(e => e.item);
+    return { wearingDays, uniqueItems, maxFreq, topItems };
+  }, [wearData, allClothingMap]);
 
   const loadMonthData = useCallback(async () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
@@ -316,6 +385,56 @@ export function WearCalendarScreen() {
           onNextMonth={goToNextMonth}
           outfitMatchMap={outfitMatchMap}
         />
+
+        {/* 月度概览统计卡片（N3） */}
+        {monthStats.wearingDays > 0 && (
+          <View style={styles.statsCard}>
+            <View style={styles.statsHeader}>
+              <View style={styles.cardDot} />
+              <Text style={styles.statsTitle}>{currentMonth}月概览</Text>
+            </View>
+            <View style={styles.statsRow}>
+              <View style={styles.statsItem}>
+                <Text style={styles.statsValue}>{monthStats.wearingDays}</Text>
+                <Text style={styles.statsDesc}>穿着天数</Text>
+              </View>
+              <View style={styles.statsDivider} />
+              <View style={styles.statsItem}>
+                <Text style={styles.statsValue}>{monthStats.uniqueItems}</Text>
+                <Text style={styles.statsDesc}>穿着件数</Text>
+              </View>
+              <View style={styles.statsDivider} />
+              <View style={styles.statsItem}>
+                <Text style={styles.statsValue}>{monthStats.maxFreq}</Text>
+                <Text style={styles.statsDesc}>最高频次</Text>
+              </View>
+            </View>
+            {monthStats.topItems.length > 0 && (
+              <>
+                <Text style={styles.statsTopLabel}>最常穿 Top {monthStats.topItems.length}</Text>
+                <View style={styles.topItemRow}>
+                  {monthStats.topItems.map(({ item, count }) => (
+                    <View key={item!.id} style={styles.topItem}>
+                      {(item!.thumbnailUri || item!.imageUri) ? (
+                        <Image
+                          source={{ uri: item!.thumbnailUri || item!.imageUri }}
+                          style={styles.topItemThumb}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={[styles.topItemThumb, { justifyContent: 'center', alignItems: 'center' }]}>
+                          <Ionicons name="shirt-outline" size={18} color={theme.colors.textTertiary} />
+                        </View>
+                      )}
+                      <Text style={styles.topItemName} numberOfLines={1}>{item!.type || item!.remarks || '--'}</Text>
+                      <Text style={styles.topItemCount}>{count} 次</Text>
+                    </View>
+                  ))}
+                </View>
+              </>
+            )}
+          </View>
+        )}
 
         {/* Recent Week Card */}
         <View style={styles.card}>
