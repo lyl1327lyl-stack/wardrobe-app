@@ -305,6 +305,11 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.textSecondary,
       marginRight: 10,
     },
+    footerPlaceholder: {
+      flex: 1,
+      fontSize: 13,
+      color: theme.colors.textTertiary,
+    },
     clearBtn: {
       paddingHorizontal: 16,
       paddingVertical: 12,
@@ -424,32 +429,33 @@ export function RecordWearScreen() {
     loadMonthData();
   }, [loadMonthData]);
 
-  // When selectedDate changes, load existing records
+  // When selectedDate/mode changes, load existing records for the day
   useEffect(() => {
     (async () => {
       const records = await wearRecordsDb.getWearRecordsByDate(selectedDate);
       const ids = records.map(r => r.clothingId);
+      // 始终记录当天已有衣物（用于追加模式标记 + 判断是否显示模式切换）
+      const map = new Map<number, ClothingItem>();
+      for (const c of clothing) map.set(c.id, c);
+      const items = records.map(r => map.get(r.clothingId) || ({
+        id: r.clothingId,
+        imageUri: r.clothingThumbnailUri || '',
+        thumbnailUri: r.clothingThumbnailUri || '',
+        originalImageUri: '',
+        type: r.clothingType || '已删除',
+        parentType: '',
+        color: '', brand: '', size: '', remarks: '',
+        seasons: [], tags: [], fit: '', thickness: '',
+        purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
+        createdAt: '', wardrobeId: 0,
+      } as ClothingItem)).filter(Boolean);
+      setTodayExistingItems(items);
       if (isAppendMode) {
-        // 追加模式：不预选，但记录已有衣物用于提示
-        const map = new Map<number, ClothingItem>();
-        for (const c of clothing) map.set(c.id, c);
-        setTodayExistingItems(records.map(r => map.get(r.clothingId) || ({
-          id: r.clothingId,
-          imageUri: r.clothingThumbnailUri || '',
-          thumbnailUri: r.clothingThumbnailUri || '',
-          originalImageUri: '',
-          type: r.clothingType || '已删除',
-          parentType: '',
-          color: '', brand: '', size: '', remarks: '',
-          seasons: [], tags: [], fit: '', thickness: '',
-          purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
-          createdAt: '', wardrobeId: 0,
-        } as ClothingItem)).filter(Boolean));
+        // 追加模式：不预选，从零添加
         setSelectedIds([]);
       } else {
-        // 替换模式：预选已有（当前行为）
+        // 替换模式：预选当天已有记录（可取消选择）
         setSelectedIds(ids);
-        setTodayExistingItems([]);
       }
     })();
   }, [selectedDate, isAppendMode, clothing]);
@@ -494,6 +500,9 @@ export function RecordWearScreen() {
   const todayExistingIds = useMemo(() => {
     return new Set(todayExistingItems.map(i => i.id));
   }, [todayExistingItems]);
+
+  // 当天是否有已有记录（决定是否显示追加/替换切换）
+  const hasExistingRecords = todayExistingItems.length > 0;
 
   const toggleItem = (id: number) => {
     // 追加模式：已记录的衣物不可重复选择
@@ -642,42 +651,46 @@ export function RecordWearScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 追加/替换模式切换（N6） */}
-      <View style={[styles.modeRow, { marginTop: 0 }]}>
-        <TouchableOpacity
-          style={[styles.modeTab, isAppendMode && styles.modeTabActive]}
-          onPress={() => setIsAppendMode(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.modeTabText, isAppendMode && styles.modeTabTextActive]}>追加记录</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.modeTab, !isAppendMode && styles.modeTabActive]}
-          onPress={() => setIsAppendMode(false)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.modeTabText, !isAppendMode && styles.modeTabTextActive]}>重新设置</Text>
-        </TouchableOpacity>
-      </View>
+      {/* 追加/替换模式切换（N6）：仅当天有记录时显示 */}
+      {hasExistingRecords && (
+        <>
+          <View style={[styles.modeRow, { marginTop: 0 }]}>
+            <TouchableOpacity
+              style={[styles.modeTab, isAppendMode && styles.modeTabActive]}
+              onPress={() => setIsAppendMode(true)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modeTabText, isAppendMode && styles.modeTabTextActive]}>追加记录</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.modeTab, !isAppendMode && styles.modeTabActive]}
+              onPress={() => setIsAppendMode(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.modeTabText, !isAppendMode && styles.modeTabTextActive]}>重新设置</Text>
+            </TouchableOpacity>
+          </View>
 
-      {/* 提示文字（N6） */}
-      <View style={styles.appendHint}>
-        <Text style={styles.appendHintText}>
-          {isAppendMode
-            ? '追加模式：在当天已有记录基础上添加，不清除已有记录'
-            : '替换模式：重新设置当天全部穿着记录'}
-        </Text>
-      </View>
+          {/* 提示文字（N6） */}
+          <View style={styles.appendHint}>
+            <Text style={styles.appendHintText}>
+              {isAppendMode
+                ? '追加模式：在当天已有记录基础上添加，不清除已有记录'
+                : '替换模式：可取消勾选来移除当天记录'}
+            </Text>
+          </View>
 
-      {/* 追加模式下已有记录提示（N6） */}
-      {isAppendMode && todayExistingItems.length > 0 && (
-        <View style={[styles.appendHint, { backgroundColor: theme.colors.borderLight }]}>
-          <Text style={styles.appendHintText}>
-            今日已记录 <Text style={styles.appendHintBold}>{todayExistingItems.length} 件</Text>
-            ：{todayExistingItems.slice(0, 5).map(i => i.type).join('、')}
-            {todayExistingItems.length > 5 ? ' 等' : ''}
-          </Text>
-        </View>
+          {/* 追加模式下已有记录提示（N6） */}
+          {isAppendMode && (
+            <View style={[styles.appendHint, { backgroundColor: theme.colors.borderLight }]}>
+              <Text style={styles.appendHintText}>
+                今日已记录 <Text style={styles.appendHintBold}>{todayExistingItems.length} 件</Text>
+                ：{todayExistingItems.slice(0, 5).map(i => i.type).join('、')}
+                {todayExistingItems.length > 5 ? ' 等' : ''}
+              </Text>
+            </View>
+          )}
+        </>
       )}
 
       {/* Mode toggle */}
@@ -821,35 +834,39 @@ export function RecordWearScreen() {
         />
       )}
 
-      {/* Footer bar */}
-      {selectedIds.length > 0 && (
-        <View style={styles.footer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedThumbs}>
-            {selectedItems.map(item => (
-              <Image
-                key={item.id}
-                source={{ uri: item.thumbnailUri }}
-                style={styles.selectedThumb}
-                resizeMode="cover"
-              />
-            ))}
-          </ScrollView>
-          <Text style={styles.footerCount}>{selectedIds.length} 件</Text>
-          <TouchableOpacity style={styles.clearBtn} onPress={() => setSelectedIds([])} activeOpacity={0.7}>
-            <Text style={styles.clearBtnText}>清空</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.confirmBtn, selectedIds.length === 0 && styles.confirmBtnDisabled]}
-            onPress={handleConfirm}
-            disabled={selectedIds.length === 0}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.confirmBtnText}>
-              {mode === 'outfit' ? '记录这套搭配' : `记录 (${selectedIds.length})`}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
+      {/* Footer bar（始终显示） */}
+      <View style={styles.footer}>
+        {selectedIds.length > 0 ? (
+          <>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedThumbs}>
+              {selectedItems.map(item => (
+                <Image
+                  key={item.id}
+                  source={{ uri: item.thumbnailUri }}
+                  style={styles.selectedThumb}
+                  resizeMode="cover"
+                />
+              ))}
+            </ScrollView>
+            <Text style={styles.footerCount}>{selectedIds.length} 件</Text>
+            <TouchableOpacity style={styles.clearBtn} onPress={() => setSelectedIds([])} activeOpacity={0.7}>
+              <Text style={styles.clearBtnText}>清空</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <Text style={styles.footerPlaceholder}>请选择今天穿的衣物</Text>
+        )}
+        <TouchableOpacity
+          style={[styles.confirmBtn, selectedIds.length === 0 && styles.confirmBtnDisabled]}
+          onPress={handleConfirm}
+          disabled={selectedIds.length === 0}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.confirmBtnText}>
+            {mode === 'outfit' ? '记录这套搭配' : `记录 (${selectedIds.length})`}
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Date picker modal */}
       <Modal visible={showDatePicker} transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
