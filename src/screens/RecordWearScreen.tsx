@@ -98,22 +98,6 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
     },
 
-    // 追加/替换模式切换（N6）
-    appendHint: {
-      marginHorizontal: 16,
-      marginBottom: 6,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      backgroundColor: theme.colors.primary + '10',
-      borderRadius: 8,
-    },
-    appendHintText: {
-      fontSize: 11, color: theme.colors.textSecondary, lineHeight: 16,
-    },
-    appendHintBold: {
-      fontWeight: '700', color: theme.colors.primary,
-    },
-
     searchRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -197,28 +181,6 @@ const makeStyles = (theme: Theme) =>
     },
     itemCardActive: {
       borderColor: theme.colors.primary,
-    },
-    itemCardRecorded: {
-      opacity: 0.65,
-      borderColor: theme.colors.accent,
-      borderWidth: 2,
-    },
-    recordedBadge: {
-      position: 'absolute',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: theme.colors.accent + 'E6',
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      paddingVertical: 3,
-      gap: 3,
-    },
-    recordedBadgeText: {
-      fontSize: 9,
-      fontWeight: '700',
-      color: theme.colors.white,
     },
     itemImage: {
       width: '100%',
@@ -362,7 +324,6 @@ export function RecordWearScreen() {
 
   const clothing = useWardrobeStore(s => s.clothing);
   const outfits = useWardrobeStore(s => s.outfits);
-  const addWearRecords = useWardrobeStore(s => s.addWearRecords);
   const replaceDayRecords = useWardrobeStore(s => s.replaceDayRecords);
   const getParents = useCustomOptionsStore(s => s.getParents);
   const getChildrenOf = useCustomOptionsStore(s => s.getChildrenOf);
@@ -370,8 +331,6 @@ export function RecordWearScreen() {
   const [mode, setMode] = useState<'items' | 'outfit'>('items');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayDateStr());
-  const [isAppendMode, setIsAppendMode] = useState(true);
-  const [todayExistingItems, setTodayExistingItems] = useState<ClothingItem[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>({});
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
@@ -429,36 +388,13 @@ export function RecordWearScreen() {
     loadMonthData();
   }, [loadMonthData]);
 
-  // When selectedDate/mode changes, load existing records for the day
+  // 切换日期时，预选当天已有记录（勾选模型：自由勾选/取消，保存时 diff 落库）
   useEffect(() => {
     (async () => {
       const records = await wearRecordsDb.getWearRecordsByDate(selectedDate);
-      const ids = records.map(r => r.clothingId);
-      // 始终记录当天已有衣物（用于追加模式标记 + 判断是否显示模式切换）
-      const map = new Map<number, ClothingItem>();
-      for (const c of clothing) map.set(c.id, c);
-      const items = records.map(r => map.get(r.clothingId) || ({
-        id: r.clothingId,
-        imageUri: r.clothingThumbnailUri || '',
-        thumbnailUri: r.clothingThumbnailUri || '',
-        originalImageUri: '',
-        type: r.clothingType || '已删除',
-        parentType: '',
-        color: '', brand: '', size: '', remarks: '',
-        seasons: [], tags: [], fit: '', thickness: '',
-        purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
-        createdAt: '', wardrobeId: 0,
-      } as ClothingItem)).filter(Boolean);
-      setTodayExistingItems(items);
-      if (isAppendMode) {
-        // 追加模式：不预选，从零添加
-        setSelectedIds([]);
-      } else {
-        // 替换模式：预选当天已有记录（可取消选择）
-        setSelectedIds(ids);
-      }
+      setSelectedIds(records.map(r => r.clothingId));
     })();
-  }, [selectedDate, isAppendMode, clothing]);
+  }, [selectedDate]);
 
   // Filter clothing
   const filteredClothing = useMemo(() => {
@@ -496,17 +432,7 @@ export function RecordWearScreen() {
     return clothing.filter(c => selectedIds.includes(c.id));
   }, [clothing, selectedIds]);
 
-  // 追加模式：已记录衣物的 ID 集合（用于列表视觉标记）
-  const todayExistingIds = useMemo(() => {
-    return new Set(todayExistingItems.map(i => i.id));
-  }, [todayExistingItems]);
-
-  // 当天是否有已有记录（决定是否显示追加/替换切换）
-  const hasExistingRecords = todayExistingItems.length > 0;
-
   const toggleItem = (id: number) => {
-    // 追加模式：已记录的衣物不可重复选择
-    if (isAppendMode && todayExistingIds.has(id)) return;
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -541,11 +467,8 @@ export function RecordWearScreen() {
       return;
     }
     try {
-      if (isAppendMode) {
-        await addWearRecords(selectedIds, selectedDate);
-      } else {
-        await replaceDayRecords(selectedIds, selectedDate);
-      }
+      // diff 保存：勾选的保留/新增，取消的移除（先 add 后 delete，防数据丢失）
+      await replaceDayRecords(selectedIds, selectedDate);
       navigation.goBack();
     } catch (error) {
       console.error('RecordWearScreen handleConfirm failed:', error);
@@ -560,28 +483,14 @@ export function RecordWearScreen() {
 
   const renderItemCard = (item: ClothingItem) => {
     const isSelected = selectedIds.includes(item.id);
-    const isAlreadyRecorded = isAppendMode && todayExistingIds.has(item.id);
     return (
       <TouchableOpacity
-        style={[
-          styles.itemCard,
-          isSelected && styles.itemCardActive,
-          isAlreadyRecorded && styles.itemCardRecorded,
-        ]}
-        onPress={() => {
-          if (isAlreadyRecorded) return;
-          toggleItem(item.id);
-        }}
-        activeOpacity={isAlreadyRecorded ? 1 : 0.7}
+        style={[styles.itemCard, isSelected && styles.itemCardActive]}
+        onPress={() => toggleItem(item.id)}
+        activeOpacity={0.7}
       >
         <Image source={{ uri: item.thumbnailUri }} style={styles.itemImage} />
-        {isAlreadyRecorded && (
-          <View style={styles.recordedBadge}>
-            <Ionicons name="checkmark-circle" size={13} color={theme.colors.white} />
-            <Text style={styles.recordedBadgeText}>已记录</Text>
-          </View>
-        )}
-        {isSelected && !isAlreadyRecorded && (
+        {isSelected && (
           <View style={styles.checkmark}>
             <Ionicons name="checkmark" size={12} color={theme.colors.white} />
           </View>
@@ -650,48 +559,6 @@ export function RecordWearScreen() {
           <Ionicons name="chevron-down" size={12} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
-
-      {/* 追加/替换模式切换（N6）：仅当天有记录时显示 */}
-      {hasExistingRecords && (
-        <>
-          <View style={[styles.modeRow, { marginTop: 0 }]}>
-            <TouchableOpacity
-              style={[styles.modeTab, isAppendMode && styles.modeTabActive]}
-              onPress={() => setIsAppendMode(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modeTabText, isAppendMode && styles.modeTabTextActive]}>追加记录</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.modeTab, !isAppendMode && styles.modeTabActive]}
-              onPress={() => setIsAppendMode(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.modeTabText, !isAppendMode && styles.modeTabTextActive]}>重新设置</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* 提示文字（N6） */}
-          <View style={styles.appendHint}>
-            <Text style={styles.appendHintText}>
-              {isAppendMode
-                ? '追加模式：在当天已有记录基础上添加，不清除已有记录'
-                : '替换模式：可取消勾选来移除当天记录'}
-            </Text>
-          </View>
-
-          {/* 追加模式下已有记录提示（N6） */}
-          {isAppendMode && (
-            <View style={[styles.appendHint, { backgroundColor: theme.colors.borderLight }]}>
-              <Text style={styles.appendHintText}>
-                今日已记录 <Text style={styles.appendHintBold}>{todayExistingItems.length} 件</Text>
-                ：{todayExistingItems.slice(0, 5).map(i => i.type).join('、')}
-                {todayExistingItems.length > 5 ? ' 等' : ''}
-              </Text>
-            </View>
-          )}
-        </>
-      )}
 
       {/* Mode toggle */}
       <View style={styles.modeRow}>
