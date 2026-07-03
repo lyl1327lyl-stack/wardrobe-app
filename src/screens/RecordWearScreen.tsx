@@ -98,6 +98,22 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
     },
 
+    // 追加/替换模式切换（N6）
+    appendHint: {
+      marginHorizontal: 16,
+      marginBottom: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.primary + '10',
+      borderRadius: 8,
+    },
+    appendHintText: {
+      fontSize: 11, color: theme.colors.textSecondary, lineHeight: 16,
+    },
+    appendHintBold: {
+      fontWeight: '700', color: theme.colors.primary,
+    },
+
     searchRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -319,6 +335,7 @@ export function RecordWearScreen() {
 
   const clothing = useWardrobeStore(s => s.clothing);
   const outfits = useWardrobeStore(s => s.outfits);
+  const addWearRecords = useWardrobeStore(s => s.addWearRecords);
   const replaceDayRecords = useWardrobeStore(s => s.replaceDayRecords);
   const getParents = useCustomOptionsStore(s => s.getParents);
   const getChildrenOf = useCustomOptionsStore(s => s.getChildrenOf);
@@ -326,6 +343,8 @@ export function RecordWearScreen() {
   const [mode, setMode] = useState<'items' | 'outfit'>('items');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedDate, setSelectedDate] = useState(todayDateStr());
+  const [isAppendMode, setIsAppendMode] = useState(true);
+  const [todayExistingItems, setTodayExistingItems] = useState<ClothingItem[]>([]);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>({});
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
@@ -383,14 +402,35 @@ export function RecordWearScreen() {
     loadMonthData();
   }, [loadMonthData]);
 
-  // When selectedDate changes, preload existing records
+  // When selectedDate changes, load existing records
   useEffect(() => {
     (async () => {
       const records = await wearRecordsDb.getWearRecordsByDate(selectedDate);
       const ids = records.map(r => r.clothingId);
-      setSelectedIds(ids);
+      if (isAppendMode) {
+        // 追加模式：不预选，但记录已有衣物用于提示
+        const map = new Map<number, ClothingItem>();
+        for (const c of clothing) map.set(c.id, c);
+        setTodayExistingItems(records.map(r => map.get(r.clothingId) || ({
+          id: r.clothingId,
+          imageUri: r.clothingThumbnailUri || '',
+          thumbnailUri: r.clothingThumbnailUri || '',
+          originalImageUri: '',
+          type: r.clothingType || '已删除',
+          parentType: '',
+          color: '', brand: '', size: '', remarks: '',
+          seasons: [], tags: [], fit: '', thickness: '',
+          purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
+          createdAt: '', wardrobeId: 0,
+        } as ClothingItem)).filter(Boolean));
+        setSelectedIds([]);
+      } else {
+        // 替换模式：预选已有（当前行为）
+        setSelectedIds(ids);
+        setTodayExistingItems([]);
+      }
     })();
-  }, [selectedDate]);
+  }, [selectedDate, isAppendMode, clothing]);
 
   // Filter clothing
   const filteredClothing = useMemo(() => {
@@ -458,12 +498,16 @@ export function RecordWearScreen() {
   };
 
   const handleConfirm = async () => {
-    if (selectedIds.length < 2) {
-      Alert.alert('提示', '请至少选择 2 件单品');
+    if (selectedIds.length < 1) {
+      Alert.alert('提示', '请至少选择 1 件单品');
       return;
     }
     try {
-      await replaceDayRecords(selectedIds, selectedDate);
+      if (isAppendMode) {
+        await addWearRecords(selectedIds, selectedDate);
+      } else {
+        await replaceDayRecords(selectedIds, selectedDate);
+      }
       navigation.goBack();
     } catch (error) {
       console.error('RecordWearScreen handleConfirm failed:', error);
@@ -554,6 +598,44 @@ export function RecordWearScreen() {
           <Ionicons name="chevron-down" size={12} color={theme.colors.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* 追加/替换模式切换（N6） */}
+      <View style={[styles.modeRow, { marginTop: 0 }]}>
+        <TouchableOpacity
+          style={[styles.modeTab, isAppendMode && styles.modeTabActive]}
+          onPress={() => setIsAppendMode(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.modeTabText, isAppendMode && styles.modeTabTextActive]}>追加记录</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, !isAppendMode && styles.modeTabActive]}
+          onPress={() => setIsAppendMode(false)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.modeTabText, !isAppendMode && styles.modeTabTextActive]}>重新设置</Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* 提示文字（N6） */}
+      <View style={styles.appendHint}>
+        <Text style={styles.appendHintText}>
+          {isAppendMode
+            ? '追加模式：在当天已有记录基础上添加，不清除已有记录'
+            : '替换模式：重新设置当天全部穿着记录'}
+        </Text>
+      </View>
+
+      {/* 追加模式下已有记录提示（N6） */}
+      {isAppendMode && todayExistingItems.length > 0 && (
+        <View style={[styles.appendHint, { backgroundColor: theme.colors.borderLight }]}>
+          <Text style={styles.appendHintText}>
+            今日已记录 <Text style={styles.appendHintBold}>{todayExistingItems.length} 件</Text>
+            ：{todayExistingItems.slice(0, 5).map(i => i.type).join('、')}
+            {todayExistingItems.length > 5 ? ' 等' : ''}
+          </Text>
+        </View>
+      )}
 
       {/* Mode toggle */}
       <View style={styles.modeRow}>
@@ -712,9 +794,9 @@ export function RecordWearScreen() {
             <Text style={styles.clearBtnText}>清空</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.confirmBtn, selectedIds.length < 2 && styles.confirmBtnDisabled]}
+            style={[styles.confirmBtn, selectedIds.length === 0 && styles.confirmBtnDisabled]}
             onPress={handleConfirm}
-            disabled={selectedIds.length < 2}
+            disabled={selectedIds.length === 0}
             activeOpacity={0.7}
           >
             <Text style={styles.confirmBtnText}>
