@@ -109,6 +109,7 @@ interface WardrobeState {
   addWearRecords: (clothingIds: number[], date: string) => Promise<number>;
   deleteWearRecord: (id: number) => Promise<void>;
   deleteWearRecordsByDate: (date: string) => Promise<void>;
+  replaceDayRecords: (clothingIds: number[], date: string) => Promise<void>;
   getWearDatesByClothing: (clothingId: number) => string[];
   getWearRecordsByDate: (date: string) => WearRecord[];
   getWearCount: (clothingId: number) => number;
@@ -913,6 +914,25 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
         };
       }),
     }));
+  },
+
+  replaceDayRecords: async (clothingIds, date) => {
+    // diff 保存：先 add 新增，再 delete 多余。失败不丢原有数据。
+    const existing = await wearRecordsDb.getWearRecordsByDate(date);
+    const existingIds = new Set(existing.map(r => r.clothingId));
+    const targetSet = new Set(clothingIds);
+
+    const toAdd = clothingIds.filter(id => !existingIds.has(id));
+    const toRemove = existing.filter(r => !targetSet.has(r.clothingId));
+
+    // 先 add 新的（失败不影响原有数据）
+    if (toAdd.length > 0) {
+      await get().addWearRecords(toAdd, date);
+    }
+    // 再 delete 多余的（add 已成功；失败则留下多余，用户可重试，绝不丢数据）
+    for (const rec of toRemove) {
+      await get().deleteWearRecord(rec.id);
+    }
   },
 
   getWearDatesByClothing: (_clothingId) => {
