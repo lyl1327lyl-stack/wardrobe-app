@@ -157,7 +157,7 @@ export function OutfitDetailScreen() {
 
       <ScrollView
         style={styles.scrollView}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -181,111 +181,53 @@ export function OutfitDetailScreen() {
           </View>
         </View>
 
-        {/* Divider */}
-        <View style={styles.canvasDivider}>
-          <View style={[styles.canvasDividerLine, { backgroundColor: theme.colors.border }]} />
+        {/* 标签行：季节 + 标签（仿衣服详情 tagsRow） */}
+        {((outfit.seasons || []).length > 0 || (outfit.tags || []).length > 0) && (
+          <View style={styles.infoSection}>
+            <View style={styles.tagsRow}>
+              {(outfit.seasons || []).map((s, i) => (
+                <View key={`season-${s}`} style={[styles.tag, i === 0 && styles.tagSeason, i === 0 && { backgroundColor: theme.colors.accent }]}>
+                  <Text style={[styles.tagText, i === 0 && styles.tagTextSeason, i === 0 && { color: theme.colors.white }]}>{s}</Text>
+                </View>
+              ))}
+              {(outfit.tags || []).map(t => (
+                <View key={`tag-${t}`} style={[styles.tag, { backgroundColor: theme.colors.borderLight }]}>
+                  <Text style={[styles.tagText, { color: theme.colors.textSecondary }]}>{t}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* 统计卡片：件数 / 总价 / 分组 */}
+        <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: theme.colors.text }]}>{outfitClothing.length}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>件数</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: theme.colors.primary }]}>¥{totalPrice.toLocaleString()}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>总价</Text>
+            </View>
+            <View style={[styles.statDivider, { backgroundColor: theme.colors.border }]} />
+            <View style={styles.statItem}>
+              <Text style={[styles.statValue, { color: theme.colors.text }]} numberOfLines={1}>{currentGroup?.name || '未分组'}</Text>
+              <Text style={[styles.statLabel, { color: theme.colors.textTertiary }]}>分组</Text>
+            </View>
+          </View>
         </View>
 
-        {/* Info Card: group + season + style + notes */}
-        <View style={[styles.card, { backgroundColor: theme.colors.card }]}>
-          {/* Group */}
-          <View style={styles.infoBlock}>
-            <View style={styles.cardHeaderLeft}>
-              <View style={[styles.cardDot, { backgroundColor: theme.colors.accent }]} />
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>分组</Text>
-            </View>
-            <View
-              style={[styles.groupRow, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
-            >
-              <Ionicons
-                name="folder-outline"
-                size={16}
-                color={currentGroup ? theme.colors.primary : theme.colors.textTertiary}
-              />
-              <Text
-                style={[styles.groupRowText, { color: currentGroup ? theme.colors.text : theme.colors.textTertiary }]}
-                numberOfLines={1}
-              >
-                {currentGroup?.name || '未分组'}
-              </Text>
-            </View>
+        {/* 备注卡片 */}
+        <View style={[styles.remarksCard, { backgroundColor: theme.colors.card, borderLeftColor: theme.colors.accent }]}>
+          <View style={styles.remarksHeader}>
+            <View style={[styles.remarksDot, { backgroundColor: theme.colors.accent }]} />
+            <Text style={[styles.remarksTitle, { color: theme.colors.textTertiary }]}>备注</Text>
           </View>
-
-          <View style={[styles.blockDivider, { backgroundColor: theme.colors.border }]} />
-
-          {/* Season */}
-          <View style={styles.infoBlock}>
-            <View style={styles.cardHeaderLeft}>
-              <View style={[styles.cardDot, { backgroundColor: theme.colors.primary }]} />
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>季节</Text>
-            </View>
-            <View style={styles.chipRow}>
-              {(outfit.seasons || []).length > 0 ? (
-                (outfit.seasons || []).map(season => (
-                  <View
-                    key={season}
-                    style={[
-                      styles.chip,
-                      { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: '#fff' }]}>
-                      {season}
-                    </Text>
-                  </View>
-                ))
-              ) : (
-                <Text style={[styles.emptyHint, { color: theme.colors.textTertiary }]}>
-                  暂无季节
-                </Text>
-              )}
-            </View>
-          </View>
-
-          <View style={[styles.blockDivider, { backgroundColor: theme.colors.border }]} />
-
-          {/* Style */}
-          <View style={styles.infoBlock}>
-            <View style={styles.cardHeaderLeft}>
-              <View style={[styles.cardDot, { backgroundColor: theme.colors.accent }]} />
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>标签</Text>
-            </View>
-            {(outfit.tags || []).length > 0 ? (
-              <View style={styles.chipRow}>
-                {(outfit.tags || []).map(tag => (
-                  <View
-                    key={tag}
-                    style={[
-                      styles.chip,
-                      { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                    ]}
-                  >
-                    <Text style={[styles.chipText, { color: '#fff' }]}>
-                      {tag}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            ) : (
-              <Text style={[styles.emptyHint, { color: theme.colors.textTertiary }]}>
-                暂无标签
-              </Text>
-            )}
-          </View>
-
-          <View style={[styles.blockDivider, { backgroundColor: theme.colors.border }]} />
-
-          {/* Notes */}
-          <View style={styles.infoBlock}>
-            <View style={styles.cardHeaderLeft}>
-              <View style={[styles.cardDot, { backgroundColor: theme.colors.textTertiary }]} />
-              <Text style={[styles.cardTitle, { color: theme.colors.text }]}>备注</Text>
-            </View>
-            <Text style={[styles.notesReadonly, { color: outfit.notes ? theme.colors.text : theme.colors.textTertiary }]}>
-              {outfit.notes || '暂无备注'}
-            </Text>
-          </View>
-
+          <Text style={[styles.remarksText, { color: outfit.notes ? theme.colors.text : theme.colors.textTertiary }]}>
+            {outfit.notes || '暂无备注'}
+          </Text>
         </View>
 
         {/* Clothing Items Card */}
@@ -354,19 +296,26 @@ export function OutfitDetailScreen() {
             </Text>
           )}
         </View>
+        {/* 操作按钮（随滚动，仿衣服详情底部管理按钮） */}
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
+            onPress={handleRecordWear}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="checkmark-done" size={20} color="#fff" />
+            <Text style={[styles.actionBtnPrimaryText, { color: theme.colors.white }]}>记录穿着</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.actionBtn, { backgroundColor: theme.colors.borderLight }]}
+            onPress={handleDelete}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
+            <Text style={[styles.actionBtnDangerText, { color: theme.colors.danger }]}>删除</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
-
-      {/* Bottom Bar */}
-      <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, paddingBottom: insets.bottom + 12 }]}>
-        <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.colors.primary }]} onPress={handleRecordWear} activeOpacity={0.8}>
-          <Ionicons name="checkmark-done" size={20} color="#fff" />
-          <Text style={styles.primaryActionText}>记录穿着</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.dangerAction, { backgroundColor: theme.colors.borderLight }]} onPress={handleDelete} activeOpacity={0.7}>
-          <Ionicons name="trash-outline" size={18} color={theme.colors.danger} />
-          <Text style={styles.dangerActionText}>删除</Text>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 }
@@ -638,5 +587,98 @@ const makeStyles = (theme: Theme, insets: any) =>
     dangerActionText: { fontSize: 13, fontWeight: '600', color: theme.colors.danger },
     clothingPrice: {
       fontSize: 15, fontWeight: '700',
+    },
+
+    // tagsRow（仿衣服详情）
+    infoSection: {
+      paddingHorizontal: 20,
+      paddingTop: 18,
+    },
+    tagsRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    tag: {
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+      borderRadius: 16,
+    },
+    tagSeason: {},
+    tagText: {
+      fontSize: 12,
+      fontWeight: '500',
+    },
+    tagTextSeason: {},
+    statsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    statItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statDivider: {
+      width: 1,
+      height: 36,
+    },
+    statValue: {
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    statLabel: {
+      fontSize: 11,
+      marginTop: 4,
+    },
+    remarksCard: {
+      marginHorizontal: 20,
+      marginTop: 16,
+      borderRadius: theme.borderRadius.lg,
+      padding: 16,
+      borderLeftWidth: 3,
+      ...theme.shadows.sm,
+    },
+    remarksHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    remarksDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      marginRight: 8,
+    },
+    remarksTitle: {
+      fontSize: 12,
+      fontWeight: '600',
+      letterSpacing: 1,
+    },
+    remarksText: {
+      fontSize: 14,
+      lineHeight: 22,
+    },
+    actionRow: {
+      flexDirection: 'row',
+      marginHorizontal: 20,
+      marginTop: 20,
+      gap: 12,
+    },
+    actionBtn: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 14,
+      borderRadius: 14,
+    },
+    actionBtnPrimaryText: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    actionBtnDangerText: {
+      fontSize: 14,
+      fontWeight: '600',
     },
   });
