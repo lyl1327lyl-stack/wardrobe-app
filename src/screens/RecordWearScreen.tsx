@@ -25,7 +25,8 @@ import * as wearRecordsDb from '../db/wearRecords';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_PADDING = 16;
 const GRID_GAP = 6;
-const CELL_W = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * 2) / 3;
+const GRID_COLS = 4;
+const CELL_W = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (GRID_COLS - 1)) / GRID_COLS;
 const CELL_H = CELL_W * 1.25;
 
 const SEASONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
@@ -175,9 +176,10 @@ const makeStyles = (theme: Theme) =>
       overflow: 'hidden',
       backgroundColor: theme.colors.borderLight,
       marginBottom: GRID_GAP,
+      borderWidth: 2,
+      borderColor: 'transparent',
     },
     itemCardActive: {
-      borderWidth: 2,
       borderColor: theme.colors.primary,
     },
     itemImage: {
@@ -244,7 +246,7 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      padding: 12,
+      padding: 16,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
       backgroundColor: theme.colors.card,
@@ -252,34 +254,34 @@ const makeStyles = (theme: Theme) =>
     selectedThumbs: {
       flex: 1,
       flexDirection: 'row',
-      gap: 4,
+      gap: 6,
     },
     selectedThumb: {
-      width: 38,
-      height: 38,
+      width: 48,
+      height: 48,
       borderRadius: 8,
       backgroundColor: theme.colors.background,
     },
     footerCount: {
-      fontSize: 13,
+      fontSize: 14,
       color: theme.colors.textSecondary,
-      marginRight: 8,
+      marginRight: 10,
     },
     clearBtn: {
-      paddingHorizontal: 14,
-      paddingVertical: 10,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
       borderRadius: 10,
       backgroundColor: theme.colors.borderLight,
-      marginRight: 8,
+      marginRight: 10,
     },
     clearBtnText: {
-      fontSize: 12,
+      fontSize: 13,
       fontWeight: '600',
       color: theme.colors.textSecondary,
     },
     confirmBtn: {
-      paddingHorizontal: 18,
-      paddingVertical: 10,
+      paddingHorizontal: 22,
+      paddingVertical: 12,
       borderRadius: 10,
       backgroundColor: theme.colors.primary,
     },
@@ -288,7 +290,7 @@ const makeStyles = (theme: Theme) =>
     },
     confirmBtnText: {
       color: theme.colors.white,
-      fontSize: 14,
+      fontSize: 15,
       fontWeight: '700',
     },
 
@@ -317,8 +319,7 @@ export function RecordWearScreen() {
 
   const clothing = useWardrobeStore(s => s.clothing);
   const outfits = useWardrobeStore(s => s.outfits);
-  const addWearRecords = useWardrobeStore(s => s.addWearRecords);
-  const deleteWearRecordsByDate = useWardrobeStore(s => s.deleteWearRecordsByDate);
+  const replaceDayRecords = useWardrobeStore(s => s.replaceDayRecords);
   const getParents = useCustomOptionsStore(s => s.getParents);
   const getChildrenOf = useCustomOptionsStore(s => s.getChildrenOf);
 
@@ -462,8 +463,7 @@ export function RecordWearScreen() {
       return;
     }
     try {
-      await deleteWearRecordsByDate(selectedDate);
-      await addWearRecords(selectedIds, selectedDate);
+      await replaceDayRecords(selectedIds, selectedDate);
       navigation.goBack();
     } catch (error) {
       console.error('RecordWearScreen handleConfirm failed:', error);
@@ -669,7 +669,7 @@ export function RecordWearScreen() {
           data={filteredClothing}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => renderItemCard(item)}
-          numColumns={3}
+          numColumns={4}
           columnWrapperStyle={styles.gridRow}
           ListEmptyComponent={
             <View style={styles.emptyList}>
