@@ -367,6 +367,53 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
       lineHeight: 22,
     },
+    // 穿着记录列表（N4）
+    wearHistoryCard: {
+      marginHorizontal: 20,
+      marginTop: 16,
+      backgroundColor: theme.colors.card,
+      borderRadius: theme.borderRadius.lg,
+      padding: 18,
+      ...theme.shadows.sm,
+    },
+    wearHistoryHeader: {
+      flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12,
+    },
+    wearHistoryDot: {
+      width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary,
+    },
+    wearHistoryTitle: {
+      fontSize: 14, fontWeight: '600', color: theme.colors.text,
+    },
+    wearHistoryItem: {
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    wearHistoryDate: {
+      fontSize: 13, fontWeight: '600', color: theme.colors.text, marginBottom: 6,
+    },
+    wearHistoryContext: {
+      flexDirection: 'row', alignItems: 'center', gap: 6,
+    },
+    wearHistoryContextLabel: {
+      fontSize: 11, color: theme.colors.textTertiary, marginRight: 2,
+    },
+    wearHistoryThumbRow: {
+      flexDirection: 'row', gap: 4, flex: 1,
+    },
+    wearHistoryThumb: {
+      width: 32, height: 32, borderRadius: 6, backgroundColor: theme.colors.borderLight,
+    },
+    wearHistoryEmpty: {
+      fontSize: 12, color: theme.colors.textTertiary, textAlign: 'center', paddingVertical: 8,
+    },
+    wearHistoryExpand: {
+      marginTop: 10, alignItems: 'center', paddingVertical: 4,
+    },
+    wearHistoryExpandText: {
+      fontSize: 12, color: theme.colors.primary, fontWeight: '600',
+    },
     // 相关搭配
     relatedSection: {
       marginHorizontal: 20,
@@ -575,6 +622,34 @@ export function ClothingDetailScreen() {
   const isTrash = source === 'trash';
   const isSold = source === 'sold';
   const isDraft = source === 'draft';
+
+  // 穿着记录列表（N4）
+  const [wearHistory, setWearHistory] = useState<{ date: string; records: any[] }[]>([]);
+  const [wearHistoryExpanded, setWearHistoryExpanded] = useState(false);
+
+  const loadWearHistory = useCallback(async () => {
+    if (!item || isTrash || isSold || isDraft) return;
+    try {
+      const records = await wearRecordsDb.getWearRecordsByClothing(item.id);
+      // 按日期分组，取最近 15 条
+      const grouped: { date: string; records: any[] }[] = [];
+      const seen = new Set<string>();
+      for (const r of records) {
+        if (seen.has(r.wornDate)) continue;
+        seen.add(r.wornDate);
+        const dayRecords = await wearRecordsDb.getWearRecordsByDate(r.wornDate);
+        grouped.push({ date: r.wornDate, records: dayRecords });
+        if (grouped.length >= 15) break;
+      }
+      setWearHistory(grouped);
+    } catch (error) {
+      console.error('loadWearHistory failed:', error);
+    }
+  }, [item, isTrash, isSold, isDraft]);
+
+  useEffect(() => {
+    loadWearHistory();
+  }, [loadWearHistory]);
 
   // 加载穿着日期
   const loadWearDates = useCallback(async () => {
@@ -1147,6 +1222,57 @@ export function ClothingDetailScreen() {
           </View>
           <Text style={styles.remarksText}>{item.remarks || '暂无备注'}</Text>
         </View>
+
+        {/* 穿着记录列表（N4） */}
+        {!isTrash && !isSold && !isDraft && (() => {
+          // Build allClothingMap for thumbnail lookup
+          const allClothingMap = new Map(allClothing.map(c => [c.id, c] as const));
+          return (
+          <View style={styles.wearHistoryCard}>
+            <View style={styles.wearHistoryHeader}>
+              <View style={styles.wearHistoryDot} />
+              <Text style={styles.wearHistoryTitle}>穿着记录</Text>
+            </View>
+            {wearHistory.length === 0 ? (
+              <Text style={styles.wearHistoryEmpty}>暂无穿着记录</Text>
+            ) : (
+              <>
+                {(wearHistoryExpanded ? wearHistory : wearHistory.slice(0, 5)).map(({ date, records }) => {
+                  const d = new Date(date);
+                  const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                  const label = `${d.getMonth() + 1}月${d.getDate()}日 ${weekDays[d.getDay()]}`;
+                  return (
+                    <View key={date} style={styles.wearHistoryItem}>
+                      <Text style={styles.wearHistoryDate}>{label}</Text>
+                      <View style={styles.wearHistoryContext}>
+                        <Text style={styles.wearHistoryContextLabel}>当日搭配</Text>
+                        <View style={styles.wearHistoryThumbRow}>
+                          {records.map((r: any) => {
+                            const cloth = allClothingMap.get(r.clothingId);
+                            const uri = cloth?.thumbnailUri || cloth?.imageUri || r.clothingThumbnailUri;
+                            return uri ? (
+                              <Image key={r.id} source={{ uri }} style={styles.wearHistoryThumb} resizeMode="cover" />
+                            ) : (
+                              <View key={r.id} style={[styles.wearHistoryThumb, { justifyContent: 'center', alignItems: 'center' }]}>
+                                <Ionicons name="shirt-outline" size={12} color={theme.colors.textTertiary} />
+                              </View>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+                {wearHistory.length > 5 && !wearHistoryExpanded && (
+                  <TouchableOpacity style={styles.wearHistoryExpand} onPress={() => setWearHistoryExpanded(true)} activeOpacity={0.7}>
+                    <Text style={styles.wearHistoryExpandText}>展开全部 {wearHistory.length} 条</Text>
+                  </TouchableOpacity>
+                )}
+              </>
+            )}
+          </View>
+          );
+        })()}
 
         {/* 穿着日历卡片 */}
         {!isTrash && !isSold && !isDraft && (
