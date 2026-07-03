@@ -447,6 +447,10 @@ export function OutfitEditorScreen({ onSave }: Props) {
           loadFromOutfit(canvasData, outfitId, background);
           console.log('[OutfitEditorScreen] Loaded existing outfit:', outfitId);
         }
+        // 从搭配详情「编辑」进入时，默认弹出属性 Sheet
+        if ((route.params as any)?.openAttrs) {
+          setShowAttrSheet(true);
+        }
       }
     } else if (selectedIds && selectedIds.length > 0) {
       // New outfit with preselected clothing - do NOT reset, store already has selectedClothings from ClothingSelectionScreen
@@ -577,7 +581,43 @@ export function OutfitEditorScreen({ onSave }: Props) {
       Alert.alert('保存失败', error?.message || '请重试');
     }
   }, [canvasItems, canvasBackground, editingOutfitId, addOutfit, updateOutfit, reset, exitEditor, groups, navigation]);
-  handleSaveRef.current = handleSave;
+
+  // canvasOnly 模式（从 EditOutfitScreen 进）：保存只更新画板，不碰属性，goBack
+  const isCanvasOnly = !!((route.params as any)?.canvasOnly);
+  const handleSaveCanvasOnly = useCallback(async () => {
+    if (canvasItems.length === 0) {
+      Alert.alert('请添加衣物', '请至少添加一件衣物到画板');
+      return;
+    }
+    setIsSavingOutfit(true);
+    const fallbackUri = canvasItems.length > 0 ? canvasItems[0].imageUri : '';
+    let thumbnailUri = fallbackUri;
+    try {
+      thumbnailUri = await generateOutfitThumbnail(captureTargetRef, fallbackUri);
+    } catch (e: any) {
+      thumbnailUri = fallbackUri;
+    }
+    try {
+      const existing = outfits.find(o => o.id === editingOutfitId);
+      if (existing) {
+        await updateOutfit({
+          ...existing,
+          itemIds: canvasItems.map(i => i.clothingId),
+          canvasData: canvasItems,
+          canvasBackground,
+          thumbnailUri,
+        } as any);
+      }
+      reset();
+      isSaving.current = true;
+      navigation.goBack();
+    } catch (error: any) {
+      Alert.alert('保存失败', error?.message || '请重试');
+    } finally {
+      setIsSavingOutfit(false);
+    }
+  }, [canvasItems, canvasBackground, editingOutfitId, outfits, updateOutfit, reset, navigation]);
+  handleSaveRef.current = isCanvasOnly ? handleSaveCanvasOnly : handleSave;
 
   const handleBackgroundPress = useCallback(() => {
     if (canvasItems.length === 0) {
@@ -597,7 +637,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
         <Text style={styles.headerTitle}>搭配画板</Text>
         <TouchableOpacity
           style={[styles.saveButton, isSavingOutfit && styles.saveButtonDisabled]}
-          onPress={handleSave}
+          onPress={isCanvasOnly ? handleSaveCanvasOnly : handleSave}
           disabled={isSavingOutfit}
           activeOpacity={0.85}
         >
