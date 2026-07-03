@@ -6,10 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Image,
-  Modal,
-  FlatList,
   Alert,
-  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, RouteProp, useIsFocused } from '@react-navigation/native';
@@ -18,8 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
 import { useWardrobeStore } from '../../store/wardrobeStore';
-import { useCustomOptionsStore } from '../../store/customOptionsStore';
-import { Outfit, ClothingItem, SEASONS } from '../../types';
+import { Outfit, ClothingItem } from '../../types';
 import { Theme } from '../../utils/theme';
 
 type RootStackParamList = {
@@ -28,6 +24,7 @@ type RootStackParamList = {
     outfitId?: number;
     mode?: 'create' | 'edit';
     groupId?: number;
+    openAttrs?: boolean;
     exitTo?: { screen: string; outfitId?: number; groupId?: number; groupName?: string };
   };
   ClothingDetail: { id: number; source?: string };
@@ -44,34 +41,11 @@ export function OutfitDetailScreen() {
   const outfits = useWardrobeStore(s => s.outfits);
   const groups = useWardrobeStore(s => s.groups);
   const clothing = useWardrobeStore(s => s.clothing);
-  const updateOutfit = useWardrobeStore(s => s.updateOutfit);
   const deleteOutfit = useWardrobeStore(s => s.deleteOutfit);
   const addWearRecords = useWardrobeStore(s => s.addWearRecords);
-  const customSeasons = useCustomOptionsStore(s => s.seasons);
-  const customTags = useCustomOptionsStore(s => s.tags);
 
   const outfit = useMemo(() => outfits.find(o => o.id === outfitId), [outfits, outfitId]);
   const currentGroup = groups.find(g => g.id === (outfit?.groupId || groupId));
-
-  const [showMoveModal, setShowMoveModal] = useState(false);
-
-  // Unified draft state — saved together with one Apply button
-  const [draftGroupId, setDraftGroupId] = useState<number | null>(null);
-
-  const draftGroup = useMemo(() => groups.find(g => g.id === draftGroupId), [groups, draftGroupId]);
-  const [draftSeasons, setDraftSeasons] = useState<string[]>([]);
-  const [draftTags, setDraftTags] = useState<string[]>([]);
-  const [draftNotes, setDraftNotes] = useState('');
-
-  // Initialize draft state when outfit loads
-  useEffect(() => {
-    if (outfit) {
-      setDraftGroupId(outfit.groupId ?? null);
-      setDraftSeasons([...(outfit.seasons || [])]);
-      setDraftTags([...(outfit.tags || [])]);
-      setDraftNotes(outfit.notes || '');
-    }
-  }, [outfit?.id]);
 
   // If outfit deleted while viewing, go back
   useEffect(() => {
@@ -79,41 +53,6 @@ export function OutfitDetailScreen() {
       navigation.goBack();
     }
   }, [isFocused, outfit, navigation]);
-
-  const savedSeasons: string[] = outfit?.seasons || [];
-  const savedTags: string[] = outfit?.tags || [];
-  const savedNotes: string = outfit?.notes || '';
-
-  const hasChanges = useMemo(() => {
-    const groupChanged = draftGroupId !== (outfit?.groupId ?? null);
-    const seasonsChanged = [...draftSeasons].sort().join(',') !== [...savedSeasons].sort().join(',');
-    const tagsChanged = [...draftTags].sort().join(',') !== [...savedTags].sort().join(',');
-    const notesChanged = draftNotes !== savedNotes;
-    return groupChanged || seasonsChanged || tagsChanged || notesChanged;
-  }, [draftGroupId, outfit?.groupId, draftSeasons, draftTags, draftNotes, savedSeasons, savedTags, savedNotes]);
-
-  const toggleSeason = useCallback((season: string) => {
-    setDraftSeasons(prev =>
-      prev.includes(season) ? prev.filter(s => s !== season) : [...prev, season]
-    );
-  }, []);
-
-  const toggleTag = useCallback((tag: string) => {
-    setDraftTags(prev =>
-      prev.includes(tag) ? prev.filter(s => s !== tag) : [...prev, tag]
-    );
-  }, []);
-
-  const handleApply = useCallback(() => {
-    if (!outfit) return;
-    updateOutfit({
-      ...outfit,
-      groupId: draftGroupId ?? undefined,
-      seasons: [...draftSeasons],
-      tags: [...draftTags],
-      notes: draftNotes,
-    } as Outfit);
-  }, [outfit, draftGroupId, draftSeasons, draftTags, draftNotes, updateOutfit]);
 
   const handleDelete = useCallback(() => {
     Alert.alert(
@@ -131,11 +70,6 @@ export function OutfitDetailScreen() {
       ],
     );
   }, [outfitId, deleteOutfit]);
-
-  const handleSelectDraftGroup = useCallback((toGroupId: number) => {
-    setDraftGroupId(toGroupId);
-    setShowMoveModal(false);
-  }, []);
 
   const handleRecordWear = useCallback(async () => {
     if (!outfit?.itemIds || outfit.itemIds.length === 0) return;
@@ -183,8 +117,6 @@ export function OutfitDetailScreen() {
     return outfitClothing.reduce((sum, c) => sum + (c.price || 0), 0);
   }, [outfitClothing]);
 
-  const seasonOptions = customSeasons.length > 0 ? customSeasons : SEASONS;
-
   const bg = (outfit as any)?.canvasBackground;
   const frameColor = bg?.type === 'color' ? bg.value : theme.colors.card;
 
@@ -206,17 +138,21 @@ export function OutfitDetailScreen() {
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: theme.colors.text }]}>搭配详情</Text>
-        {hasChanges ? (
-          <TouchableOpacity
-            style={[styles.headerApplyBtn, { backgroundColor: theme.colors.primary }]}
-            onPress={handleApply}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.headerApplyText}>应用</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
+        <TouchableOpacity
+          style={[styles.headerEditBtn, { backgroundColor: theme.colors.primary }]}
+          onPress={() => {
+            navigation.navigate('OutfitEditor', {
+              outfitId,
+              mode: 'edit',
+              groupId: outfit.groupId,
+              openAttrs: true,
+              exitTo: { screen: 'OutfitDetail', outfitId, groupId: outfit.groupId, groupName: currentGroup?.name || groupName },
+            });
+          }}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="create-outline" size={20} color="#fff" />
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -242,20 +178,6 @@ export function OutfitDetailScreen() {
                 </Text>
               </View>
             )}
-            <TouchableOpacity
-              style={[styles.editCanvasBtn, { backgroundColor: theme.colors.primary }]}
-              onPress={() => {
-                navigation.navigate('OutfitEditor', {
-                  outfitId,
-                  mode: 'edit',
-                  groupId: outfit.groupId,
-                  exitTo: { screen: 'OutfitDetail', outfitId, groupId: outfit.groupId, groupName: currentGroup?.name || groupName },
-                });
-              }}
-              activeOpacity={0.8}
-            >
-              <Ionicons name="create-outline" size={16} color="#fff" />
-            </TouchableOpacity>
           </View>
         </View>
 
@@ -272,24 +194,21 @@ export function OutfitDetailScreen() {
               <View style={[styles.cardDot, { backgroundColor: theme.colors.accent }]} />
               <Text style={[styles.cardTitle, { color: theme.colors.text }]}>分组</Text>
             </View>
-            <TouchableOpacity
+            <View
               style={[styles.groupRow, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}
-              onPress={() => setShowMoveModal(true)}
-              activeOpacity={0.7}
             >
               <Ionicons
                 name="folder-outline"
                 size={16}
-                color={draftGroup ? theme.colors.primary : theme.colors.textTertiary}
+                color={currentGroup ? theme.colors.primary : theme.colors.textTertiary}
               />
               <Text
-                style={[styles.groupRowText, { color: draftGroup ? theme.colors.text : theme.colors.textTertiary }]}
+                style={[styles.groupRowText, { color: currentGroup ? theme.colors.text : theme.colors.textTertiary }]}
                 numberOfLines={1}
               >
-                {draftGroup?.name || '未分组'}
+                {currentGroup?.name || '未分组'}
               </Text>
-              <Ionicons name="chevron-down" size={14} color={theme.colors.textTertiary} />
-            </TouchableOpacity>
+            </View>
           </View>
 
           <View style={[styles.blockDivider, { backgroundColor: theme.colors.border }]} />
@@ -301,26 +220,25 @@ export function OutfitDetailScreen() {
               <Text style={[styles.cardTitle, { color: theme.colors.text }]}>季节</Text>
             </View>
             <View style={styles.chipRow}>
-              {seasonOptions.map(season => (
-                <TouchableOpacity
-                  key={season}
-                  style={[
-                    styles.chip,
-                    { backgroundColor: theme.colors.background, borderColor: theme.colors.border },
-                    draftSeasons.includes(season) && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-                  ]}
-                  onPress={() => toggleSeason(season)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[
-                    styles.chipText,
-                    { color: theme.colors.textSecondary },
-                    draftSeasons.includes(season) && { color: '#fff' },
-                  ]}>
-                    {season}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+              {(outfit.seasons || []).length > 0 ? (
+                (outfit.seasons || []).map(season => (
+                  <View
+                    key={season}
+                    style={[
+                      styles.chip,
+                      { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                    ]}
+                  >
+                    <Text style={[styles.chipText, { color: '#fff' }]}>
+                      {season}
+                    </Text>
+                  </View>
+                ))
+              ) : (
+                <Text style={[styles.emptyHint, { color: theme.colors.textTertiary }]}>
+                  暂无季节
+                </Text>
+              )}
             </View>
           </View>
 
@@ -332,32 +250,25 @@ export function OutfitDetailScreen() {
               <View style={[styles.cardDot, { backgroundColor: theme.colors.accent }]} />
               <Text style={[styles.cardTitle, { color: theme.colors.text }]}>标签</Text>
             </View>
-            {customTags.length > 0 ? (
+            {(outfit.tags || []).length > 0 ? (
               <View style={styles.chipRow}>
-                {customTags.map(tag => (
-                  <TouchableOpacity
+                {(outfit.tags || []).map(tag => (
+                  <View
                     key={tag}
                     style={[
                       styles.chip,
-                      { backgroundColor: theme.colors.background, borderColor: theme.colors.border },
-                      draftTags.includes(tag) && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+                      { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
                     ]}
-                    onPress={() => toggleTag(tag)}
-                    activeOpacity={0.7}
                   >
-                    <Text style={[
-                      styles.chipText,
-                      { color: theme.colors.textSecondary },
-                      draftTags.includes(tag) && { color: '#fff' },
-                    ]}>
+                    <Text style={[styles.chipText, { color: '#fff' }]}>
                       {tag}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
                 ))}
               </View>
             ) : (
               <Text style={[styles.emptyHint, { color: theme.colors.textTertiary }]}>
-                暂无标签选项，可在个人中心添加
+                暂无标签
               </Text>
             )}
           </View>
@@ -370,20 +281,9 @@ export function OutfitDetailScreen() {
               <View style={[styles.cardDot, { backgroundColor: theme.colors.textTertiary }]} />
               <Text style={[styles.cardTitle, { color: theme.colors.text }]}>备注</Text>
             </View>
-            <TextInput
-              style={[styles.notesInput, {
-                backgroundColor: theme.colors.background,
-                borderColor: theme.colors.border,
-                color: theme.colors.text,
-              }]}
-              placeholder="添加备注..."
-              placeholderTextColor={theme.colors.textTertiary}
-              value={draftNotes}
-              onChangeText={setDraftNotes}
-              maxLength={200}
-              multiline
-              textAlignVertical="top"
-            />
+            <Text style={[styles.notesReadonly, { color: outfit.notes ? theme.colors.text : theme.colors.textTertiary }]}>
+              {outfit.notes || '暂无备注'}
+            </Text>
           </View>
 
         </View>
@@ -456,42 +356,6 @@ export function OutfitDetailScreen() {
         </View>
       </ScrollView>
 
-      {/* Move Modal */}
-      <Modal visible={showMoveModal} animationType="slide" transparent>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowMoveModal(false)}>
-          <View style={[styles.moveSheet, { backgroundColor: theme.colors.card, paddingBottom: insets.bottom + 20 }]}>
-            <View style={styles.moveHandle} />
-            <Text style={[styles.moveTitle, { color: theme.colors.text }]}>选择分组</Text>
-            <FlatList
-              data={groups}
-              keyExtractor={item => item.id.toString()}
-              style={styles.moveList}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={[
-                    styles.moveItem,
-                    { backgroundColor: theme.colors.background },
-                    draftGroupId === item.id && { backgroundColor: theme.colors.primary + '15', borderColor: theme.colors.primary, borderWidth: 2 },
-                  ]}
-                  onPress={() => handleSelectDraftGroup(item.id)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.moveItemText, { color: theme.colors.text }]}>{item.name}</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={[styles.moveItemCount, { color: theme.colors.textTertiary }]}>
-                      {outfits.filter(o => o.groupId === item.id).length}套
-                    </Text>
-                    {draftGroupId === item.id && (
-                      <Ionicons name="checkmark" size={18} color={theme.colors.primary} />
-                    )}
-                  </View>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
       {/* Bottom Bar */}
       <View style={[styles.bottomBar, { backgroundColor: theme.colors.card, paddingBottom: insets.bottom + 12 }]}>
         <TouchableOpacity style={[styles.primaryAction, { backgroundColor: theme.colors.primary }]} onPress={handleRecordWear} activeOpacity={0.8}>
@@ -533,6 +397,13 @@ const makeStyles = (theme: Theme, insets: any) =>
     },
     headerTitle: { fontSize: 17, fontWeight: '600', letterSpacing: 0.3 },
     headerSpacer: { width: 36, height: 36 },
+    headerEditBtn: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     scrollView: { flex: 1 },
 
     // Canvas Card
@@ -666,6 +537,11 @@ const makeStyles = (theme: Theme, insets: any) =>
       lineHeight: 22,
       borderWidth: 1,
       minHeight: 80,
+    },
+    notesReadonly: {
+      fontSize: 14,
+      lineHeight: 20,
+      minHeight: 40,
     },
 
     // Clothing
