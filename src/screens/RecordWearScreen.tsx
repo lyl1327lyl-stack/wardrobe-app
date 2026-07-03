@@ -243,41 +243,58 @@ const makeStyles = (theme: Theme) =>
     },
 
     footer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      padding: 16,
       borderTopWidth: 1,
       borderTopColor: theme.colors.border,
       backgroundColor: theme.colors.card,
+      paddingHorizontal: 16,
+      paddingTop: 12,
+      paddingBottom: 16,
+      gap: 12,
+    },
+    footerTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      minHeight: 48,
     },
     selectedThumbs: {
       flex: 1,
-      flexDirection: 'row',
-      gap: 6,
     },
     selectedThumb: {
       width: 48,
       height: 48,
       borderRadius: 8,
       backgroundColor: theme.colors.background,
+      marginRight: 6,
     },
-    footerCount: {
-      fontSize: 14,
+    footerCountBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      backgroundColor: theme.colors.borderLight,
+    },
+    footerCountText: {
+      fontSize: 12,
+      fontWeight: '600',
       color: theme.colors.textSecondary,
-      marginRight: 10,
     },
     footerPlaceholder: {
       flex: 1,
       fontSize: 13,
       color: theme.colors.textTertiary,
     },
+    footerBtnRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
     clearBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
       paddingHorizontal: 16,
       paddingVertical: 12,
       borderRadius: 10,
       backgroundColor: theme.colors.borderLight,
-      marginRight: 10,
     },
     clearBtnText: {
       fontSize: 13,
@@ -285,9 +302,11 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.textSecondary,
     },
     confirmBtn: {
-      paddingHorizontal: 22,
-      paddingVertical: 12,
+      flex: 1,
+      paddingVertical: 13,
       borderRadius: 10,
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: theme.colors.primary,
     },
     confirmBtnDisabled: {
@@ -701,38 +720,50 @@ export function RecordWearScreen() {
         />
       )}
 
-      {/* Footer bar（始终显示） */}
+      {/* Footer bar（两栏：已选 + 按钮） */}
       <View style={styles.footer}>
-        {selectedIds.length > 0 ? (
-          <>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedThumbs}>
-              {selectedItems.map(item => (
-                <Image
-                  key={item.id}
-                  source={{ uri: item.thumbnailUri }}
-                  style={styles.selectedThumb}
-                  resizeMode="cover"
-                />
-              ))}
-            </ScrollView>
-            <Text style={styles.footerCount}>{selectedIds.length} 件</Text>
+        {/* 第一栏：已选衣物 */}
+        <View style={styles.footerTopRow}>
+          {selectedIds.length > 0 ? (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.selectedThumbs}>
+                {selectedItems.map(item => (
+                  <Image
+                    key={item.id}
+                    source={{ uri: item.thumbnailUri }}
+                    style={styles.selectedThumb}
+                    resizeMode="cover"
+                  />
+                ))}
+              </ScrollView>
+              <View style={styles.footerCountBadge}>
+                <Text style={styles.footerCountText}>{selectedIds.length} 件</Text>
+              </View>
+            </>
+          ) : (
+            <Text style={styles.footerPlaceholder}>请选择今天穿的衣物</Text>
+          )}
+        </View>
+
+        {/* 第二栏：操作按钮 */}
+        <View style={styles.footerBtnRow}>
+          {selectedIds.length > 0 && (
             <TouchableOpacity style={styles.clearBtn} onPress={() => setSelectedIds([])} activeOpacity={0.7}>
+              <Ionicons name="trash-outline" size={16} color={theme.colors.textSecondary} />
               <Text style={styles.clearBtnText}>清空</Text>
             </TouchableOpacity>
-          </>
-        ) : (
-          <Text style={styles.footerPlaceholder}>请选择今天穿的衣物</Text>
-        )}
-        <TouchableOpacity
-          style={[styles.confirmBtn, selectedIds.length === 0 && styles.confirmBtnDisabled]}
-          onPress={handleConfirm}
-          disabled={selectedIds.length === 0}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.confirmBtnText}>
-            {mode === 'outfit' ? '记录这套搭配' : `记录 (${selectedIds.length})`}
-          </Text>
-        </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={[styles.confirmBtn, selectedIds.length === 0 && styles.confirmBtnDisabled]}
+            onPress={handleConfirm}
+            disabled={selectedIds.length === 0}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.confirmBtnText}>
+              {mode === 'outfit' ? '记录这套搭配' : `记录 (${selectedIds.length})`}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Date picker modal */}
