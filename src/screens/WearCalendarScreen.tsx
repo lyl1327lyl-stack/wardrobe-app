@@ -229,6 +229,10 @@ export function WearCalendarScreen() {
     setRecentWeek(result);
   }, [allClothingMap]);
 
+  const reloadAll = useCallback(async () => {
+    await Promise.all([loadMonthData(), loadRecentWeek()]);
+  }, [loadMonthData, loadRecentWeek]);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -263,11 +267,11 @@ export function WearCalendarScreen() {
 
   const handleDeleteRecord = async (recordId: number) => {
     await deleteWearRecord(recordId);
-    loadMonthData();
+    reloadAll();
   };
 
   const handleAddRecord = () => {
-    loadMonthData();
+    reloadAll();
   };
 
   const getDayLabel = (dateStr: string) => {
