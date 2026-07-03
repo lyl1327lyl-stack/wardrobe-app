@@ -17,6 +17,7 @@ import { GroupDetailScreen } from './src/screens/outfit/GroupDetailScreen';
 import { ClothingSelectionScreen } from './src/screens/outfit/ClothingSelectionScreen';
 import { OutfitEditorScreen } from './src/screens/outfit/OutfitEditorScreen';
 import { OutfitDetailScreen } from './src/screens/outfit/OutfitDetailScreen';
+import { EditOutfitScreen } from './src/screens/outfit/EditOutfitScreen';
 import { StatsDetailScreen } from './src/screens/StatsDetailScreen';
 import { TrashScreen } from './src/screens/TrashScreen';
 import { SoldItemsScreen } from './src/screens/SoldItemsScreen';
@@ -324,6 +325,14 @@ function AppNavigator() {
         <RootStack.Screen
           name="OutfitDetail"
           component={OutfitDetailScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="EditOutfit"
+          component={EditOutfitScreen}
           options={{
             headerShown: false,
             presentation: 'card',

@@ -20,6 +20,7 @@ import { Theme } from '../../utils/theme';
 
 type RootStackParamList = {
   OutfitDetail: { outfitId: number; groupId?: number; groupName?: string };
+  EditOutfit: { outfitId: number };
   OutfitEditor: {
     outfitId?: number;
     mode?: 'create' | 'edit';
@@ -141,13 +142,7 @@ export function OutfitDetailScreen() {
         <TouchableOpacity
           style={[styles.headerEditBtn, { backgroundColor: theme.colors.primary }]}
           onPress={() => {
-            navigation.navigate('OutfitEditor', {
-              outfitId,
-              mode: 'edit',
-              groupId: outfit.groupId,
-              openAttrs: true,
-              exitTo: { screen: 'OutfitDetail', outfitId, groupId: outfit.groupId, groupName: currentGroup?.name || groupName },
-            });
+            navigation.navigate('EditOutfit', { outfitId });
           }}
           activeOpacity={0.8}
         >

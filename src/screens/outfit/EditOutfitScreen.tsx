@@ -46,7 +46,6 @@ export function EditOutfitScreen() {
   const customTags = useCustomOptionsStore(s => s.tags);
 
   const outfit = useMemo(() => outfits.find(o => o.id === outfitId), [outfits, outfitId]);
-  const currentGroup = groups.find(g => g.id === outfit?.groupId);
 
   const [name, setName] = useState('');
   const [groupId, setGroupId] = useState<number>(0);
@@ -119,7 +118,7 @@ export function EditOutfitScreen() {
   };
 
   const availableTags = customTags.filter(t => !tags.includes(t));
-  const bg = (outfit as any)?.canvasBackground;
+  const bg = outfit?.canvasBackground;
   const previewBg = bg?.type === 'color' ? bg.value : theme.colors.card;
 
   return (
