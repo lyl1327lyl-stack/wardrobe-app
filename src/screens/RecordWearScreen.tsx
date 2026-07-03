@@ -198,6 +198,28 @@ const makeStyles = (theme: Theme) =>
     itemCardActive: {
       borderColor: theme.colors.primary,
     },
+    itemCardRecorded: {
+      opacity: 0.65,
+      borderColor: theme.colors.accent,
+      borderWidth: 2,
+    },
+    recordedBadge: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: theme.colors.accent + 'E6',
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 3,
+      gap: 3,
+    },
+    recordedBadgeText: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: theme.colors.white,
+    },
     itemImage: {
       width: '100%',
       height: '100%',
@@ -468,7 +490,14 @@ export function RecordWearScreen() {
     return clothing.filter(c => selectedIds.includes(c.id));
   }, [clothing, selectedIds]);
 
+  // 追加模式：已记录衣物的 ID 集合（用于列表视觉标记）
+  const todayExistingIds = useMemo(() => {
+    return new Set(todayExistingItems.map(i => i.id));
+  }, [todayExistingItems]);
+
   const toggleItem = (id: number) => {
+    // 追加模式：已记录的衣物不可重复选择
+    if (isAppendMode && todayExistingIds.has(id)) return;
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
@@ -522,14 +551,28 @@ export function RecordWearScreen() {
 
   const renderItemCard = (item: ClothingItem) => {
     const isSelected = selectedIds.includes(item.id);
+    const isAlreadyRecorded = isAppendMode && todayExistingIds.has(item.id);
     return (
       <TouchableOpacity
-        style={[styles.itemCard, isSelected && styles.itemCardActive]}
-        onPress={() => toggleItem(item.id)}
-        activeOpacity={0.7}
+        style={[
+          styles.itemCard,
+          isSelected && styles.itemCardActive,
+          isAlreadyRecorded && styles.itemCardRecorded,
+        ]}
+        onPress={() => {
+          if (isAlreadyRecorded) return;
+          toggleItem(item.id);
+        }}
+        activeOpacity={isAlreadyRecorded ? 1 : 0.7}
       >
         <Image source={{ uri: item.thumbnailUri }} style={styles.itemImage} />
-        {isSelected && (
+        {isAlreadyRecorded && (
+          <View style={styles.recordedBadge}>
+            <Ionicons name="checkmark-circle" size={13} color={theme.colors.white} />
+            <Text style={styles.recordedBadgeText}>已记录</Text>
+          </View>
+        )}
+        {isSelected && !isAlreadyRecorded && (
           <View style={styles.checkmark}>
             <Ionicons name="checkmark" size={12} color={theme.colors.white} />
           </View>
@@ -748,6 +791,7 @@ export function RecordWearScreen() {
 
       {mode === 'items' ? (
         <FlatList
+          key={`items-${mode}`}
           data={filteredClothing}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => renderItemCard(item)}
@@ -762,6 +806,7 @@ export function RecordWearScreen() {
         />
       ) : (
         <FlatList
+          key={`outfit-${mode}`}
           data={filteredOutfits}
           keyExtractor={item => item.id.toString()}
           renderItem={({ item }) => renderOutfitCard(item)}
