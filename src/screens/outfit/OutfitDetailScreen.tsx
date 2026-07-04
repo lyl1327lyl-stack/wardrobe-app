@@ -43,7 +43,6 @@ export function OutfitDetailScreen() {
   const groups = useWardrobeStore(s => s.groups);
   const clothing = useWardrobeStore(s => s.clothing);
   const deleteOutfit = useWardrobeStore(s => s.deleteOutfit);
-  const addWearRecords = useWardrobeStore(s => s.addWearRecords);
 
   const outfit = useMemo(() => outfits.find(o => o.id === outfitId), [outfits, outfitId]);
   const currentGroup = groups.find(g => g.id === (outfit?.groupId || groupId));
@@ -72,17 +71,12 @@ export function OutfitDetailScreen() {
     );
   }, [outfitId, deleteOutfit]);
 
-  const handleRecordWear = useCallback(async () => {
+  const handleRecordWear = useCallback(() => {
     if (!outfit?.itemIds || outfit.itemIds.length === 0) return;
     const now = new Date();
     const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const count = await addWearRecords([...outfit.itemIds], dateStr);
-    if (count > 0) {
-      Alert.alert('已记录', `已为 ${count} 件衣物记录今天的穿着`);
-    } else {
-      Alert.alert('提示', '搭配中的所有衣物今天都已记录过穿着');
-    }
-  }, [outfit?.itemIds, addWearRecords]);
+    navigation.navigate('RecordWear' as any, { date: dateStr, outfitId: outfit.id });
+  }, [outfit?.itemIds, outfit?.id, navigation]);
 
   // 从 canvasData 中获取已删除单品的缓存图片 URI
   const deletedImageUriMap = useMemo(() => {
