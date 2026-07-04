@@ -16,15 +16,18 @@ const CELL = 14;
 const GAP = 3;
 const ROWS = 7; // 周一..周日
 const STRIDE = CELL + GAP;
-const MONTH_GAP = 8; // 月份之间的额外间隔
+const MONTH_GAP = 10; // 月份之间的额外间隔
+
+interface Cell {
+  key: string;
+  worn: boolean;
+  isToday: boolean;
+  isPadding: boolean; // 月份首列上方 / 末列下方的占位（不属于该月任何一天）
+}
 
 function parseDate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
   return new Date(y, m - 1, d);
-}
-
-function toKey(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 const makeStyles = (theme: Theme) =>
@@ -62,24 +65,23 @@ const makeStyles = (theme: Theme) =>
     scroll: {
       paddingVertical: 4,
     },
-    monthLabelRow: {
-      height: 14,
-      marginBottom: 4,
-      position: 'relative',
+    timeline: {
+      flexDirection: 'row',
+    },
+    monthGroup: {
+      marginRight: MONTH_GAP,
     },
     monthLabel: {
-      position: 'absolute',
       fontSize: 10,
       color: theme.colors.textTertiary,
+      marginBottom: 4,
+      height: 14,
     },
     grid: {
       flexDirection: 'row',
     },
     col: {
       marginRight: GAP,
-    },
-    newMonthCol: {
-      marginLeft: MONTH_GAP,
     },
     cell: {
       width: CELL,
@@ -95,7 +97,7 @@ const makeStyles = (theme: Theme) =>
       borderWidth: 1.5,
       borderColor: theme.colors.accent,
     },
-    cellFuture: {
+    cellPad: {
       backgroundColor: 'transparent',
     },
     legend: {
@@ -134,60 +136,57 @@ export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) 
   const scrollRef = useRef<ScrollView>(null);
   const [didScroll, setDidScroll] = useState(false);
 
-  const { columns, monthLabels, newMonthCols, recentCount } = useMemo(() => {
+  const { monthsData, recentCount } = useMemo(() => {
     const todayD = parseDate(today);
-    const start = new Date(todayD);
-    start.setDate(start.getDate() - months * 30);
-    // 对齐到周一：getDay 0=Sun..6=Sat → Mon 为 0
-    const dow = (start.getDay() + 6) % 7;
-    start.setDate(start.getDate() - dow);
-
-    const cols: { key: string; worn: boolean; isToday: boolean; isFuture: boolean }[][] = [];
-    const labels: { col: number; label: string }[] = [];
-    const newMonthSet = new Set<number>();
-    let lastMonth = -1;
+    const groups: { label: string; columns: Cell[][]; dayCount: number }[] = [];
     let count = 0;
-    const cur = new Date(start);
-    let colIdx = 0;
 
-    while (cur <= todayD) {
-      const col: { key: string; worn: boolean; isToday: boolean; isFuture: boolean }[] = [];
-      // 找本列的月份：优先取列内“1 号”所在月，否则取首日月
-      let colMonth = -1;
-      for (let r = 0; r < ROWS; r++) {
-        const key = toKey(cur);
-        const isFuture = cur > todayD;
-        const worn = !isFuture && wornDates.has(key);
-        if (worn) count++;
-        if (cur.getDate() === 1) colMonth = cur.getMonth();
-        col.push({ key: `${key}-${r}`, worn, isToday: key === today, isFuture });
-        cur.setDate(cur.getDate() + 1);
+    for (let i = months - 1; i >= 0; i--) {
+      const firstOfMonth = new Date(todayD.getFullYear(), todayD.getMonth() - i, 1);
+      const y = firstOfMonth.getFullYear();
+      const m = firstOfMonth.getMonth(); // 0-based
+      const isCurrent = i === 0;
+      const totalDays = isCurrent
+        ? todayD.getDate()
+        : new Date(y, m + 1, 0).getDate();
+      // 周一对齐：getDay 0=Sun..6=Sat → Mon 为 0
+      const firstWeekday = (firstOfMonth.getDay() + 6) % 7;
+      const totalCells = firstWeekday + totalDays;
+      const colCount = Math.ceil(totalCells / ROWS);
+
+      const columns: Cell[][] = [];
+      for (let c = 0; c < colCount; c++) {
+        const col: Cell[] = [];
+        for (let r = 0; r < ROWS; r++) {
+          const idx = c * ROWS + r;
+          if (idx < firstWeekday || idx >= firstWeekday + totalDays) {
+            // 首列 1 号上方 / 末列最后一天下方的占位
+            col.push({ key: `${y}-${m}-pad-${idx}`, worn: false, isToday: false, isPadding: true });
+          } else {
+            const day = idx - firstWeekday + 1;
+            const key = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            const worn = wornDates.has(key);
+            if (worn) count++;
+            col.push({ key, worn, isToday: isCurrent && day === todayD.getDate(), isPadding: false });
+          }
+        }
+        columns.push(col);
       }
-      if (colMonth === -1) colMonth = parseDate(col[0].key.slice(0, 10)).getMonth();
-      if (colMonth !== lastMonth) {
-        labels.push({ col: colIdx, label: `${colMonth + 1}月` });
-        if (colIdx > 0) newMonthSet.add(colIdx); // 月份切换处加间隔
-        lastMonth = colMonth;
-      }
-      cols.push(col);
-      colIdx++;
-      if (colIdx > 300) break; // 安全上限
+      groups.push({ label: `${m + 1}月`, columns, dayCount: totalDays });
     }
-    return { columns: cols, monthLabels: labels, newMonthCols: newMonthSet, recentCount: count };
+    return { monthsData: groups, recentCount: count };
   }, [wornDates, months, today]);
 
-  // 默认滚动到最右（当前周）
+  // 默认滚动到最右（当前月）
   useEffect(() => {
-    if (!didScroll && columns.length > 0) {
+    if (!didScroll && monthsData.length > 0) {
       const t = setTimeout(() => {
         scrollRef.current?.scrollToEnd({ animated: false });
         setDidScroll(true);
       }, 0);
       return () => clearTimeout(t);
     }
-  }, [didScroll, columns.length]);
-
-  const gridWidth = columns.length * STRIDE + MONTH_GAP * newMonthCols.size;
+  }, [didScroll, monthsData.length]);
 
   return (
     <View style={styles.card}>
@@ -203,37 +202,31 @@ export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) 
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        <View style={{ width: gridWidth }}>
-          <View style={styles.monthLabelRow}>
-            {monthLabels.map((ml, i) => {
-              const gaps = [...newMonthCols].filter(c => c <= ml.col).length;
-              return (
-                <Text
-                  key={i}
-                  style={[styles.monthLabel, { left: ml.col * STRIDE + gaps * MONTH_GAP }]}
-                >
-                  {ml.label}
-                </Text>
-              );
-            })}
-          </View>
-          <View style={styles.grid}>
-            {columns.map((col, ci) => (
-              <View key={ci} style={[styles.col, newMonthCols.has(ci) && styles.newMonthCol]}>
-                {col.map((cell) => (
-                  <View
-                    key={cell.key}
-                    style={[
-                      styles.cell,
-                      cell.isFuture && styles.cellFuture,
-                      cell.worn && styles.cellWorn,
-                      cell.isToday && styles.cellToday,
-                    ]}
-                  />
+        <View style={styles.timeline}>
+          {monthsData.map((md, mi) => (
+            <View key={mi} style={styles.monthGroup}>
+              <Text style={styles.monthLabel}>{md.label}</Text>
+              <View style={styles.grid}>
+                {md.columns.map((col, ci) => (
+                  <View key={ci} style={styles.col}>
+                    {col.map((cell) => (
+                      <View
+                        key={cell.key}
+                        style={[
+                          styles.cell,
+                          cell.isPadding
+                            ? styles.cellPad
+                            : cell.worn
+                              ? [styles.cellWorn, cell.isToday && styles.cellToday]
+                              : cell.isToday && styles.cellToday,
+                        ]}
+                      />
+                    ))}
+                  </View>
                 ))}
               </View>
-            ))}
-          </View>
+            </View>
+          ))}
         </View>
       </ScrollView>
 
