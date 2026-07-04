@@ -26,6 +26,7 @@ import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
 import { WearCalendarSheet } from '../components/WearCalendarSheet';
 import { OutfitWarningModal } from '../components/OutfitWarningModal';
+import { MonthCalendar } from '../components/MonthCalendar';
 import * as wearRecordsDb from '../db/wearRecords';
 
 type DetailSource = 'wardrobe' | 'trash' | 'sold' | 'draft';
@@ -595,6 +596,10 @@ export function ClothingDetailScreen() {
     const now = new Date();
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
   });
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
 
   const handleSaveImage = useCallback(async () => {
     if (!item?.imageUri || savingImage) return;
@@ -751,135 +756,6 @@ export function ClothingDetailScreen() {
       console.error('删除穿着记录失败:', e);
     }
   };
-
-  // 获取日历样式
-  const getCalendarStyles = useMemo(() => StyleSheet.create({
-    calendarCard: {
-      marginHorizontal: 20,
-      marginTop: 16,
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.lg,
-      padding: 16,
-      ...theme.shadows.sm,
-    },
-    calendarHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: 16,
-    },
-    calendarTitle: {
-      fontSize: 15,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    legend: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: 16,
-      marginBottom: 8,
-    },
-    legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-    },
-    legendDot: {
-      width: 10,
-      height: 10,
-      borderRadius: 5,
-    },
-    legendText: {
-      fontSize: 11,
-      color: theme.colors.textTertiary,
-    },
-    monthNav: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 16,
-    },
-    monthNavBtn: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.colors.background,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    monthText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.text,
-      minWidth: 80,
-      textAlign: 'center',
-    },
-    weekDaysRow: {
-      flexDirection: 'row',
-      marginBottom: 8,
-    },
-    weekDay: {
-      flex: 1,
-      alignItems: 'center',
-      paddingVertical: 6,
-    },
-    weekDayText: {
-      fontSize: 12,
-      color: theme.colors.textTertiary,
-      fontWeight: '500',
-    },
-    daysGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-    },
-    dayCell: {
-      width: '14.28%',
-      aspectRatio: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dayText: {
-      fontSize: 14,
-      color: theme.colors.text,
-    },
-    dayTextOther: {
-      color: theme.colors.textTertiary,
-    },
-    dayFilled: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // 已穿着（过去）的样式
-    dayFilledPast: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    // 计划穿着（未来）的样式
-    dayFilledPlanned: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
-      backgroundColor: theme.colors.accent,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    dayFilledText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.white,
-    },
-    dayTextToday: {
-      fontWeight: '700',
-      color: theme.colors.primary,
-    },
-  }), [theme]);
 
   if (!item) {
     return (
@@ -1275,84 +1151,26 @@ export function ClothingDetailScreen() {
         })()}
 
         {/* 穿着日历卡片 */}
-        {!isTrash && !isSold && !isDraft && (
-          <View style={getCalendarStyles.calendarCard}>
-            <View style={getCalendarStyles.calendarHeader}>
-              <Text style={getCalendarStyles.calendarTitle}>穿着日历</Text>
-              <View style={getCalendarStyles.monthNav}>
-                <TouchableOpacity style={getCalendarStyles.monthNavBtn} onPress={prevMonth}>
-                  <Ionicons name="chevron-back" size={18} color={theme.colors.text} />
-                </TouchableOpacity>
-                <Text style={getCalendarStyles.monthText}>
-                  {currentMonth.year}年{currentMonth.month}月
-                </Text>
-                <TouchableOpacity style={getCalendarStyles.monthNavBtn} onPress={nextMonth}>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.text} />
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={getCalendarStyles.legend}>
-              <View style={getCalendarStyles.legendItem}>
-                <View style={[getCalendarStyles.legendDot, { backgroundColor: theme.colors.primary }]} />
-                <Text style={getCalendarStyles.legendText}>已穿着</Text>
-              </View>
-              <View style={getCalendarStyles.legendItem}>
-                <View style={[getCalendarStyles.legendDot, { backgroundColor: theme.colors.accent }]} />
-                <Text style={getCalendarStyles.legendText}>计划</Text>
-              </View>
-            </View>
-            <View style={getCalendarStyles.weekDaysRow}>
-              {['日', '一', '二', '三', '四', '五', '六'].map(day => (
-                <View key={day} style={getCalendarStyles.weekDay}>
-                  <Text style={getCalendarStyles.weekDayText}>{day}</Text>
-                </View>
-              ))}
-            </View>
-            <View style={getCalendarStyles.daysGrid}>
-              {(() => {
-                const firstDay = new Date(currentMonth.year, currentMonth.month - 1, 1).getDay();
-                const daysInMonth = new Date(currentMonth.year, currentMonth.month, 0).getDate();
-                const today = new Date();
-                const cells = [];
-                for (let i = 0; i < firstDay; i++) {
-                  cells.push(<View key={`empty-${i}`} style={getCalendarStyles.dayCell} />);
-                }
-                for (let d = 1; d <= daysInMonth; d++) {
-                  const dateStr = `${currentMonth.year}-${String(currentMonth.month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-                  const isToday = today.getFullYear() === currentMonth.year &&
-                    today.getMonth() + 1 === currentMonth.month &&
-                    today.getDate() === d;
-                  const hasRecord = wearDates.includes(dateStr);
-                  // 判断是否未来日期
-                  const isFuture = new Date(dateStr) > new Date(today.toISOString().split('T')[0]);
-                  cells.push(
-                    <TouchableOpacity
-                      key={d}
-                      style={getCalendarStyles.dayCell}
-                      onPress={() => hasRecord ? handleDatePress(dateStr) : (!isFuture && handleAddWearDate(dateStr))}
-                      disabled={isFuture}
-                      activeOpacity={0.7}
-                    >
-                      {hasRecord ? (
-                        <View style={isFuture ? getCalendarStyles.dayFilledPlanned : getCalendarStyles.dayFilled}>
-                          <Text style={getCalendarStyles.dayFilledText}>{d}</Text>
-                        </View>
-                      ) : (
-                        <Text style={[
-                          getCalendarStyles.dayText,
-                          isToday && getCalendarStyles.dayTextToday,
-                          isFuture && getCalendarStyles.dayTextOther,
-                        ]}>
-                          {d}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  );
-                }
-                return cells;
-              })()}
-            </View>
-          </View>
+        {!isTrash && !isSold && !isDraft && item && (
+          <MonthCalendar
+            year={currentMonth.year}
+            month={currentMonth.month}
+            today={todayStr}
+            wearData={wearDates.reduce((acc, d) => {
+              acc[d] = [item];
+              return acc;
+            }, {} as Record<string, ClothingItem[]>)}
+            onSelectDate={(dateStr) => {
+              if (wearDates.includes(dateStr)) {
+                handleDatePress(dateStr);
+              } else {
+                handleAddWearDate(dateStr);
+              }
+            }}
+            onPrevMonth={prevMonth}
+            onNextMonth={nextMonth}
+            disableFuture
+          />
         )}
 
         {/* 相关搭配 */}
