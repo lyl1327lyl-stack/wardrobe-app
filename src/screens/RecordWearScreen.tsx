@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { ClothingItem, Season, CategoryFilter, Outfit } from '../types';
@@ -363,6 +363,9 @@ const makeStyles = (theme: Theme) =>
 
 export function RecordWearScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
+  const initialDate = route.params?.date as string | undefined;
+  const initialOutfitId = route.params?.outfitId as number | undefined;
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -372,9 +375,9 @@ export function RecordWearScreen() {
   const getParents = useCustomOptionsStore(s => s.getParents);
   const getChildrenOf = useCustomOptionsStore(s => s.getChildrenOf);
 
-  const [mode, setMode] = useState<'items' | 'outfit'>('items');
+  const [mode, setMode] = useState<'items' | 'outfit'>(initialOutfitId ? 'outfit' : 'items');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
-  const [selectedDate, setSelectedDate] = useState(todayDateStr());
+  const [selectedDate, setSelectedDate] = useState(initialDate || todayDateStr());
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>({});
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
@@ -432,13 +435,22 @@ export function RecordWearScreen() {
     loadMonthData();
   }, [loadMonthData]);
 
-  // 切换日期时，预选当天已有记录（勾选模型：自由勾选/取消，保存时 diff 落库）
+  const outfitPresetAppliedRef = useRef(false);
+  // 切换日期时，预选当天已有记录（勾选模型）；首次若有 outfitId 预设则 union
   useEffect(() => {
     (async () => {
       const records = await wearRecordsDb.getWearRecordsByDate(selectedDate);
-      setSelectedIds(records.map(r => r.clothingId));
+      let ids = records.map(r => r.clothingId);
+      if (initialOutfitId && !outfitPresetAppliedRef.current) {
+        const outfit = outfits.find(o => o.id === initialOutfitId);
+        if (outfit) {
+          ids = [...new Set([...ids, ...outfit.itemIds])];
+        }
+        outfitPresetAppliedRef.current = true;
+      }
+      setSelectedIds(ids);
     })();
-  }, [selectedDate]);
+  }, [selectedDate, initialOutfitId, outfits]);
 
   // Filter clothing
   const filteredClothing = useMemo(() => {
