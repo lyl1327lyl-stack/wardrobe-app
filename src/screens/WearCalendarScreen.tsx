@@ -8,7 +8,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ClothingItem } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
@@ -302,6 +302,12 @@ export function WearCalendarScreen() {
     await Promise.all([loadMonthData(), loadRecentWeek()]);
   }, [loadMonthData, loadRecentWeek]);
 
+  useFocusEffect(
+    useCallback(() => {
+      reloadAll();
+    }, [reloadAll])
+  );
+
   useEffect(() => {
     loadData();
   }, []);
@@ -340,7 +346,10 @@ export function WearCalendarScreen() {
   };
 
   const handleAddRecord = () => {
-    reloadAll();
+    if (selectedDate) {
+      setShowSheet(false);
+      navigation.navigate('RecordWear' as any, { date: selectedDate });
+    }
   };
 
   const getDayLabel = (dateStr: string) => {
