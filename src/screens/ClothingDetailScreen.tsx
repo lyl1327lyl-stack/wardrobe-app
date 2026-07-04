@@ -17,6 +17,7 @@ import { useNavigation, useRoute, useFocusEffect, RouteProp } from '@react-navig
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as MediaLibrary from 'expo-media-library';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { useOutfitStore } from '../store/outfitStore';
 import { deleteImage } from '../utils/imageUtils';
 import { Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
@@ -383,6 +384,20 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
       gap: 6,
     },
+    relatedCreateBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 14,
+      backgroundColor: theme.colors.primary + '12',
+    },
+    relatedCreateText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.primary,
+    },
     relatedTitleText: {
       fontSize: 16,
       fontWeight: '600',
@@ -581,7 +596,7 @@ export function ClothingDetailScreen() {
         const records = await wearRecordsDb.getWearRecordsByClothing(item.id);
         const now = new Date();
         const cutoff = new Date(now);
-        cutoff.setMonth(cutoff.getMonth() - 6);
+        cutoff.setMonth(cutoff.getMonth() - 4);
         const set = new Set<string>();
         for (const r of records) {
           const d = new Date(r.wornDate);
@@ -617,6 +632,16 @@ export function ClothingDetailScreen() {
       loadLastWornDate();
     }, [loadWearHistory, loadLastWornDate])
   );
+
+  // 为这件衣服创建新搭配：预选该衣物进入搭配编辑器
+  const resetOutfitStore = useOutfitStore(s => s.reset);
+  const setSelectedClothings = useOutfitStore(s => s.setSelectedClothings);
+  const handleCreateOutfit = useCallback(() => {
+    if (!item) return;
+    resetOutfitStore();
+    setSelectedClothings([item]);
+    navigation.navigate('OutfitEditor', { selectedIds: [item.id] });
+  }, [item, resetOutfitStore, setSelectedClothings, navigation]);
 
   if (!item) {
     return (
@@ -960,9 +985,9 @@ export function ClothingDetailScreen() {
           <Text style={styles.remarksText}>{item.remarks || '暂无备注'}</Text>
         </View>
 
-        {/* 穿着频次热力图（近 6 个月，只读） */}
+        {/* 穿着频次热力图（近 4 个月，只读） */}
         {!isTrash && !isSold && !isDraft && item && (
-          <WearHeatmap wornDates={wornDateSet} today={todayStr} />
+          <WearHeatmap wornDates={wornDateSet} months={4} today={todayStr} />
         )}
 
         {/* 相关搭配 */}
@@ -974,14 +999,19 @@ export function ClothingDetailScreen() {
                 <Text style={styles.relatedTitleText}>相关搭配</Text>
                 <Text style={styles.relatedCount}>{relatedOutfits.length}</Text>
               </View>
-              {relatedOutfits.length > 3 && (
-                <Ionicons name="chevron-forward" size={16} color={theme.colors.textTertiary} />
-              )}
+              <TouchableOpacity style={styles.relatedCreateBtn} onPress={handleCreateOutfit} activeOpacity={0.7}>
+                <Ionicons name="add-circle-outline" size={15} color={theme.colors.primary} />
+                <Text style={styles.relatedCreateText}>新建搭配</Text>
+              </TouchableOpacity>
             </View>
             {relatedOutfits.length === 0 ? (
               <View style={styles.relatedEmptyCard}>
                 <Ionicons name="grid-outline" size={28} color={theme.colors.border} />
                 <Text style={styles.relatedEmptyText}>暂无相关搭配</Text>
+                <TouchableOpacity style={[styles.relatedCreateBtn, { marginTop: 10 }]} onPress={handleCreateOutfit} activeOpacity={0.7}>
+                  <Ionicons name="add-circle-outline" size={15} color={theme.colors.primary} />
+                  <Text style={styles.relatedCreateText}>为这件衣服创建搭配</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               <ScrollView
@@ -993,7 +1023,7 @@ export function ClothingDetailScreen() {
                   <TouchableOpacity
                     key={outfit.id}
                     style={styles.relatedCard}
-                    onPress={() => navigation.navigate('OutfitDetail', { id: outfit.id })}
+                    onPress={() => navigation.navigate('OutfitDetail', { outfitId: outfit.id })}
                     activeOpacity={0.8}
                   >
                     <View style={styles.relatedImageWrap}>
