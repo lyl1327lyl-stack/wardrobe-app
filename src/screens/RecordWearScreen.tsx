@@ -350,10 +350,9 @@ const makeStyles = (theme: Theme) =>
       paddingHorizontal: 20,
     },
     dateModalCard: {
-      backgroundColor: theme.colors.card,
-      borderRadius: 20,
-      padding: 16,
-      ...theme.shadows.lg,
+      width: '100%',
+      maxWidth: 420,
+      alignSelf: 'center',
     },
     dateModalClose: {
       alignSelf: 'flex-end',
@@ -451,6 +450,27 @@ export function RecordWearScreen() {
       setSelectedIds(ids);
     })();
   }, [selectedDate, initialOutfitId, outfits]);
+
+  const outfitMatchMap = useMemo(() => {
+    const map: Record<string, { outfitId: number; outfitName: string; outfitThumb: string; extraItemIds: number[] }> = {};
+    for (const [dateStr, items] of Object.entries(dateWearData)) {
+      const itemIds = new Set(items.map(i => i.id));
+      for (const outfit of outfits) {
+        if (outfit.itemIds.length === 0) continue;
+        if (outfit.itemIds.every(cid => itemIds.has(cid))) {
+          const extraItemIds = items.filter(i => !outfit.itemIds.includes(i.id)).map(i => i.id);
+          map[dateStr] = {
+            outfitId: outfit.id,
+            outfitName: outfit.name,
+            outfitThumb: outfit.thumbnailUri || '',
+            extraItemIds,
+          };
+          break;
+        }
+      }
+    }
+    return map;
+  }, [dateWearData, outfits]);
 
   // Filter clothing
   const filteredClothing = useMemo(() => {
@@ -839,6 +859,11 @@ export function RecordWearScreen() {
               month={calMonth}
               today={today}
               wearData={dateWearData}
+              outfitMatchMap={outfitMatchMap}
+              legendItems={[
+                { label: '已穿着', color: theme.colors.primary + '40' },
+                { label: '今天', icon: 'star', iconColor: theme.colors.primary },
+              ]}
               onSelectDate={handleDateSelect}
               onPrevMonth={() => {
                 if (calMonth === 1) { setCalMonth(12); setCalYear(calYear - 1); }
