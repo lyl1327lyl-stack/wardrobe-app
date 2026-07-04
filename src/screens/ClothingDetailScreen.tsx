@@ -18,15 +18,14 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as MediaLibrary from 'expo-media-library';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { deleteImage } from '../utils/imageUtils';
-import { ClothingItem, Outfit } from '../types';
+import { Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
 import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
-import { WearCalendarSheet } from '../components/WearCalendarSheet';
 import { OutfitWarningModal } from '../components/OutfitWarningModal';
-import { MonthCalendar } from '../components/MonthCalendar';
+import { WearHeatmap } from '../components/WearHeatmap';
 import * as wearRecordsDb from '../db/wearRecords';
 
 type DetailSource = 'wardrobe' | 'trash' | 'sold' | 'draft';
@@ -499,7 +498,7 @@ const makeStyles = (theme: Theme) =>
 export function ClothingDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'ClothingDetail'>>();
-  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, publishDraft, addWearRecord, deleteWearRecord, getOutfitWarningForDeletion } = useWardrobeStore();
+  const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, publishDraft, getOutfitWarningForDeletion } = useWardrobeStore();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
@@ -531,7 +530,6 @@ export function ClothingDetailScreen() {
   const [showDiscardSheet, setShowDiscardSheet] = useState(false);
   const [showSellSheet, setShowSellSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
-  const [showWearCalendar, setShowWearCalendar] = useState(false);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
   const [outfitWarning, setOutfitWarning] = useState<{
@@ -542,13 +540,8 @@ export function ClothingDetailScreen() {
     description?: string;
     onConfirm: () => void;
   } | null>(null);
-  const [selectedDate, setSelectedDate] = useState<string>('');
-  const [wearDates, setWearDates] = useState<string[]>([]);
+  const [wornDateSet, setWornDateSet] = useState<Set<string>>(new Set());
   const [dynamicLastWorn, setDynamicLastWorn] = useState<string | null>(null);
-  const [currentMonth, setCurrentMonth] = useState(() => {
-    const now = new Date();
-    return { year: now.getFullYear(), month: now.getMonth() + 1 };
-  });
   const todayStr = useMemo(() => {
     const d = new Date();
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -582,20 +575,24 @@ export function ClothingDetailScreen() {
   const isDraft = source === 'draft';
 
   // 加载穿着日期
-  const loadWearDates = useCallback(async () => {
+  const loadWearHistory = useCallback(async () => {
     if (item && !isTrash && !isSold && !isDraft) {
       try {
-        const dates = await wearRecordsDb.getWearDatesByMonth(
-          item.id,
-          currentMonth.year,
-          currentMonth.month
-        );
-        setWearDates(dates);
+        const records = await wearRecordsDb.getWearRecordsByClothing(item.id);
+        const now = new Date();
+        const cutoff = new Date(now);
+        cutoff.setMonth(cutoff.getMonth() - 6);
+        const set = new Set<string>();
+        for (const r of records) {
+          const d = new Date(r.wornDate);
+          if (d >= cutoff && d <= now) set.add(r.wornDate);
+        }
+        setWornDateSet(set);
       } catch (error) {
-        console.error('Failed to load wear dates:', error);
+        console.error('Failed to load wear history:', error);
       }
     }
-  }, [item, currentMonth, isTrash, isSold, isDraft]);
+  }, [item, isTrash, isSold, isDraft]);
 
   const loadLastWornDate = useCallback(async () => {
     if (item && !isTrash && !isSold && !isDraft) {
@@ -609,78 +606,17 @@ export function ClothingDetailScreen() {
   }, [item, isTrash, isSold, isDraft]);
 
   useEffect(() => {
-    loadWearDates();
+    loadWearHistory();
     loadLastWornDate();
-  }, [loadWearDates, loadLastWornDate]);
+  }, [loadWearHistory, loadLastWornDate]);
 
   // 每次屏幕进入焦点时重新加载穿着统计
   useFocusEffect(
     useCallback(() => {
+      loadWearHistory();
       loadLastWornDate();
-    }, [loadLastWornDate])
+    }, [loadWearHistory, loadLastWornDate])
   );
-
-  // 月份切换
-  const prevMonth = () => {
-    setCurrentMonth(prev => {
-      if (prev.month === 1) {
-        return { year: prev.year - 1, month: 12 };
-      }
-      return { year: prev.year, month: prev.month - 1 };
-    });
-  };
-
-  const nextMonth = () => {
-    setCurrentMonth(prev => {
-      if (prev.month === 12) {
-        return { year: prev.year + 1, month: 1 };
-      }
-      return { year: prev.year, month: prev.month + 1 };
-    });
-  };
-
-  // 点击日期（已有记录）
-  const handleDatePress = (date: string) => {
-    setSelectedDate(date);
-    setShowWearCalendar(true);
-  };
-
-  // 添加过往穿着日期
-  const handleAddWearDate = (date: string) => {
-    if (!item) return;
-    Alert.alert(
-      '确认记录',
-      `确认记录 ${date} 的穿着吗？`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确认',
-          onPress: () => {
-            (async () => {
-              try {
-                await addWearRecord(item.id, date);
-                await loadWearDates();
-              } catch (e) {
-                console.error('记录穿着失败:', e);
-              }
-            })();
-          },
-        },
-      ]
-    );
-  };
-
-  // 删除穿着记录后刷新
-  const handleDeleteRecord = async (recordId: number) => {
-    if (!item) return;
-    try {
-      // 使用 store 的 deleteWearRecord（它会正确更新数据库和内存状态）
-      await deleteWearRecord(recordId);
-      await loadWearDates();
-    } catch (e) {
-      console.error('删除穿着记录失败:', e);
-    }
-  };
 
   if (!item) {
     return (
@@ -1024,27 +960,9 @@ export function ClothingDetailScreen() {
           <Text style={styles.remarksText}>{item.remarks || '暂无备注'}</Text>
         </View>
 
-        {/* 穿着日历卡片 */}
+        {/* 穿着频次热力图（近 6 个月，只读） */}
         {!isTrash && !isSold && !isDraft && item && (
-          <MonthCalendar
-            year={currentMonth.year}
-            month={currentMonth.month}
-            today={todayStr}
-            wearData={wearDates.reduce((acc, d) => {
-              acc[d] = [item];
-              return acc;
-            }, {} as Record<string, ClothingItem[]>)}
-            onSelectDate={(dateStr) => {
-              if (wearDates.includes(dateStr)) {
-                handleDatePress(dateStr);
-              } else {
-                handleAddWearDate(dateStr);
-              }
-            }}
-            onPrevMonth={prevMonth}
-            onNextMonth={nextMonth}
-            disableFuture
-          />
+          <WearHeatmap wornDates={wornDateSet} today={todayStr} />
         )}
 
         {/* 相关搭配 */}
@@ -1194,14 +1112,6 @@ export function ClothingDetailScreen() {
         onClose={() => setShowEditReason(false)}
         clothingItem={item}
         onSave={handleEditReason}
-      />
-
-      <WearCalendarSheet
-        visible={showWearCalendar}
-        onClose={() => setShowWearCalendar(false)}
-        date={selectedDate}
-        onDeleteRecord={handleDeleteRecord}
-        onAddRecord={loadWearDates}
       />
 
       {outfitWarning && (
