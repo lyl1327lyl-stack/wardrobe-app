@@ -71,13 +71,6 @@ export function OutfitDetailScreen() {
     );
   }, [outfitId, deleteOutfit]);
 
-  const handleRecordWear = useCallback(() => {
-    if (!outfit?.itemIds || outfit.itemIds.length === 0) return;
-    const now = new Date();
-    const dateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    navigation.navigate('RecordWear' as any, { date: dateStr, outfitId: outfit.id });
-  }, [outfit?.itemIds, outfit?.id, navigation]);
-
   // 从 canvasData 中获取已删除单品的缓存图片 URI
   const deletedImageUriMap = useMemo(() => {
     const map: Record<number, string> = {};
@@ -287,14 +280,6 @@ export function OutfitDetailScreen() {
         </View>
         {/* 操作按钮（随滚动，仿衣服详情底部管理按钮） */}
         <View style={styles.actionRow}>
-          <TouchableOpacity
-            style={[styles.actionBtn, { backgroundColor: theme.colors.primary }]}
-            onPress={handleRecordWear}
-            activeOpacity={0.8}
-          >
-            <Ionicons name="checkmark-done" size={20} color="#fff" />
-            <Text style={[styles.actionBtnPrimaryText, { color: theme.colors.white }]}>记录穿着</Text>
-          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: theme.colors.borderLight }]}
             onPress={handleDelete}
@@ -661,10 +646,6 @@ const makeStyles = (theme: Theme, insets: any) =>
       gap: 6,
       paddingVertical: 14,
       borderRadius: 14,
-    },
-    actionBtnPrimaryText: {
-      fontSize: 14,
-      fontWeight: '700',
     },
     actionBtnDangerText: {
       fontSize: 14,
