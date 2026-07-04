@@ -17,6 +17,13 @@ const CARD_PADDING = 18;
 const CELL_MARGIN = 4;
 const CELL_SIZE = Math.floor((SCREEN_WIDTH - 40 - CARD_PADDING * 2 - CELL_MARGIN * 6) / 7);
 
+export interface LegendItem {
+  label: string;
+  color?: string;
+  icon?: string;
+  iconColor?: string;
+}
+
 export interface MonthCalendarProps {
   year: number;
   month: number;
@@ -26,6 +33,8 @@ export interface MonthCalendarProps {
   onPrevMonth: () => void;
   onNextMonth: () => void;
   outfitMatchMap?: Record<string, { outfitId: number; outfitName: string; outfitThumb: string; extraItemIds?: number[] }>;
+  disableFuture?: boolean;
+  legendItems?: LegendItem[];
 }
 
 export function getDaysInMonth(year: number, month: number): number {
@@ -171,6 +180,8 @@ export function MonthCalendar({
   onPrevMonth,
   onNextMonth,
   outfitMatchMap,
+  disableFuture,
+  legendItems,
 }: MonthCalendarProps) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -203,6 +214,7 @@ export function MonthCalendar({
     const isToday = dateStr === today;
     const hasRecords = dayRecords.length > 0;
     const isFuture = dateStr > today;
+    const isFutureDisabled = disableFuture && isFuture;
     const weekIndex = (firstDay + day - 1) % 7;
     const isSunday = weekIndex === 6;
     const match = outfitMatchMap?.[dateStr];
@@ -215,11 +227,13 @@ export function MonthCalendar({
           styles.dayCell,
           isToday && styles.dayCellToday,
           hasRecords && !isToday && (isFuture ? styles.dayCellPlanned : styles.dayCellHasRecords),
+          isFutureDisabled && styles.dayCellEmpty,
           !isSunday && { marginRight: CELL_MARGIN },
           { marginBottom: CELL_MARGIN },
           showOutfitThumb && { overflow: 'hidden' },
         ]}
-        onPress={() => onSelectDate(dateStr)}
+        onPress={() => { if (!isFutureDisabled) onSelectDate(dateStr); }}
+        disabled={isFutureDisabled}
         activeOpacity={0.7}
       >
         {showOutfitThumb ? (
@@ -312,18 +326,20 @@ export function MonthCalendar({
       </View>
 
       <View style={styles.legend}>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: theme.colors.primary + '40' }]} />
-          <Text style={styles.legendText}>已穿着</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <View style={[styles.legendDot, { backgroundColor: theme.colors.accent + '50' }]} />
-          <Text style={styles.legendText}>计划穿着</Text>
-        </View>
-        <View style={styles.legendItem}>
-          <Ionicons name="star" size={12} color={theme.colors.primary} />
-          <Text style={styles.legendText}>今天</Text>
-        </View>
+        {(legendItems && legendItems.length > 0 ? legendItems : [
+          { label: '已穿着', color: theme.colors.primary + '40' },
+          { label: '计划穿着', color: theme.colors.accent + '50' },
+          { label: '今天', icon: 'star', iconColor: theme.colors.primary },
+        ]).map((item, idx) => (
+          <View key={idx} style={styles.legendItem}>
+            {item.icon ? (
+              <Ionicons name={item.icon as any} size={12} color={item.iconColor || theme.colors.primary} />
+            ) : (
+              <View style={[styles.legendDot, { backgroundColor: item.color || theme.colors.primary }]} />
+            )}
+            <Text style={styles.legendText}>{item.label}</Text>
+          </View>
+        ))}
       </View>
     </View>
   );
