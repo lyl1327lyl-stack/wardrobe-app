@@ -149,21 +149,18 @@ export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) 
       const totalDays = isCurrent
         ? todayD.getDate()
         : new Date(y, m + 1, 0).getDate();
-      // 周一对齐：getDay 0=Sun..6=Sat → Mon 为 0
-      const firstWeekday = (firstOfMonth.getDay() + 6) % 7;
-      const totalCells = firstWeekday + totalDays;
-      const colCount = Math.ceil(totalCells / ROWS);
+      // 1 号固定放第一行第一列，按列顺序填，末列不满则置空
+      const colCount = Math.ceil(totalDays / ROWS);
 
       const columns: Cell[][] = [];
       for (let c = 0; c < colCount; c++) {
         const col: Cell[] = [];
         for (let r = 0; r < ROWS; r++) {
-          const idx = c * ROWS + r;
-          if (idx < firstWeekday || idx >= firstWeekday + totalDays) {
-            // 首列 1 号上方 / 末列最后一天下方的占位
-            col.push({ key: `${y}-${m}-pad-${idx}`, worn: false, isToday: false, isPadding: true });
+          const day = c * ROWS + r + 1;
+          if (day > totalDays) {
+            // 末列最后一天下方的占位
+            col.push({ key: `${y}-${m}-pad-${c}-${r}`, worn: false, isToday: false, isPadding: true });
           } else {
-            const day = idx - firstWeekday + 1;
             const key = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             const worn = wornDates.has(key);
             if (worn) count++;
