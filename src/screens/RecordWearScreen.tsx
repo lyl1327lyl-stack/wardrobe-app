@@ -387,41 +387,40 @@ export function RecordWearScreen() {
   const [calMonth, setCalMonth] = useState(new Date().getMonth() + 1);
   const today = todayDateStr();
 
-  // Load month data for date picker
+  // Load month data for date picker（单次范围查询替代逐天查询，N10）
   const loadMonthData = useCallback(async () => {
     try {
       const daysInMonth = getDaysInMonth(calYear, calMonth);
-      const newData: Record<string, ClothingItem[]> = {};
+      const startDate = `${calYear}-${String(calMonth).padStart(2, '0')}-01`;
+      const endDate = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
       const allClothingMap = new Map<number, ClothingItem>();
       for (const c of clothing) allClothingMap.set(c.id, c);
 
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${calYear}-${String(calMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
-        const items = records
-          .map(r => {
-            const live = allClothingMap.get(r.clothingId);
-            if (live) return live;
-            // Fallback: use stored thumbnail from wear record for deleted items
-            if (r.clothingThumbnailUri) {
-              return {
-                id: r.clothingId,
-                imageUri: r.clothingThumbnailUri,
-                thumbnailUri: r.clothingThumbnailUri,
-                originalImageUri: '',
-                type: r.clothingType || '已删除',
-                parentType: '',
-                color: '', brand: '', size: '', remarks: '',
-                seasons: [], tags: [], fit: '', thickness: '',
-                purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
-                createdAt: '', wardrobeId: 0,
-              } as ClothingItem;
-            }
-            return undefined;
-          })
-          .filter((c): c is ClothingItem => c !== undefined);
-        if (items.length > 0) {
-          newData[dateStr] = items;
+      const allRecords = await wearRecordsDb.getWearRecordsByDateRange(startDate, endDate);
+      const newData: Record<string, ClothingItem[]> = {};
+      for (const r of allRecords) {
+        const live = allClothingMap.get(r.clothingId);
+        let item: ClothingItem | undefined;
+        if (live) {
+          item = live;
+        } else if (r.clothingThumbnailUri) {
+          // 回退：用记录里的缩略图（已删除衣物）
+          item = {
+            id: r.clothingId,
+            imageUri: r.clothingThumbnailUri,
+            thumbnailUri: r.clothingThumbnailUri,
+            originalImageUri: '',
+            type: r.clothingType || '已删除',
+            parentType: '',
+            color: '', brand: '', size: '', remarks: '',
+            seasons: [], tags: [], fit: '', thickness: '',
+            purchaseDate: '', price: 0, wearCount: 0, lastWornAt: null,
+            createdAt: '', wardrobeId: 0,
+          };
+        }
+        if (item) {
+          if (!newData[r.wornDate]) newData[r.wornDate] = [];
+          newData[r.wornDate].push(item);
         }
       }
       setDateWearData(newData);

@@ -9,13 +9,41 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { ClothingItem } from '../types';
+import { ClothingItem, WearRecord } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import * as wearRecordsDb from '../db/wearRecords';
 import { MonthCalendar, getDaysInMonth } from '../components/MonthCalendar';
 import { WearCalendarSheet } from '../components/WearCalendarSheet';
+
+// 穿着记录 → ClothingItem（命中实时数据用实时，否则用记录里的缩略图回退）
+function recordToClothingItem(r: WearRecord, map: Map<number, ClothingItem>): ClothingItem {
+  const live = map.get(r.clothingId);
+  if (live) return live;
+  return {
+    id: r.clothingId,
+    imageUri: r.clothingThumbnailUri || '',
+    thumbnailUri: r.clothingThumbnailUri || '',
+    originalImageUri: '',
+    type: r.clothingType || '已删除',
+    parentType: '',
+    color: '',
+    brand: '',
+    size: '',
+    remarks: '',
+    seasons: [],
+    tags: [],
+    fit: '',
+    thickness: '',
+    purchaseDate: '',
+    price: 0,
+    wearCount: 0,
+    lastWornAt: null,
+    createdAt: '',
+    wardrobeId: 0,
+  };
+}
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
@@ -225,75 +253,37 @@ export function WearCalendarScreen() {
 
   const loadMonthData = useCallback(async () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
+    const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
+    const endDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(daysInMonth).padStart(2, '0')}`;
+    // 单次范围查询替代逐天查询（N10）
+    const allRecords = await wearRecordsDb.getWearRecordsByDateRange(startDate, endDate);
     const newData: Record<string, ClothingItem[]> = {};
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
-      const items = records
-        .map(r => allClothingMap.get(r.clothingId) || {
-          id: r.clothingId,
-          imageUri: r.clothingThumbnailUri || '',
-          thumbnailUri: r.clothingThumbnailUri || '',
-          originalImageUri: '',
-          type: r.clothingType || '已删除',
-          parentType: '',
-          color: '',
-          brand: '',
-          size: '',
-          remarks: '',
-          seasons: [],
-          tags: [],
-          fit: '',
-          thickness: '',
-          purchaseDate: '',
-          price: 0,
-          wearCount: 0,
-          lastWornAt: null,
-          createdAt: '',
-          wardrobeId: 0,
-        } as ClothingItem)
-        .filter((c): c is ClothingItem => c !== undefined);
-      if (items.length > 0) {
-        newData[dateStr] = items;
-      }
+    for (const r of allRecords) {
+      if (!newData[r.wornDate]) newData[r.wornDate] = [];
+      newData[r.wornDate].push(recordToClothingItem(r, allClothingMap));
     }
-
     setWearData(newData);
   }, [currentYear, currentMonth, allClothingMap]);
 
   const loadRecentWeek = useCallback(async () => {
-    const result: { date: string; items: ClothingItem[] }[] = [];
     const now = new Date();
+    const start = new Date(now);
+    start.setDate(start.getDate() - 6);
+    const startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
+    const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    // 单次范围查询替代逐天查询（N10）
+    const allRecords = await wearRecordsDb.getWearRecordsByDateRange(startDate, endDate);
+    const byDate = new Map<string, ClothingItem[]>();
+    for (const r of allRecords) {
+      if (!byDate.has(r.wornDate)) byDate.set(r.wornDate, []);
+      byDate.get(r.wornDate)!.push(recordToClothingItem(r, allClothingMap));
+    }
+    const result: { date: string; items: ClothingItem[] }[] = [];
     for (let i = 0; i < 7; i++) {
       const d = new Date(now);
       d.setDate(d.getDate() - i);
       const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      const records = await wearRecordsDb.getWearRecordsByDate(dateStr);
-      const items = records
-        .map(r => allClothingMap.get(r.clothingId) || {
-          id: r.clothingId,
-          imageUri: r.clothingThumbnailUri || '',
-          thumbnailUri: r.clothingThumbnailUri || '',
-          originalImageUri: '',
-          type: r.clothingType || '已删除',
-          parentType: '',
-          color: '',
-          brand: '',
-          size: '',
-          remarks: '',
-          seasons: [],
-          tags: [],
-          fit: '',
-          thickness: '',
-          purchaseDate: '',
-          price: 0,
-          wearCount: 0,
-          lastWornAt: null,
-          createdAt: '',
-          wardrobeId: 0,
-        } as ClothingItem);
-      result.push({ date: dateStr, items });
+      result.push({ date: dateStr, items: byDate.get(dateStr) || [] });
     }
     setRecentWeek(result);
   }, [allClothingMap]);
