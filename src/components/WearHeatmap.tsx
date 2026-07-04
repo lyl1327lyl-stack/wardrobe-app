@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
@@ -16,6 +16,7 @@ const CELL = 14;
 const GAP = 3;
 const ROWS = 7; // 周一..周日
 const STRIDE = CELL + GAP;
+const MONTH_GAP = 8; // 月份之间的额外间隔
 
 function parseDate(s: string): Date {
   const [y, m, d] = s.split('-').map(Number);
@@ -77,6 +78,9 @@ const makeStyles = (theme: Theme) =>
     col: {
       marginRight: GAP,
     },
+    newMonthCol: {
+      marginLeft: MONTH_GAP,
+    },
     cell: {
       width: CELL,
       height: CELL,
@@ -127,8 +131,10 @@ const makeStyles = (theme: Theme) =>
 export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const scrollRef = useRef<ScrollView>(null);
+  const [didScroll, setDidScroll] = useState(false);
 
-  const { columns, monthLabels, recentCount } = useMemo(() => {
+  const { columns, monthLabels, newMonthCols, recentCount } = useMemo(() => {
     const todayD = parseDate(today);
     const start = new Date(todayD);
     start.setDate(start.getDate() - months * 30);
@@ -138,6 +144,7 @@ export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) 
 
     const cols: { key: string; worn: boolean; isToday: boolean; isFuture: boolean }[][] = [];
     const labels: { col: number; label: string }[] = [];
+    const newMonthSet = new Set<number>();
     let lastMonth = -1;
     let count = 0;
     const cur = new Date(start);
@@ -145,28 +152,42 @@ export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) 
 
     while (cur <= todayD) {
       const col: { key: string; worn: boolean; isToday: boolean; isFuture: boolean }[] = [];
+      // 找本列的月份：优先取列内“1 号”所在月，否则取首日月
+      let colMonth = -1;
       for (let r = 0; r < ROWS; r++) {
         const key = toKey(cur);
         const isFuture = cur > todayD;
         const worn = !isFuture && wornDates.has(key);
         if (worn) count++;
+        if (cur.getDate() === 1) colMonth = cur.getMonth();
         col.push({ key: `${key}-${r}`, worn, isToday: key === today, isFuture });
         cur.setDate(cur.getDate() + 1);
       }
-      // 月份标签：以本列首日所在月份为准
-      const firstMonth = parseDate(col[0].key.slice(0, 10)).getMonth();
-      if (firstMonth !== lastMonth) {
-        labels.push({ col: colIdx, label: `${firstMonth + 1}月` });
-        lastMonth = firstMonth;
+      if (colMonth === -1) colMonth = parseDate(col[0].key.slice(0, 10)).getMonth();
+      if (colMonth !== lastMonth) {
+        labels.push({ col: colIdx, label: `${colMonth + 1}月` });
+        if (colIdx > 0) newMonthSet.add(colIdx); // 月份切换处加间隔
+        lastMonth = colMonth;
       }
       cols.push(col);
       colIdx++;
       if (colIdx > 300) break; // 安全上限
     }
-    return { columns: cols, monthLabels: labels, recentCount: count };
+    return { columns: cols, monthLabels: labels, newMonthCols: newMonthSet, recentCount: count };
   }, [wornDates, months, today]);
 
-  const gridWidth = columns.length * STRIDE;
+  // 默认滚动到最右（当前周）
+  useEffect(() => {
+    if (!didScroll && columns.length > 0) {
+      const t = setTimeout(() => {
+        scrollRef.current?.scrollToEnd({ animated: false });
+        setDidScroll(true);
+      }, 0);
+      return () => clearTimeout(t);
+    }
+  }, [didScroll, columns.length]);
+
+  const gridWidth = columns.length * STRIDE + MONTH_GAP * newMonthCols.size;
 
   return (
     <View style={styles.card}>
@@ -176,16 +197,29 @@ export function WearHeatmap({ wornDates, months = 6, today }: WearHeatmapProps) 
         <Text style={styles.subtitle}>近 {months} 个月</Text>
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scroll}>
+      <ScrollView
+        ref={scrollRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+      >
         <View style={{ width: gridWidth }}>
           <View style={styles.monthLabelRow}>
-            {monthLabels.map((ml, i) => (
-              <Text key={i} style={[styles.monthLabel, { left: ml.col * STRIDE }]}>{ml.label}</Text>
-            ))}
+            {monthLabels.map((ml, i) => {
+              const gaps = [...newMonthCols].filter(c => c <= ml.col).length;
+              return (
+                <Text
+                  key={i}
+                  style={[styles.monthLabel, { left: ml.col * STRIDE + gaps * MONTH_GAP }]}
+                >
+                  {ml.label}
+                </Text>
+              );
+            })}
           </View>
           <View style={styles.grid}>
             {columns.map((col, ci) => (
-              <View key={ci} style={styles.col}>
+              <View key={ci} style={[styles.col, newMonthCols.has(ci) && styles.newMonthCol]}>
                 {col.map((cell) => (
                   <View
                     key={cell.key}

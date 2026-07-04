@@ -384,19 +384,32 @@ const makeStyles = (theme: Theme) =>
       alignItems: 'center',
       gap: 6,
     },
-    relatedCreateBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
+    relatedCreateCard: {
+      width: 148,
+      minHeight: 200,
+      backgroundColor: theme.colors.background,
       borderRadius: 14,
-      backgroundColor: theme.colors.primary + '12',
+      borderWidth: 1.5,
+      borderColor: theme.colors.border,
+      borderStyle: 'dashed',
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: 10,
+      padding: 16,
     },
-    relatedCreateText: {
+    relatedCreateIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.primary + '15',
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    relatedCreateCardText: {
       fontSize: 12,
       fontWeight: '600',
       color: theme.colors.primary,
+      textAlign: 'center',
     },
     relatedTitleText: {
       fontSize: 16,
@@ -444,19 +457,6 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.primary,
       marginTop: 2,
       fontWeight: '500',
-    },
-    relatedEmptyCard: {
-      width: 148,
-      height: 148,
-      backgroundColor: theme.colors.borderLight,
-      borderRadius: 14,
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 6,
-    },
-    relatedEmptyText: {
-      fontSize: 12,
-      color: theme.colors.textTertiary,
     },
     bottomPadding: {
       height: 40,
@@ -596,7 +596,7 @@ export function ClothingDetailScreen() {
         const records = await wearRecordsDb.getWearRecordsByClothing(item.id);
         const now = new Date();
         const cutoff = new Date(now);
-        cutoff.setMonth(cutoff.getMonth() - 4);
+        cutoff.setMonth(cutoff.getMonth() - 6);
         const set = new Set<string>();
         for (const r of records) {
           const d = new Date(r.wornDate);
@@ -985,9 +985,9 @@ export function ClothingDetailScreen() {
           <Text style={styles.remarksText}>{item.remarks || '暂无备注'}</Text>
         </View>
 
-        {/* 穿着频次热力图（近 4 个月，只读） */}
+        {/* 穿着频次热力图（近 6 个月，只读，默认滚到当前） */}
         {!isTrash && !isSold && !isDraft && item && (
-          <WearHeatmap wornDates={wornDateSet} months={4} today={todayStr} />
+          <WearHeatmap wornDates={wornDateSet} months={6} today={todayStr} />
         )}
 
         {/* 相关搭配 */}
@@ -999,61 +999,63 @@ export function ClothingDetailScreen() {
                 <Text style={styles.relatedTitleText}>相关搭配</Text>
                 <Text style={styles.relatedCount}>{relatedOutfits.length}</Text>
               </View>
-              <TouchableOpacity style={styles.relatedCreateBtn} onPress={handleCreateOutfit} activeOpacity={0.7}>
-                <Ionicons name="add-circle-outline" size={15} color={theme.colors.primary} />
-                <Text style={styles.relatedCreateText}>新建搭配</Text>
-              </TouchableOpacity>
             </View>
-            {relatedOutfits.length === 0 ? (
-              <View style={styles.relatedEmptyCard}>
-                <Ionicons name="grid-outline" size={28} color={theme.colors.border} />
-                <Text style={styles.relatedEmptyText}>暂无相关搭配</Text>
-                <TouchableOpacity style={[styles.relatedCreateBtn, { marginTop: 10 }]} onPress={handleCreateOutfit} activeOpacity={0.7}>
-                  <Ionicons name="add-circle-outline" size={15} color={theme.colors.primary} />
-                  <Text style={styles.relatedCreateText}>为这件衣服创建搭配</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.relatedScroll}
+            >
+              {relatedOutfits.length === 0 ? (
+                <TouchableOpacity style={styles.relatedCreateCard} onPress={handleCreateOutfit} activeOpacity={0.8}>
+                  <View style={styles.relatedCreateIcon}>
+                    <Ionicons name="add" size={24} color={theme.colors.primary} />
+                  </View>
+                  <Text style={styles.relatedCreateCardText}>为这件衣服新建搭配</Text>
                 </TouchableOpacity>
-              </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.relatedScroll}
-              >
-                {relatedOutfits.map(outfit => (
-                  <TouchableOpacity
-                    key={outfit.id}
-                    style={styles.relatedCard}
-                    onPress={() => navigation.navigate('OutfitDetail', { outfitId: outfit.id })}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.relatedImageWrap}>
-                      {outfit.thumbnailUri ? (
-                        <Image
-                          source={{ uri: outfit.thumbnailUri }}
-                          style={styles.relatedImage}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={[styles.relatedImageWrap, { justifyContent: 'center', alignItems: 'center' }]}>
-                          <Ionicons name="shirt-outline" size={32} color={theme.colors.border} />
-                        </View>
-                      )}
+              ) : (
+                <>
+                  {relatedOutfits.map(outfit => (
+                    <TouchableOpacity
+                      key={outfit.id}
+                      style={styles.relatedCard}
+                      onPress={() => navigation.navigate('OutfitDetail', { outfitId: outfit.id })}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.relatedImageWrap}>
+                        {outfit.thumbnailUri ? (
+                          <Image
+                            source={{ uri: outfit.thumbnailUri }}
+                            style={styles.relatedImage}
+                            resizeMode="cover"
+                          />
+                        ) : (
+                          <View style={[styles.relatedImageWrap, { justifyContent: 'center', alignItems: 'center' }]}>
+                            <Ionicons name="shirt-outline" size={32} color={theme.colors.border} />
+                          </View>
+                        )}
+                      </View>
+                      <View style={styles.relatedCardBody}>
+                        <Text style={styles.relatedCardName} numberOfLines={1}>
+                          {outfit.name || '未命名搭配'}
+                        </Text>
+                        <Text style={styles.relatedCardGroup} numberOfLines={1}>
+                          {outfit.groupName}
+                        </Text>
+                        <Text style={styles.relatedCardCount}>
+                          {outfit.itemIds.length} 件衣物
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  ))}
+                  <TouchableOpacity style={styles.relatedCreateCard} onPress={handleCreateOutfit} activeOpacity={0.8}>
+                    <View style={styles.relatedCreateIcon}>
+                      <Ionicons name="add" size={24} color={theme.colors.primary} />
                     </View>
-                    <View style={styles.relatedCardBody}>
-                      <Text style={styles.relatedCardName} numberOfLines={1}>
-                        {outfit.name || '未命名搭配'}
-                      </Text>
-                      <Text style={styles.relatedCardGroup} numberOfLines={1}>
-                        {outfit.groupName}
-                      </Text>
-                      <Text style={styles.relatedCardCount}>
-                        {outfit.itemIds.length} 件衣物
-                      </Text>
-                    </View>
+                    <Text style={styles.relatedCreateCardText}>新建搭配</Text>
                   </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
+                </>
+              )}
+            </ScrollView>
           </View>
         )}
 
