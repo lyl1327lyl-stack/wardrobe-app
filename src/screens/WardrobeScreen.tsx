@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   Dimensions,
+  TextInput,
 } from 'react-native';
 import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -456,6 +457,26 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 12,
       backgroundColor: theme.colors.background,
     },
+    // 搜索框
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 16,
+      marginBottom: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.card,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 14,
+      color: theme.colors.text,
+      padding: 0,
+    },
     // 筛选汇总条
     summaryBar: {
       flexDirection: 'row',
@@ -682,6 +703,8 @@ export function WardrobeScreen() {
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchKeyword, setSearchKeyword] = useState('');
 
   // 清除所有筛选
   const clearAllFilters = useCallback(() => {
@@ -691,17 +714,19 @@ export function WardrobeScreen() {
     setSelectedTag('全部');
     setSortBy('createdAt');
     setSortAsc(false);
+    setSearchKeyword('');
   }, [handleSeasonChange]);
 
   // 当前生效的筛选标签（用于汇总条）
   const activeFilterLabels = useMemo(() => {
     const labels: string[] = [];
+    if (searchKeyword.trim()) labels.push(`“${searchKeyword.trim()}”`);
     if (selectedSeason !== '全部') labels.push(selectedSeason);
     if (selectedType !== '全部') labels.push(selectedType);
     if (selectedChildType !== '全部') labels.push(selectedChildType);
     if (selectedTag !== '全部') labels.push(`#${selectedTag}`);
     return labels;
-  }, [selectedSeason, selectedType, selectedChildType, selectedTag]);
+  }, [searchKeyword, selectedSeason, selectedType, selectedChildType, selectedTag]);
 
 
   // 批量选择状态
@@ -746,6 +771,18 @@ export function WardrobeScreen() {
   // 使用 useMemo 确保稳定的数组引用
   const filteredClothing = useMemo(() => {
     let result = clothingForTypeFilter;
+    // 关键词搜索
+    const kw = searchKeyword.trim().toLowerCase();
+    if (kw) {
+      result = result.filter(item =>
+        (item.brand || '').toLowerCase().includes(kw) ||
+        (item.color || '').toLowerCase().includes(kw) ||
+        (item.type || '').toLowerCase().includes(kw) ||
+        (item.parentType || '').toLowerCase().includes(kw) ||
+        (item.remarks || '').toLowerCase().includes(kw) ||
+        (item.tags || []).some(t => t.toLowerCase().includes(kw))
+      );
+    }
     // 标签筛选
     if (selectedTag !== '全部') {
       result = result.filter(item => item.tags.includes(selectedTag));
@@ -781,7 +818,7 @@ export function WardrobeScreen() {
       return ascending ? cmp : -cmp;
     });
     return result;
-  }, [clothingForTypeFilter, selectedTag, selectedType, selectedChildType, sortBy, sortAsc]);
+  }, [clothingForTypeFilter, searchKeyword, selectedTag, selectedType, selectedChildType, sortBy, sortAsc]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -945,8 +982,15 @@ export function WardrobeScreen() {
               <Text style={styles.headerTitle}>{currentWardrobe?.name || '我的衣橱'}</Text>
               <Ionicons name="chevron-down" size={18} color={theme.colors.textTertiary} />
             </TouchableOpacity>
-            {/* 右侧：日历 + 草稿箱 */}
+            {/* 右侧：搜索 + 日历 + 草稿箱 */}
             <View style={styles.headerRightIcons}>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => setShowSearch(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={showSearch ? 'search' : 'search-outline'} size={22} color={theme.colors.text} />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 onPress={() => navigation.navigate('WearCalendar')}
@@ -971,6 +1015,26 @@ export function WardrobeScreen() {
         )}
         </View>
       </View>
+
+      {/* 搜索框 */}
+      {showSearch && (
+        <View style={styles.searchRow}>
+          <Ionicons name="search" size={16} color={theme.colors.textTertiary} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchKeyword}
+            onChangeText={setSearchKeyword}
+            placeholder="搜索品牌/颜色/类型/标签/备注..."
+            placeholderTextColor={theme.colors.textTertiary}
+            returnKeyType="search"
+          />
+          {searchKeyword.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchKeyword('')} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={16} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {filtersExpanded && (<>
       {/* 季节筛选按钮 */}
