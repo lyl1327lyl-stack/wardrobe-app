@@ -223,6 +223,15 @@ export async function migrateClothingParentType(oldParent: string, newParent: st
   return result.changes;
 }
 
+export async function migrateClothingSize(oldSize: string, newSize: string): Promise<number> {
+  const db = await getDatabase();
+  const result = await db.runAsync(
+    'UPDATE clothing_items SET size = ? WHERE size = ?',
+    [newSize, oldSize]
+  );
+  return result.changes;
+}
+
 export async function moveClothingToWardrobe(id: number, wardrobeId: number): Promise<void> {
   const db = await getDatabase();
   await db.runAsync('UPDATE clothing_items SET wardrobeId = ? WHERE id = ?', [wardrobeId, id]);

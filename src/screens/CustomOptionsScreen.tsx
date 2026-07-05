@@ -345,9 +345,12 @@ const makeStyles = (theme: Theme) =>
 export function CustomOptionsScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'CustomOptions'>>();
-  const { clothing } = useWardrobeStore();
+  const { clothing, trashClothing, soldClothing, draftClothing } = useWardrobeStore();
   const migrateClothingType = useWardrobeStore(state => state.migrateClothingType);
   const migrateClothingParentType = useWardrobeStore(state => state.migrateClothingParentType);
+  const migrateClothingSize = useWardrobeStore(state => state.migrateClothingSize);
+  const migrateClothingTag = useWardrobeStore(state => state.migrateClothingTag);
+  const migrateClothingSeason = useWardrobeStore(state => state.migrateClothingSeason);
 
   // Zustand selectors
   const categories = useCustomOptionsStore(state => state.categories);
@@ -379,7 +382,7 @@ export function CustomOptionsScreen() {
   // Modal 状态
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalMode, setModalMode] = useState<'addParent' | 'addChild' | 'addOption' | 'edit'>('addParent');
-  const [editTarget, setEditTarget] = useState<{ parent?: string; child?: string }>({});
+  const [editTarget, setEditTarget] = useState<{ category?: OptionCategory; parent?: string; child?: string }>({});
   const [newOptionText, setNewOptionText] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
@@ -406,24 +409,25 @@ export function CustomOptionsScreen() {
     return categories[parent] || [];
   };
 
-  // 检查选项是否被使用
+  // 检查选项是否被使用（含废衣篓/已卖出/草稿，避免删后留孤立引用）
   const isOptionInUse = useCallback(
     (category: OptionCategory, value: string): boolean => {
+      const allItems = [...clothing, ...trashClothing, ...soldClothing, ...draftClothing];
       if (category === 'categories') {
         // 检查任何衣物的 type 是否等于这个子分类
-        for (const item of clothing) {
+        for (const item of allItems) {
           if (item.type === value) return true;
         }
         // 也检查父分类是否被使用
         const children = getChildrenOf(value);
         for (const child of children) {
-          for (const item of clothing) {
+          for (const item of allItems) {
             if (item.type === child) return true;
           }
         }
         return false;
       }
-      for (const item of clothing) {
+      for (const item of allItems) {
         switch (category) {
           case 'seasons':
             if (item.seasons.includes(value)) return true;
@@ -438,12 +442,13 @@ export function CustomOptionsScreen() {
       }
       return false;
     },
-    [clothing, categories]
+    [clothing, trashClothing, soldClothing, draftClothing, categories]
   );
 
-  // 检查子分类是否被使用
+  // 检查子分类是否被使用（含废衣篓/已卖出/草稿）
   const isChildInUse = (parent: string, child: string): boolean => {
-    for (const item of clothing) {
+    const allItems = [...clothing, ...trashClothing, ...soldClothing, ...draftClothing];
+    for (const item of allItems) {
       if (item.type === child) return true;
     }
     return false;
@@ -479,7 +484,7 @@ export function CustomOptionsScreen() {
   // 打开编辑弹窗
   const handleEditOption = (category: OptionCategory, parent: string, child?: string) => {
     setModalMode('edit');
-    setEditTarget(child ? { parent, child } : { parent });
+    setEditTarget(child ? { category, parent, child } : { category, parent });
     setNewOptionText(child || parent);
     setShowAddModal(true);
   };
@@ -583,19 +588,27 @@ export function CustomOptionsScreen() {
         await updateCategory(cat as 'seasons' | 'tags' | 'sizes', [...opts, trimmed]);
       } else {
         // edit mode
-        const { parent, child } = editTarget;
-        if (child) {
-          // 编辑子分类
+        const { category, parent, child } = editTarget;
+        if (category && category !== 'categories') {
+          // 一维选项改名（标签/季节/尺码）：先迁移衣物，再持久化选项
+          if (parent && parent !== trimmed) {
+            if (category === 'tags') await migrateClothingTag(parent, trimmed);
+            else if (category === 'seasons') await migrateClothingSeason(parent, trimmed);
+            else if (category === 'sizes') await migrateClothingSize(parent, trimmed);
+            const opts = getOptionsForCategory(category);
+            await updateCategory(category as 'seasons' | 'tags' | 'sizes', opts.map(o => o === parent ? trimmed : o));
+          }
+        } else if (child) {
+          // 编辑子分类：先迁移衣物 type，再持久化（避免中途失败留下孤立选项）
           if (child !== trimmed) {
-            await renameChild(parent!, child, trimmed);
-            // 如果是 type 子分类，需要迁移衣物的 type
             await migrateClothingType(child, trimmed);
+            await renameChild(parent!, child, trimmed);
           }
         } else if (parent) {
-          // 编辑父分类
+          // 编辑父分类：先迁移衣物 parentType，再持久化
           if (parent !== trimmed) {
-            await renameParent(parent, trimmed);
             await migrateClothingParentType(parent, trimmed);
+            await renameParent(parent, trimmed);
           }
         }
       }

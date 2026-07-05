@@ -77,6 +77,9 @@ interface WardrobeState {
   wearMultipleClothing: (ids: number[]) => Promise<void>;
   migrateClothingType: (oldType: string, newType: string) => Promise<number>;
   migrateClothingParentType: (oldParent: string, newParent: string) => Promise<number>;
+  migrateClothingSize: (oldSize: string, newSize: string) => Promise<number>;
+  migrateClothingTag: (oldTag: string, newTag: string) => Promise<number>;
+  migrateClothingSeason: (oldSeason: string, newSeason: string) => Promise<number>;
   // 批量操作
   moveMultipleToTrash: (ids: number[], reason?: string) => Promise<void>;
   restoreMultipleFromTrash: (ids: number[]) => Promise<void>;
@@ -531,6 +534,72 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
       draftClothing: state.draftClothing.map(c => c.parentType === oldParent ? { ...c, parentType: newParent } : c),
     }));
     return count;
+  },
+
+  migrateClothingSize: async (oldSize: string, newSize: string) => {
+    const count = await clothingDb.migrateClothingSize(oldSize, newSize);
+    set(state => ({
+      clothing: state.clothing.map(c => c.size === oldSize ? { ...c, size: newSize } : c),
+      trashClothing: state.trashClothing.map(c => c.size === oldSize ? { ...c, size: newSize } : c),
+      soldClothing: state.soldClothing.map(c => c.size === oldSize ? { ...c, size: newSize } : c),
+      draftClothing: state.draftClothing.map(c => c.size === oldSize ? { ...c, size: newSize } : c),
+    }));
+    return count;
+  },
+
+  migrateClothingTag: async (oldTag: string, newTag: string) => {
+    const all = [
+      ...get().clothing,
+      ...get().trashClothing,
+      ...get().soldClothing,
+      ...get().draftClothing,
+    ];
+    const affected = all.filter(c => Array.isArray(c.tags) && c.tags.includes(oldTag));
+    // 标签存在 styles(JSON) 列，逐件改写并持久化
+    for (const item of affected) {
+      const updated = { ...item, tags: item.tags!.map(t => t === oldTag ? newTag : t) };
+      await clothingDb.updateClothing(updated);
+    }
+    const remap = (list: ClothingItem[]) =>
+      list.map(c => (Array.isArray(c.tags) && c.tags.includes(oldTag))
+        ? { ...c, tags: c.tags!.map(t => t === oldTag ? newTag : t) }
+        : c);
+    set(state => ({
+      clothing: remap(state.clothing),
+      trashClothing: remap(state.trashClothing),
+      soldClothing: remap(state.soldClothing),
+      draftClothing: remap(state.draftClothing),
+    }));
+    return affected.length;
+  },
+
+  migrateClothingSeason: async (oldSeason: string, newSeason: string) => {
+    const all = [
+      ...get().clothing,
+      ...get().trashClothing,
+      ...get().soldClothing,
+      ...get().draftClothing,
+    ];
+    const affected = all.filter(c => Array.isArray(c.seasons) && c.seasons.includes(oldSeason));
+    // 季节存在 seasons(JSON) 列，逐件改写并持久化
+    for (const item of affected) {
+      const updated = {
+        ...item,
+        seasons: item.seasons!.map(s => s === oldSeason ? newSeason : s),
+      };
+      await clothingDb.updateClothing(updated);
+    }
+    const remap = (list: ClothingItem[]) =>
+      list.map(c => (Array.isArray(c.seasons) && c.seasons.includes(oldSeason))
+        ? { ...c, seasons: c.seasons!.map(s => s === oldSeason ? newSeason : s) }
+        : c);
+    set(state => ({
+      clothing: remap(state.clothing),
+      trashClothing: remap(state.trashClothing),
+      soldClothing: remap(state.soldClothing),
+      draftClothing: remap(state.draftClothing),
+    }));
+    return affected.length;
   },
 
   moveMultipleToTrash: async (ids, reason = '') => {
