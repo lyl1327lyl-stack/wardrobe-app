@@ -7,7 +7,6 @@ import {
   Modal,
   Image,
   FlatList,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ClothingItem } from '../types';
@@ -20,7 +19,6 @@ interface WearCalendarSheetProps {
   visible: boolean;
   onClose: () => void;
   date: string; // YYYY-MM-DD
-  onDeleteRecord?: (recordId: number) => void;
   onAddRecord?: () => void;
 }
 
@@ -133,14 +131,6 @@ const makeStyles = (theme: Theme) =>
       fontSize: 13,
       color: theme.colors.textTertiary,
     },
-    deleteBtn: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
-      backgroundColor: theme.colors.background,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
     confirmAddBtn: {
       backgroundColor: theme.colors.primary,
       paddingVertical: 14,
@@ -159,7 +149,6 @@ export function WearCalendarSheet({
   visible,
   onClose,
   date,
-  onDeleteRecord,
   onAddRecord,
 }: WearCalendarSheetProps) {
   const { theme } = useTheme();
@@ -224,32 +213,6 @@ export function WearCalendarSheet({
     }
   }, [visible, date]);
 
-  const handleDelete = (clothingId: number) => {
-    Alert.alert(
-      '取消穿着记录',
-      '确定要取消这件衣物在该日期的穿着记录吗？',
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确定',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const wearRecords = await wearRecordsDb.getWearRecordsByDate(date);
-              const record = wearRecords.find(r => r.clothingId === clothingId);
-              if (record && onDeleteRecord) {
-                await onDeleteRecord(record.id);
-              }
-              loadRecords();
-            } catch (error) {
-              console.error('Failed to delete wear record:', error);
-            }
-          },
-        },
-      ]
-    );
-  };
-
   const renderItem = ({ item }: { item: ClothingItem }) => {
     const imageUri = item.thumbnailUri || item.imageUri;
     const isActive = activeIds.has(item.id);
@@ -296,13 +259,6 @@ export function WearCalendarSheet({
             {isDeleted ? deleteHint : (item.brand || item.color || '无品牌')}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.deleteBtn}
-          onPress={() => handleDelete(item.id)}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="remove-circle-outline" size={22} color={theme.colors.warning} />
-        </TouchableOpacity>
       </View>
     );
   };

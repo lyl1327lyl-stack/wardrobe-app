@@ -248,7 +248,7 @@ export function WearCalendarScreen() {
   const trashClothing = useWardrobeStore(s => s.trashClothing);
   const soldClothing = useWardrobeStore(s => s.soldClothing);
   const outfits = useWardrobeStore(s => s.outfits);
-  const { addWearRecords, deleteWearRecord, loadData } = useWardrobeStore();
+  const { loadData } = useWardrobeStore();
 
   // 合并所有衣物来源（衣柜 + 废衣篓 + 已卖出），用于日历中查找穿着记录
   const allClothingMap = useMemo(() => {
@@ -399,11 +399,6 @@ export function WearCalendarScreen() {
   const handleDayPress = (dateStr: string) => {
     setSelectedDate(dateStr);
     setShowSheet(true);
-  };
-
-  const handleDeleteRecord = async (recordId: number) => {
-    await deleteWearRecord(recordId);
-    reloadAll();
   };
 
   const handleAddRecord = () => {
@@ -596,7 +591,6 @@ export function WearCalendarScreen() {
           visible={showSheet}
           onClose={() => setShowSheet(false)}
           date={selectedDate}
-          onDeleteRecord={handleDeleteRecord}
           onAddRecord={handleAddRecord}
         />
       )}
