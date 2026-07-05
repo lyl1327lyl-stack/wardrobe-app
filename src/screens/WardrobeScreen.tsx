@@ -689,7 +689,7 @@ export function WardrobeScreen() {
       return ascending ? cmp : -cmp;
     });
     return result;
-  }, [clothingForTypeFilter, selectedType, sortBy, sortAsc]);
+  }, [clothingForTypeFilter, selectedTag, selectedType, sortBy, sortAsc]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
