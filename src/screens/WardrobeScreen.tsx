@@ -431,6 +431,13 @@ const makeStyles = (theme: Theme) =>
     seasonPillTextActive: {
       color: theme.colors.white,
     },
+    // 子类型 chip：更小、更轻，区别于父类
+    childPill: {
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 12,
+      backgroundColor: theme.colors.background,
+    },
     // 排序选项条
     sortSection: {
       flexDirection: 'row',
@@ -612,6 +619,7 @@ export function WardrobeScreen() {
 
   const [selectedTag, setSelectedTag] = useState<string>('全部');
   const [selectedType, setSelectedType] = useState<string>('全部');
+  const [selectedChildType, setSelectedChildType] = useState<string>('全部');
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
@@ -666,6 +674,10 @@ export function WardrobeScreen() {
     if (selectedType !== '全部') {
       result = result.filter(item => item.parentType === selectedType);
     }
+    // 按子类型筛选
+    if (selectedChildType !== '全部') {
+      result = result.filter(item => item.type === selectedChildType);
+    }
     // 排序
     const sortKey = sortBy;
     const ascending = sortAsc;
@@ -689,7 +701,7 @@ export function WardrobeScreen() {
       return ascending ? cmp : -cmp;
     });
     return result;
-  }, [clothingForTypeFilter, selectedTag, selectedType, sortBy, sortAsc]);
+  }, [clothingForTypeFilter, selectedTag, selectedType, selectedChildType, sortBy, sortAsc]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
@@ -717,6 +729,33 @@ export function WardrobeScreen() {
   const availableParents = useMemo(() => {
     return parentsWithClothing.length > 0 ? [...new Set(parentsWithClothing)] : [...new Set(parentCategories)];
   }, [parentsWithClothing, parentCategories]);
+
+  // 各父类件数（仅按季节筛选，不受标签影响，保证 chip 稳定）
+  const parentCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of clothingForTypeFilter) {
+      const p = item.parentType || (parentCategories.includes(item.type) ? item.type : '');
+      if (p) counts[p] = (counts[p] || 0) + 1;
+    }
+    return counts;
+  }, [clothingForTypeFilter, parentCategories]);
+
+  // 当前选中父类的子类型列表 + 件数
+  const childOptions = useMemo(() => {
+    if (selectedType === '全部') return [] as string[];
+    return effectiveCategories[selectedType] || [];
+  }, [selectedType, effectiveCategories]);
+
+  const childCounts = useMemo(() => {
+    if (selectedType === '全部') return {} as Record<string, number>;
+    const counts: Record<string, number> = {};
+    for (const item of clothingForTypeFilter) {
+      if (item.parentType === selectedType) {
+        counts[item.type] = (counts[item.type] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [clothingForTypeFilter, selectedType]);
 
   const isEmpty = filteredClothing.length === 0;
   const seasonOptions: ('全部' | Season)[] = ['全部', ...(seasons || [])];
@@ -883,27 +922,55 @@ export function WardrobeScreen() {
         </ScrollView>
       </View>
 
-      {/* 衣服种类筛选 */}
+      {/* 衣服种类筛选（父类，带件数） */}
       <View style={styles.filterSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
         {['全部', ...availableParents].map((type) => {
           const isSelected = selectedType === type;
-          const handlePress = () => setSelectedType(type);
+          const count = type === '全部' ? clothingForTypeFilter.length : (parentCounts[type] || 0);
           return (
             <TouchableOpacity
               key={type}
               style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
-              onPress={handlePress}
+              onPress={() => { setSelectedType(type); setSelectedChildType('全部'); }}
               activeOpacity={0.7}
             >
               <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
-                {type}
+                {type} {count}
               </Text>
             </TouchableOpacity>
           );
         })}
         </ScrollView>
       </View>
+
+      {/* 子类型筛选（选中父类后出现，带件数） */}
+      {selectedType !== '全部' && childOptions.length > 0 && (
+        <View style={styles.filterSection}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+            {['全部', ...childOptions].map((child) => {
+              const isSelected = selectedChildType === child;
+              const count = child === '全部'
+                ? (parentCounts[selectedType] || 0)
+                : (childCounts[child] || 0);
+              // 只显示有件数的子类（全部 始终显示）
+              if (child !== '全部' && count === 0) return null;
+              return (
+                <TouchableOpacity
+                  key={child}
+                  style={[styles.seasonPill, isSelected && styles.seasonPillActive, styles.childPill]}
+                  onPress={() => setSelectedChildType(child)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
+                    {child} {count}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+      )}
 
       {/* 标签筛选按钮 - 单选 */}
       <View style={styles.filterSection}>
