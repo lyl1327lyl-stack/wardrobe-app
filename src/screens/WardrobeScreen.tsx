@@ -280,6 +280,24 @@ const makeStyles = (theme: Theme) =>
       justifyContent: 'center',
       alignItems: 'center',
     },
+    // 穿着次数角标
+    wearBadge: {
+      position: 'absolute',
+      bottom: 6,
+      right: 6,
+      backgroundColor: 'rgba(0,0,0,0.55)',
+      borderRadius: 8,
+      paddingHorizontal: 5,
+      paddingVertical: 2,
+    },
+    wearBadgeNew: {
+      backgroundColor: theme.colors.accent,
+    },
+    wearBadgeText: {
+      fontSize: 9,
+      fontWeight: '700',
+      color: '#FFFFFF',
+    },
     bottomPadding: {
       height: 100,
     },
@@ -663,6 +681,7 @@ export function WardrobeScreen() {
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
 
   // 清除所有筛选
   const clearAllFilters = useCallback(() => {
@@ -953,6 +972,7 @@ export function WardrobeScreen() {
         </View>
       </View>
 
+      {filtersExpanded && (<>
       {/* 季节筛选按钮 */}
       <View style={styles.filterSection}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
@@ -1101,6 +1121,7 @@ export function WardrobeScreen() {
           })}
           </ScrollView>
       </View>
+      </>)}
 
       {/* 筛选汇总条 */}
       <View style={styles.summaryBar}>
@@ -1108,12 +1129,18 @@ export function WardrobeScreen() {
           {activeFilterLabels.length > 0 ? activeFilterLabels.join(' · ') : '全部衣物'}
           <Text style={styles.summaryCount}> · 共 {filteredClothing.length} 件</Text>
         </Text>
-        {activeFilterLabels.length > 0 && (
-          <TouchableOpacity style={styles.summaryClear} onPress={clearAllFilters} activeOpacity={0.7}>
-            <Ionicons name="close-circle" size={15} color={theme.colors.primary} />
-            <Text style={styles.summaryClearText}>清除</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <TouchableOpacity style={styles.summaryClear} onPress={() => setFiltersExpanded(v => !v)} activeOpacity={0.7}>
+            <Ionicons name={filtersExpanded ? 'chevron-up' : 'filter-outline'} size={14} color={theme.colors.primary} />
+            <Text style={styles.summaryClearText}>{filtersExpanded ? '收起' : '筛选'}</Text>
           </TouchableOpacity>
-        )}
+          {activeFilterLabels.length > 0 && (
+            <TouchableOpacity style={styles.summaryClear} onPress={clearAllFilters} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={15} color={theme.colors.primary} />
+              <Text style={styles.summaryClearText}>清除</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* 内容区域 */}
@@ -1160,6 +1187,13 @@ export function WardrobeScreen() {
                     style={[styles.gridItemImage, { width: gridItemSize, height: gridItemSize }]}
                     resizeMode="cover"
                   />
+                  {!isSelecting && (
+                    <View style={[styles.wearBadge, item.wearCount === 0 && styles.wearBadgeNew]}>
+                      <Text style={styles.wearBadgeText}>
+                        {item.wearCount === 0 ? '新' : `${item.wearCount}次`}
+                      </Text>
+                    </View>
+                  )}
                   {isSelecting && isSelected && (
                     <View style={styles.gridSelectBadge}>
                       <Ionicons name="checkmark" size={14} color={theme.colors.white} />
