@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
-import { DEFAULT_OPTIONS, getAllChildren } from '../utils/customOptions';
+import { DEFAULT_OPTIONS } from '../utils/customOptions';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,16 +43,6 @@ const SEASON_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color
   '夏': { name: 'sunny', color: '#FFB74D' },
   '秋': { name: 'leaf', color: '#8D6E63' },
   '冬': { name: 'snow', color: '#4FC3F7' },
-};
-
-// 父分类图标映射
-const PARENT_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
-  '上装': 'shirt-outline',
-  '下装': 'layers-outline',
-  '外套': 'snow-outline',
-  '鞋': 'footsteps-outline',
-  '配饰': 'sparkles-outline',
-  '包包': 'bag-outline',
 };
 
 // Create styles dynamically based on theme
@@ -625,7 +615,6 @@ export function WardrobeScreen() {
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
 
   // 批量选择状态
   const [isSelecting, setIsSelecting] = useState(false);
@@ -648,11 +637,6 @@ export function WardrobeScreen() {
 
   const handlePress = (item: ClothingItem) => {
     navigation.navigate('ClothingDetail', { id: item.id });
-  };
-
-  const handleViewAll = (parent: string) => {
-    const season = selectedSeason;
-    navigation.navigate('CategoryDetail', { type: parent, season });
   };
 
   const getItemId = (item: ClothingItem) => Number(item.id);
@@ -678,13 +662,13 @@ export function WardrobeScreen() {
     if (selectedTag !== '全部') {
       result = result.filter(item => item.tags.includes(selectedTag));
     }
-    // 按衣服种类筛选（仅网格模式生效）
-    if (viewMode === 'grid' && selectedType !== '全部') {
+    // 按衣服种类筛选
+    if (selectedType !== '全部') {
       result = result.filter(item => item.parentType === selectedType);
     }
-    // 排序：网格视图使用选择的排序方式，列表视图默认按创建时间
-    const sortKey = viewMode === 'grid' ? sortBy : 'createdAt';
-    const ascending = viewMode === 'grid' ? sortAsc : false;
+    // 排序
+    const sortKey = sortBy;
+    const ascending = sortAsc;
     result = [...result].sort((a, b) => {
       let cmp = 0;
       switch (sortKey) {
@@ -705,25 +689,10 @@ export function WardrobeScreen() {
       return ascending ? cmp : -cmp;
     });
     return result;
-  }, [clothingForTypeFilter, selectedType, sortBy, sortAsc, viewMode]);
+  }, [clothingForTypeFilter, selectedType, sortBy, sortAsc]);
 
   const effectiveCategories = categories && Object.keys(categories).length > 0 ? categories : DEFAULT_OPTIONS.categories;
   const parentCategories = Object.keys(effectiveCategories);
-
-  // 获取所有已知的子分类
-  const allKnownChildren = useMemo(() => getAllChildren(effectiveCategories), [effectiveCategories]);
-
-  // 获取未分类的衣服（parentType 为空且 type 也不是任何已知父分类）
-  const uncategorizedItems = useMemo(() => {
-    return filteredClothing.filter(item => {
-      // 有 parentType 的都已被 getClothingByParent 处理，不属于未分类
-      if (item.parentType) return false;
-      // parentType 为空时：如果 type 正好是某个父分类名称，可归属到该父分类（不算未分类）
-      if (parentCategories.includes(item.type)) return false;
-      // 其他情况视为未分类
-      return true;
-    });
-  }, [filteredClothing, parentCategories]);
 
   // 根据父分类获取衣服（直接用 parentType 字段匹配，消除歧义）
   // 使用 clothingForTypeFilter 确保种类筛选芯片不会因选中某项而消失
@@ -749,12 +718,6 @@ export function WardrobeScreen() {
     return parentsWithClothing.length > 0 ? [...new Set(parentsWithClothing)] : [...new Set(parentCategories)];
   }, [parentsWithClothing, parentCategories]);
 
-  // 列表视图：选中某个类型时，只渲染该分类区块（chip 选项仍用 availableParents 保持稳定）
-  const visibleParents = useMemo(() => {
-    return selectedType !== '全部' ? availableParents.filter(p => p === selectedType) : availableParents;
-  }, [availableParents, selectedType]);
-
-  const hasUncategorized = uncategorizedItems.length > 0 && selectedType === '全部';
   const isEmpty = filteredClothing.length === 0;
   const seasonOptions: ('全部' | Season)[] = ['全部', ...(seasons || [])];
 
@@ -863,19 +826,8 @@ export function WardrobeScreen() {
               <Text style={styles.headerTitle}>{currentWardrobe?.name || '我的衣橱'}</Text>
               <Ionicons name="chevron-down" size={18} color={theme.colors.textTertiary} />
             </TouchableOpacity>
-            {/* 右侧：视图切换 + 日历 + 草稿箱 */}
+            {/* 右侧：日历 + 草稿箱 */}
             <View style={styles.headerRightIcons}>
-              <TouchableOpacity
-                style={styles.headerIconBtn}
-                onPress={() => setViewMode(viewMode === 'list' ? 'grid' : 'list')}
-                activeOpacity={0.7}
-              >
-                <Ionicons
-                  name={viewMode === 'list' ? 'grid-outline' : 'list-outline'}
-                  size={22}
-                  color={theme.colors.text}
-                />
-              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 onPress={() => navigation.navigate('WearCalendar')}
@@ -977,16 +929,15 @@ export function WardrobeScreen() {
         </ScrollView>
       </View>
 
-      {/* 排序 - 仅网格视图 */}
-      {viewMode === 'grid' && (
-        <View style={styles.sortSection}>
-          <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.textTertiary} style={{ marginRight: 6 }} />
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.sortContent}
-          >
-          {SORT_OPTIONS.map((opt) => {
+      {/* 排序 */}
+      <View style={styles.sortSection}>
+        <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.textTertiary} style={{ marginRight: 6 }} />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortContent}
+        >
+        {SORT_OPTIONS.map((opt) => {
             const isActive = sortBy === opt.key;
             return (
               <TouchableOpacity
@@ -1021,8 +972,7 @@ export function WardrobeScreen() {
             );
           })}
           </ScrollView>
-        </View>
-      )}
+      </View>
 
       {/* 内容区域 */}
       {isEmpty ? (
@@ -1037,7 +987,7 @@ export function WardrobeScreen() {
             {selectedSeason === '全部' ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
           </Text>
         </View>
-      ) : viewMode === 'grid' ? (
+      ) : (
         /* 网格视图 */
         <ScrollView
           style={styles.scrollView}
@@ -1077,132 +1027,6 @@ export function WardrobeScreen() {
               );
             })}
           </View>
-        </ScrollView>
-      ) : (
-        /* 列表视图 */
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
-          {/* 分类横向卡片 */}
-          {visibleParents.map(parent => {
-            const items = getClothingByParent(parent);
-            if (items.length === 0) return null;
-
-            return (
-              <View key={parent} style={styles.categoryCard}>
-                {/* 类别标题栏 */}
-                <View style={styles.categoryHeader}>
-                  <View style={styles.categoryTitleRow}>
-                    <Ionicons
-                      name={PARENT_ICONS[parent] || 'shirt-outline'}
-                      size={18}
-                      color={theme.colors.accent}
-                    />
-                    <Text style={styles.categoryTitle}>{parent}</Text>
-                    <Text style={styles.categoryCount}>{items.length}件</Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.viewAllBtn}
-                    onPress={() => handleViewAll(parent)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.viewAllText}>查看更多</Text>
-                    <Ionicons name="chevron-forward" size={14} color={theme.colors.textTertiary} />
-                  </TouchableOpacity>
-                </View>
-                {/* 横向图片列表 - 显示所有衣服，最新在前 */}
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoryScroll}
-                >
-                  {[...items].sort((a, b) => Number(b.createdAt?.replace(/-/g, '')) - Number(a.createdAt?.replace(/-/g, ''))).map(item => {
-                    const itemId = getItemId(item);
-                    const isSelected = selectedIds.includes(itemId);
-                    const imageUri = item.thumbnailUri || item.imageUri;
-                    const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
-                    return (
-                      <TouchableOpacity
-                        key={`card-${itemId}-${isSelected}`}
-                        style={[
-                          isTransparent ? styles.itemCardTransparent : styles.itemCard,
-                          isSelecting && isSelected && styles.itemCardSelected
-                        ]}
-                        onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
-                        onLongPress={() => handleLongPress(itemId)}
-                        activeOpacity={0.85}
-                      >
-                        <Image
-                          source={{ uri: imageUri }}
-                          style={styles.itemImage}
-                          resizeMode="cover"
-                        />
-                        {isSelecting && isSelected && (
-                          <View style={styles.selectBadge}>
-                            <Ionicons name="checkmark" size={14} color={theme.colors.white} />
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-            );
-          })}
-          {/* 未分类卡片 */}
-          {hasUncategorized && (
-            <View style={styles.categoryCard}>
-              <View style={styles.categoryHeader}>
-                <View style={styles.categoryTitleRow}>
-                  <Ionicons
-                    name="help-circle-outline"
-                    size={18}
-                    color={theme.colors.accent}
-                  />
-                  <Text style={styles.categoryTitle}>未分类</Text>
-                  <Text style={styles.categoryCount}>{uncategorizedItems.length}件</Text>
-                </View>
-              </View>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoryScroll}
-              >
-                {[...uncategorizedItems].sort((a, b) => Number(b.createdAt?.replace(/-/g, '')) - Number(a.createdAt?.replace(/-/g, ''))).map(item => {
-                  const itemId = getItemId(item);
-                  const isSelected = selectedIds.includes(itemId);
-                  const imageUri = item.thumbnailUri || item.imageUri;
-                  const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
-                  return (
-                    <TouchableOpacity
-                      key={`card-${itemId}`}
-                      style={[
-                        isTransparent ? styles.itemCardTransparent : styles.itemCard,
-                        isSelecting && isSelected && styles.itemCardSelected
-                      ]}
-                      onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
-                      onLongPress={() => handleLongPress(itemId)}
-                      activeOpacity={0.85}
-                    >
-                      <Image
-                        source={{ uri: imageUri }}
-                        style={styles.itemImage}
-                        resizeMode="cover"
-                      />
-                      {isSelecting && isSelected && (
-                        <View style={styles.selectBadge}>
-                          <Ionicons name="checkmark" size={14} color={theme.colors.white} />
-                        </View>
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
-            </View>
-          )}
-          <View style={styles.bottomPadding} />
         </ScrollView>
       )}
 
