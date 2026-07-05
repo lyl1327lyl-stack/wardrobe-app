@@ -346,9 +346,6 @@ export function WearCalendarSheet({
                 <Ionicons name="pencil" size={18} color={theme.colors.white} />
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={onClose} style={{ marginLeft: 12 }}>
-              <Ionicons name="close" size={22} color={theme.colors.textTertiary} />
-            </TouchableOpacity>
           </View>
 
           <View style={styles.content}>
