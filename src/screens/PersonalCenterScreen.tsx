@@ -180,7 +180,6 @@ export function PersonalCenterScreen() {
 
     switch (action) {
       case 'categories':
-      case 'seasons':
       case 'tags':
         (navigation as any).navigate('CustomOptions', { category: action });
         break;

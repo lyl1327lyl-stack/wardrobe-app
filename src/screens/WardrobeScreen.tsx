@@ -749,7 +749,12 @@ export function WardrobeScreen() {
     return parentsWithClothing.length > 0 ? [...new Set(parentsWithClothing)] : [...new Set(parentCategories)];
   }, [parentsWithClothing, parentCategories]);
 
-  const hasUncategorized = uncategorizedItems.length > 0;
+  // 列表视图：选中某个类型时，只渲染该分类区块（chip 选项仍用 availableParents 保持稳定）
+  const visibleParents = useMemo(() => {
+    return selectedType !== '全部' ? availableParents.filter(p => p === selectedType) : availableParents;
+  }, [availableParents, selectedType]);
+
+  const hasUncategorized = uncategorizedItems.length > 0 && selectedType === '全部';
   const isEmpty = filteredClothing.length === 0;
   const seasonOptions: ('全部' | Season)[] = ['全部', ...(seasons || [])];
 
@@ -926,29 +931,27 @@ export function WardrobeScreen() {
         </ScrollView>
       </View>
 
-      {/* 衣服种类筛选 - 仅网格视图 */}
-      {viewMode === 'grid' && (
-        <View style={styles.filterSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-          {['全部', ...availableParents].map((type) => {
-            const isSelected = selectedType === type;
-            const handlePress = () => setSelectedType(type);
-            return (
-              <TouchableOpacity
-                key={type}
-                style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
-                onPress={handlePress}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
-                  {type}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-          </ScrollView>
-        </View>
-      )}
+      {/* 衣服种类筛选 */}
+      <View style={styles.filterSection}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+        {['全部', ...availableParents].map((type) => {
+          const isSelected = selectedType === type;
+          const handlePress = () => setSelectedType(type);
+          return (
+            <TouchableOpacity
+              key={type}
+              style={[styles.seasonPill, isSelected && styles.seasonPillActive]}
+              onPress={handlePress}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.seasonPillText, isSelected && styles.seasonPillTextActive]}>
+                {type}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+        </ScrollView>
+      </View>
 
       {/* 标签筛选按钮 - 单选 */}
       <View style={styles.filterSection}>
@@ -1083,7 +1086,7 @@ export function WardrobeScreen() {
           contentContainerStyle={styles.scrollContent}
         >
           {/* 分类横向卡片 */}
-          {availableParents.map(parent => {
+          {visibleParents.map(parent => {
             const items = getClothingByParent(parent);
             if (items.length === 0) return null;
 

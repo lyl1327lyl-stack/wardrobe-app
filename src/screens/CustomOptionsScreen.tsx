@@ -30,7 +30,6 @@ interface CategoryConfig {
 
 const CATEGORIES: CategoryConfig[] = [
   { key: 'categories', label: '类型', icon: 'grid-outline' },
-  { key: 'seasons', label: '季节', icon: 'flower-outline' },
   { key: 'tags', label: '标签', icon: 'pricetags-outline' },
   { key: 'sizes', label: '尺码', icon: 'resize-outline' },
 ];
