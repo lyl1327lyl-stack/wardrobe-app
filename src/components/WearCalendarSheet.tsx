@@ -343,7 +343,7 @@ export function WearCalendarSheet({
                 onPress={() => onAddRecord?.()}
                 activeOpacity={0.7}
               >
-                <Ionicons name="add" size={22} color={theme.colors.white} />
+                <Ionicons name="pencil" size={18} color={theme.colors.white} />
               </TouchableOpacity>
             )}
             <TouchableOpacity onPress={onClose} style={{ marginLeft: 12 }}>
