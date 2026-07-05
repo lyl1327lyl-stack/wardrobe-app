@@ -438,6 +438,46 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 12,
       backgroundColor: theme.colors.background,
     },
+    // 筛选汇总条
+    summaryBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      marginBottom: 2,
+      backgroundColor: theme.colors.primary + '0A',
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    summaryText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.text,
+    },
+    summaryCount: {
+      fontSize: 12,
+      fontWeight: '400',
+      color: theme.colors.textTertiary,
+    },
+    summaryClear: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      backgroundColor: theme.colors.card,
+      marginLeft: 10,
+    },
+    summaryClearText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.primary,
+    },
     // 排序选项条
     sortSection: {
       flexDirection: 'row',
@@ -623,6 +663,27 @@ export function WardrobeScreen() {
   const [sortBy, setSortBy] = useState<string>('createdAt');
   const [sortAsc, setSortAsc] = useState(false);
   const [showWardrobePicker, setShowWardrobePicker] = useState(false);
+
+  // 清除所有筛选
+  const clearAllFilters = useCallback(() => {
+    handleSeasonChange('全部');
+    setSelectedType('全部');
+    setSelectedChildType('全部');
+    setSelectedTag('全部');
+    setSortBy('createdAt');
+    setSortAsc(false);
+  }, [handleSeasonChange]);
+
+  // 当前生效的筛选标签（用于汇总条）
+  const activeFilterLabels = useMemo(() => {
+    const labels: string[] = [];
+    if (selectedSeason !== '全部') labels.push(selectedSeason);
+    if (selectedType !== '全部') labels.push(selectedType);
+    if (selectedChildType !== '全部') labels.push(selectedChildType);
+    if (selectedTag !== '全部') labels.push(`#${selectedTag}`);
+    return labels;
+  }, [selectedSeason, selectedType, selectedChildType, selectedTag]);
+
 
   // 批量选择状态
   const [isSelecting, setIsSelecting] = useState(false);
@@ -958,7 +1019,7 @@ export function WardrobeScreen() {
               return (
                 <TouchableOpacity
                   key={child}
-                  style={[styles.seasonPill, isSelected && styles.seasonPillActive, styles.childPill]}
+                  style={[styles.seasonPill, styles.childPill, isSelected && styles.seasonPillActive]}
                   onPress={() => setSelectedChildType(child)}
                   activeOpacity={0.7}
                 >
@@ -1039,6 +1100,20 @@ export function WardrobeScreen() {
             );
           })}
           </ScrollView>
+      </View>
+
+      {/* 筛选汇总条 */}
+      <View style={styles.summaryBar}>
+        <Text style={styles.summaryText} numberOfLines={1}>
+          {activeFilterLabels.length > 0 ? activeFilterLabels.join(' · ') : '全部衣物'}
+          <Text style={styles.summaryCount}> · 共 {filteredClothing.length} 件</Text>
+        </Text>
+        {activeFilterLabels.length > 0 && (
+          <TouchableOpacity style={styles.summaryClear} onPress={clearAllFilters} activeOpacity={0.7}>
+            <Ionicons name="close-circle" size={15} color={theme.colors.primary} />
+            <Text style={styles.summaryClearText}>清除</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* 内容区域 */}
