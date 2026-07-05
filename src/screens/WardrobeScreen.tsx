@@ -4,11 +4,11 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  Image,
   ScrollView,
   Alert,
   Dimensions,
   TextInput,
+  Animated,
 } from 'react-native';
 import { useNavigation, useFocusEffect, CommonActions } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -45,6 +45,22 @@ const SEASON_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color
   '秋': { name: 'leaf', color: '#8D6E63' },
   '冬': { name: 'snow', color: '#4FC3F7' },
 };
+
+// 网格图片：加载前显示占位底色，加载后淡入
+function GridImage({ uri, size, placeholderBg }: { uri: string; size: number; placeholderBg: string }) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  return (
+    <View style={{ width: size, height: size, borderRadius: 8, overflow: 'hidden', backgroundColor: placeholderBg, justifyContent: 'center', alignItems: 'center' }}>
+      <Ionicons name="shirt-outline" size={Math.min(28, size * 0.3)} color="#D6D0C8" />
+      <Animated.Image
+        source={{ uri }}
+        style={{ position: 'absolute', width: size, height: size, opacity }}
+        resizeMode="cover"
+        onLoad={() => Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: true }).start()}
+      />
+    </View>
+  );
+}
 
 // Create styles dynamically based on theme
 const makeStyles = (theme: Theme) =>
@@ -329,6 +345,21 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.textTertiary,
       textAlign: 'center',
       lineHeight: 20,
+    },
+    emptyClearBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 11,
+      borderRadius: 14,
+      backgroundColor: theme.colors.primary,
+    },
+    emptyClearBtnText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.colors.white,
     },
     fab: {
       position: 'absolute',
@@ -1211,14 +1242,28 @@ export function WardrobeScreen() {
       {isEmpty ? (
         <View style={styles.empty}>
           <View style={styles.emptyIconWrap}>
-            <Ionicons name="shirt-outline" size={56} color={theme.colors.border} />
+            <Ionicons
+              name={activeFilterLabels.length > 0 ? 'filter-outline' : 'shirt-outline'}
+              size={56}
+              color={theme.colors.border}
+            />
           </View>
           <Text style={styles.emptyTitle}>
-            {selectedSeason === '全部' ? '还没有添加衣服' : `暂无${selectedSeason}季衣物`}
+            {activeFilterLabels.length > 0
+              ? '没有符合的衣物'
+              : (selectedSeason === '全部' ? '还没有添加衣服' : `暂无${selectedSeason}季衣物`)}
           </Text>
           <Text style={styles.emptySubtext}>
-            {selectedSeason === '全部' ? '点击下方按钮添加第一件衣服' : '试试切换其他季节'}
+            {activeFilterLabels.length > 0
+              ? '试试调整或清除当前筛选条件'
+              : (selectedSeason === '全部' ? '点击下方按钮添加第一件衣服' : '试试切换其他季节')}
           </Text>
+          {activeFilterLabels.length > 0 && (
+            <TouchableOpacity style={styles.emptyClearBtn} onPress={clearAllFilters} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={15} color={theme.colors.white} />
+              <Text style={styles.emptyClearBtnText}>清除筛选</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         /* 网格视图 */
@@ -1233,7 +1278,6 @@ export function WardrobeScreen() {
               const isSelected = selectedIds.includes(itemId);
               const imageUri = item.thumbnailUri || item.imageUri;
               const isTransparent = !!(item.thumbnailUri && item.thumbnailUri.endsWith('.png'));
-              console.log('[GridItem] render:', itemId, '| isSelecting:', isSelecting, '| imageUri:', imageUri);
               return (
                 <TouchableOpacity
                   key={`grid-${itemId}-${isSelected}`}
@@ -1246,11 +1290,7 @@ export function WardrobeScreen() {
                   onLongPress={() => handleLongPress(itemId)}
                   activeOpacity={0.85}
                 >
-                  <Image
-                    source={{ uri: imageUri }}
-                    style={[styles.gridItemImage, { width: gridItemSize, height: gridItemSize }]}
-                    resizeMode="cover"
-                  />
+                  <GridImage uri={imageUri} size={gridItemSize} placeholderBg={theme.colors.borderLight} />
                   {!isSelecting && (
                     <View style={[styles.wearBadge, item.wearCount === 0 && styles.wearBadgeNew]}>
                       <Text style={styles.wearBadgeText}>
