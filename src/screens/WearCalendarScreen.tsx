@@ -81,6 +81,20 @@ const makeStyles = (theme: Theme) =>
       fontSize: 17, fontWeight: '600', color: theme.colors.text, letterSpacing: 0.3,
     },
     headerRight: { width: 36 },
+    todayBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 14,
+      backgroundColor: theme.colors.primary + '15',
+    },
+    todayBtnText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.primary,
+    },
 
     // Card
     card: {
@@ -101,31 +115,77 @@ const makeStyles = (theme: Theme) =>
       fontSize: 14, fontWeight: '600', color: theme.colors.text,
     },
 
-    // 最近一周
-    recentRow: {
-      flexDirection: 'row', alignItems: 'center',
-      paddingVertical: 10, paddingHorizontal: 12,
-      borderRadius: 12,
-      marginBottom: 6, gap: 10, height: 56,
+    // 最近一周（横排 7 列）
+    recentWeekRow: {
+      flexDirection: 'row',
+      gap: 6,
+    },
+    recentDayCol: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 8,
+      borderRadius: 10,
       backgroundColor: theme.colors.background,
     },
-    recentDateCol: { minWidth: 72 },
-    recentDateLabel: {
-      fontSize: 13, fontWeight: '600', color: theme.colors.text,
+    recentDayLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.colors.text,
     },
-    recentThumbsScroll: { flex: 1 },
-    recentThumb: {
-      width: 36, height: 36, borderRadius: 8, marginRight: 6,
+    recentDayLabelToday: {
+      color: theme.colors.primary,
     },
-    recentEmpty: {
-      fontSize: 13, flex: 1, color: theme.colors.textTertiary,
+    recentDayLabelWeekend: {
+      color: theme.colors.accent,
     },
-    recentCount: {
-      paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10,
+    recentDayLabelEmpty: {
+      color: theme.colors.textTertiary,
+      fontWeight: '500',
+    },
+    recentDayThumbs: {
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 3,
+      minHeight: 60,
+      justifyContent: 'center',
+    },
+    recentDayThumbWrap: {
+      width: 30,
+      height: 30,
+      borderRadius: 6,
+      overflow: 'hidden',
+    },
+    recentDayThumb: {
+      width: 30,
+      height: 30,
+      borderRadius: 6,
       backgroundColor: theme.colors.borderLight,
     },
-    recentCountText: {
-      fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary,
+    recentDayMore: {
+      position: 'absolute',
+      bottom: 0,
+      right: 0,
+      backgroundColor: theme.colors.primary,
+      borderRadius: 7,
+      paddingHorizontal: 3,
+      minWidth: 14,
+      alignItems: 'center',
+    },
+    recentDayMoreText: {
+      fontSize: 8,
+      color: theme.colors.white,
+      fontWeight: '700',
+    },
+    recentDayEmptyDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.colors.border,
+    },
+    recentDayCount: {
+      fontSize: 9,
+      color: theme.colors.textTertiary,
     },
     // 月度概览统计卡片（N3）
     statsCard: {
@@ -325,6 +385,17 @@ export function WearCalendarScreen() {
     }
   };
 
+  const isViewingOtherMonth = (() => {
+    const d = new Date();
+    return currentYear !== d.getFullYear() || currentMonth !== d.getMonth() + 1;
+  })();
+
+  const goToToday = () => {
+    const d = new Date();
+    setCurrentYear(d.getFullYear());
+    setCurrentMonth(d.getMonth() + 1);
+  };
+
   const handleDayPress = (dateStr: string) => {
     setSelectedDate(dateStr);
     setShowSheet(true);
@@ -355,6 +426,19 @@ export function WearCalendarScreen() {
     return `${d.getMonth() + 1}/${d.getDate()} ${weekDays[d.getDay()]}`;
   };
 
+  // 紧凑标签（横排用）：今天 / 昨天 / 周X
+  const getDayShortLabel = (dateStr: string) => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+    if (dateStr === todayStr) return '今天';
+    if (dateStr === yesterdayStr) return '昨天';
+    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
+    return `周${weekDays[new Date(dateStr).getDay()]}`;
+  };
+
   return (
     <View style={styles.container}>
       {/* 顶栏 */}
@@ -369,7 +453,14 @@ export function WearCalendarScreen() {
             </View>
             <Text style={styles.headerTitle}>穿着记录</Text>
           </View>
-          <View style={styles.headerRight} />
+          {isViewingOtherMonth ? (
+            <TouchableOpacity style={styles.todayBtn} onPress={goToToday} activeOpacity={0.7}>
+              <Ionicons name="today-outline" size={13} color={theme.colors.primary} />
+              <Text style={styles.todayBtnText}>今天</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.headerRight} />
+          )}
         </View>
       </View>
 
@@ -435,49 +526,67 @@ export function WearCalendarScreen() {
           </View>
         )}
 
-        {/* Recent Week Card */}
+        {/* Recent Week Card（横排 7 列） */}
         <View style={styles.card}>
           <View style={styles.cardHeader}>
             <View style={styles.cardDot} />
             <Text style={styles.cardTitle}>最近一周</Text>
           </View>
-          {recentWeek.map(({ date: dateStr, items }) => (
-            <TouchableOpacity
-              key={dateStr}
-              style={styles.recentRow}
-              onPress={() => handleDayPress(dateStr)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.recentDateCol}>
-                <Text style={styles.recentDateLabel}>{getDayLabel(dateStr)}</Text>
-              </View>
-              {items.length > 0 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recentThumbsScroll}>
-                  {items.map(item => (
-                    (item.thumbnailUri || item.imageUri) ? (
-                      <Image
-                        key={item.id}
-                        source={{ uri: item.thumbnailUri || item.imageUri }}
-                        style={styles.recentThumb}
-                        resizeMode="cover"
-                      />
+          <View style={styles.recentWeekRow}>
+            {recentWeek.map(({ date: dateStr, items }) => {
+              const d = new Date(dateStr);
+              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
+              return (
+                <TouchableOpacity
+                  key={dateStr}
+                  style={styles.recentDayCol}
+                  onPress={() => handleDayPress(dateStr)}
+                  activeOpacity={0.7}
+                >
+                  <Text
+                    style={[
+                      styles.recentDayLabel,
+                      dateStr === today && styles.recentDayLabelToday,
+                      isWeekend && dateStr !== today && styles.recentDayLabelWeekend,
+                      items.length === 0 && styles.recentDayLabelEmpty,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {getDayShortLabel(dateStr)}
+                  </Text>
+                  <View style={styles.recentDayThumbs}>
+                    {items.length === 0 ? (
+                      <View style={styles.recentDayEmptyDot} />
                     ) : (
-                      <View key={item.id} style={[styles.recentThumb, { justifyContent: 'center', alignItems: 'center', backgroundColor: theme.colors.borderLight }]}>
-                        <Ionicons name="image-outline" size={14} color={theme.colors.textTertiary} />
-                      </View>
-                    )
-                  ))}
-                </ScrollView>
-              ) : (
-                <Text style={styles.recentEmpty}>无记录</Text>
-              )}
-              {items.length > 0 && (
-                <View style={styles.recentCount}>
-                  <Text style={styles.recentCountText}>{items.length}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          ))}
+                      items.slice(0, 3).map((item, idx) => (
+                        <View key={item.id} style={styles.recentDayThumbWrap}>
+                          {(item.thumbnailUri || item.imageUri) ? (
+                            <Image
+                              source={{ uri: item.thumbnailUri || item.imageUri }}
+                              style={styles.recentDayThumb}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <View style={[styles.recentDayThumb, { justifyContent: 'center', alignItems: 'center' }]}>
+                              <Ionicons name="shirt-outline" size={10} color={theme.colors.textTertiary} />
+                            </View>
+                          )}
+                          {idx === 2 && items.length > 3 && (
+                            <View style={styles.recentDayMore}>
+                              <Text style={styles.recentDayMoreText}>+{items.length - 3}</Text>
+                            </View>
+                          )}
+                        </View>
+                      ))
+                    )}
+                  </View>
+                  {items.length > 0 && (
+                    <Text style={styles.recentDayCount}>{items.length}件</Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       </ScrollView>
 

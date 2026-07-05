@@ -86,6 +86,9 @@ const makeStyles = (theme: Theme) =>
       marginRight: CELL_MARGIN,
     },
     weekDayLast: { marginRight: 0 },
+    weekDayWeekend: {
+      color: theme.colors.accent,
+    },
     calendarGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -123,6 +126,9 @@ const makeStyles = (theme: Theme) =>
     },
     dayNumberEmpty: {
       color: theme.colors.textTertiary,
+    },
+    dayNumberWeekend: {
+      color: theme.colors.accent,
     },
     thumbnailsGrid: {
       flexDirection: 'column', gap: 2,
@@ -217,6 +223,7 @@ export function MonthCalendar({
     const isFutureDisabled = disableFuture && isFuture;
     const weekIndex = (firstDay + day - 1) % 7;
     const isSunday = weekIndex === 6;
+    const isWeekend = weekIndex >= 5; // 周六/周日
     const match = outfitMatchMap?.[dateStr];
     const showOutfitThumb = match && match.outfitThumb;
 
@@ -239,7 +246,7 @@ export function MonthCalendar({
         {showOutfitThumb ? (
           <>
             <View style={styles.dayNumberRow}>
-              <Text style={styles.dayNumberOverlayText}>{day}</Text>
+              <Text style={[styles.dayNumberOverlayText, isWeekend && !isToday && styles.dayNumberWeekend]}>{day}</Text>
               {isToday && (
                 <Ionicons name="star" size={11} color={theme.colors.primary} style={{ marginLeft: 2 }} />
               )}
@@ -252,8 +259,13 @@ export function MonthCalendar({
               <Text
                 style={[
                   styles.dayNumber,
-                  isToday && styles.dayNumberToday,
-                  hasRecords && !isToday && styles.dayNumberEmpty,
+                  isToday
+                    ? styles.dayNumberToday
+                    : isWeekend
+                      ? styles.dayNumberWeekend
+                      : hasRecords
+                        ? styles.dayNumberEmpty
+                        : undefined,
                 ]}
               >
                 {day}
@@ -317,7 +329,7 @@ export function MonthCalendar({
 
       <View style={styles.weekDaysRow}>
         {weekDays.map((day, idx) => (
-          <Text key={day} style={[styles.weekDay, idx === 6 && styles.weekDayLast]}>{day}</Text>
+          <Text key={day} style={[styles.weekDay, idx >= 5 && styles.weekDayWeekend, idx === 6 && styles.weekDayLast]}>{day}</Text>
         ))}
       </View>
 
