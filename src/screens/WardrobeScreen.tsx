@@ -33,7 +33,10 @@ const GRID_PADDING = 16;
 const SEASON_OPTIONS: ('全部' | Season)[] = ['全部', '春', '夏', '秋', '冬'];
 
 const SORT_OPTIONS = [
-  { key: 'createdAt' as const, label: '创建时间', icon: 'time-outline' as const },
+  { key: 'createdAt' as const, label: '添加时间', icon: 'time-outline' as const },
+  { key: 'purchaseDate' as const, label: '购买时间', icon: 'calendar-outline' as const },
+  { key: 'lastWornAt' as const, label: '最近穿着', icon: 'timer-outline' as const },
+  { key: 'wearCount' as const, label: '穿着次数', icon: 'stats-chart-outline' as const },
   { key: 'price' as const, label: '价格', icon: 'cash-outline' as const },
   { key: 'color' as const, label: '颜色', icon: 'color-palette-outline' as const },
 ];
@@ -555,18 +558,31 @@ const makeStyles = (theme: Theme) =>
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: 16,
-      paddingVertical: 6,
-      marginBottom: 2,
+      paddingVertical: 8,
+      marginBottom: 4,
+      marginTop: 2,
+      backgroundColor: theme.colors.background,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+    },
+    sortLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.colors.textTertiary,
+      marginRight: 4,
     },
     sortContent: {
       gap: 6,
+      alignItems: 'center',
     },
     sortPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: 10,
-      paddingVertical: 5,
-      borderRadius: 14,
+      paddingHorizontal: 9,
+      paddingVertical: 4,
+      borderRadius: 12,
       backgroundColor: theme.colors.card,
       gap: 4,
       borderWidth: 1,
@@ -577,7 +593,7 @@ const makeStyles = (theme: Theme) =>
       borderColor: theme.colors.primary,
     },
     sortPillText: {
-      fontSize: 14,
+      fontSize: 13,
       fontWeight: '500',
       color: theme.colors.textSecondary,
     },
@@ -836,6 +852,16 @@ export function WardrobeScreen() {
       switch (sortKey) {
         case 'createdAt':
           cmp = (a.createdAt || '').localeCompare(b.createdAt || '');
+          break;
+        case 'purchaseDate':
+          cmp = (a.purchaseDate || '').localeCompare(b.purchaseDate || '');
+          break;
+        case 'lastWornAt':
+          // 最近的在前，未穿过('')排末尾
+          cmp = (a.lastWornAt || '').localeCompare(b.lastWornAt || '');
+          break;
+        case 'wearCount':
+          cmp = (a.wearCount || 0) - (b.wearCount || 0);
           break;
         case 'price':
           cmp = (a.price || 0) - (b.price || 0);
@@ -1176,7 +1202,8 @@ export function WardrobeScreen() {
 
       {/* 排序 */}
       <View style={styles.sortSection}>
-        <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.textTertiary} style={{ marginRight: 6 }} />
+        <Ionicons name="swap-vertical-outline" size={14} color={theme.colors.textTertiary} />
+        <Text style={styles.sortLabel}>排序</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
