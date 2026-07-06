@@ -46,6 +46,7 @@ export function GroupListScreen() {
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [viewMode, setViewMode] = useState<'groups' | 'grid'>('grid');
+  const [showFilters, setShowFilters] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<number | 'all'>('all');
   const [selectedSeason, setSelectedSeason] = useState<string>('全部');
   const [selectedTag, setSelectedTag] = useState<string>('全部');
@@ -188,8 +189,17 @@ export function GroupListScreen() {
       return a.sortOrder - b.sortOrder;
     });
 
-    return [...visibleGroups, { id: -2, name: '', description: '', sortOrder: 999, createdAt: '' } as OutfitGroup];
-  }, [groups, outfits]);
+    // 搜索分组名
+    const kw = searchKeyword.trim().toLowerCase();
+    if (kw) {
+      visibleGroups = visibleGroups.filter(g => (g.name || '').toLowerCase().includes(kw));
+    }
+
+    // 搜索时隐藏「新建分组」卡片
+    return kw
+      ? visibleGroups
+      : [...visibleGroups, { id: -2, name: '', description: '', sortOrder: 999, createdAt: '' } as OutfitGroup];
+  }, [groups, outfits, searchKeyword]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
@@ -203,6 +213,17 @@ export function GroupListScreen() {
               </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => setShowFilters(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name="filter-outline"
+                  size={22}
+                  color={showFilters ? theme.colors.primary : theme.colors.text}
+                />
+              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerIconBtn}
                 onPress={() => setViewMode(m => m === 'groups' ? 'grid' : 'groups')}
@@ -227,6 +248,24 @@ export function GroupListScreen() {
       </View>
 
       {viewMode === 'groups' ? (
+      <View style={{ flex: 1 }}>
+      {showFilters && (
+        <View style={[styles.outfitSearchRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+          <Ionicons name="search" size={16} color={theme.colors.textTertiary} />
+          <TextInput
+            style={[styles.outfitSearchInput, { color: theme.colors.text }]}
+            value={searchKeyword}
+            onChangeText={setSearchKeyword}
+            placeholder="搜索分组名..."
+            placeholderTextColor={theme.colors.textTertiary}
+          />
+          {searchKeyword.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchKeyword('')} activeOpacity={0.7}>
+              <Ionicons name="close-circle" size={16} color={theme.colors.textTertiary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
       <FlatList
         data={data}
         renderItem={({ item }) => {
@@ -270,9 +309,11 @@ export function GroupListScreen() {
           </View>
         }
       />
+      </View>
       ) : (
         /* 网格视图：所有搭配 + 分组筛选 */
         <View style={{ flex: 1 }}>
+          {showFilters && (<>
           {/* 搜索 */}
           <View style={[styles.outfitSearchRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <Ionicons name="search" size={16} color={theme.colors.textTertiary} />
@@ -355,6 +396,7 @@ export function GroupListScreen() {
               </ScrollView>
             </View>
           )}
+          </>)}
 
           {/* 汇总条 */}
           <View style={[styles.outfitSummary, { backgroundColor: theme.colors.primary + '0A', borderBottomColor: theme.colors.border }]}>
