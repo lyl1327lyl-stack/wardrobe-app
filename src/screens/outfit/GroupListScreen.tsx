@@ -11,6 +11,7 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -26,6 +27,8 @@ const GRID_PADDING = 16;
 const GRID_GAP = 12;
 const NUM_COLUMNS = 2;
 const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / NUM_COLUMNS;
+const OUTFIT_COLS = 3;
+const OUTFIT_CARD_W = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP * (OUTFIT_COLS - 1)) / OUTFIT_COLS;
 
 type RootStackParamList = {
   GroupDetail: { groupId: number; groupName: string };
@@ -374,30 +377,34 @@ export function GroupListScreen() {
               const groupName = groupNameOf(item.groupId);
               return (
                 <TouchableOpacity
-                  style={[styles.outfitCard, { backgroundColor: theme.colors.card }]}
+                  style={[styles.outfitCard, { width: OUTFIT_CARD_W, height: OUTFIT_CARD_W, backgroundColor: theme.colors.borderLight }]}
                   onPress={() => navigation.navigate('OutfitDetail', { outfitId: item.id })}
                   activeOpacity={0.85}
                 >
-                  <View style={styles.outfitThumbWrap}>
-                    {item.thumbnailUri ? (
-                      <Image source={{ uri: item.thumbnailUri }} style={styles.outfitThumb} resizeMode="cover" />
-                    ) : (
-                      <View style={[styles.outfitThumb, { backgroundColor: theme.colors.borderLight, justifyContent: 'center', alignItems: 'center' }]}>
-                        <Ionicons name="shirt-outline" size={28} color={theme.colors.textTertiary} />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.outfitCardName, { color: theme.colors.text }]} numberOfLines={1}>
-                    {item.name || '未命名搭配'}
-                  </Text>
-                  <Text style={[styles.outfitCardMeta, { color: theme.colors.textTertiary }]} numberOfLines={1}>
-                    {groupName} · {item.itemIds.length}件
-                  </Text>
+                  {item.thumbnailUri ? (
+                    <Image source={{ uri: item.thumbnailUri }} style={styles.outfitThumbFill} resizeMode="cover" />
+                  ) : (
+                    <View style={[styles.outfitThumbFill, { justifyContent: 'center', alignItems: 'center' }]}>
+                      <Ionicons name="shirt-outline" size={28} color={theme.colors.textTertiary} />
+                    </View>
+                  )}
+                  <LinearGradient
+                    colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
+                    locations={[0.4, 1]}
+                    style={styles.outfitCardOverlay}
+                  >
+                    <Text style={styles.outfitCardName} numberOfLines={1}>
+                      {item.name || '未命名搭配'}
+                    </Text>
+                    <Text style={styles.outfitCardMeta} numberOfLines={1}>
+                      {groupName} · {item.itemIds.length}件
+                    </Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               );
             }}
             keyExtractor={item => item.id.toString()}
-            numColumns={2}
+            numColumns={OUTFIT_COLS}
             columnWrapperStyle={styles.gridRow}
             contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 20 }]}
             showsVerticalScrollIndicator={false}
@@ -524,34 +531,35 @@ const createStyles = (theme: any, insets: any) =>
       fontWeight: '600',
     },
     outfitCard: {
-      width: CARD_WIDTH,
-      borderRadius: 16,
-      padding: 10,
+      borderRadius: 12,
+      overflow: 'hidden',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.08,
       shadowRadius: 12,
       elevation: 3,
     },
-    outfitThumbWrap: {
-      width: '100%',
-      aspectRatio: 1,
-      borderRadius: 10,
-      overflow: 'hidden',
-      marginBottom: 8,
+    outfitThumbFill: {
+      ...StyleSheet.absoluteFillObject,
     },
-    outfitThumb: {
-      width: '100%',
-      height: '100%',
-      borderRadius: 10,
+    outfitCardOverlay: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: 8,
+      paddingTop: 18,
+      paddingBottom: 7,
     },
     outfitCardName: {
-      fontSize: 14,
+      fontSize: 12,
       fontWeight: '700',
-      marginBottom: 2,
+      color: '#FFFFFF',
+      marginBottom: 1,
     },
     outfitCardMeta: {
-      fontSize: 11,
+      fontSize: 10,
+      color: 'rgba(255,255,255,0.85)',
     },
     card: {
       width: CARD_WIDTH,
