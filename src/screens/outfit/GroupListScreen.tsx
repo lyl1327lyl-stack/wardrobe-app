@@ -11,7 +11,6 @@ import {
   TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -374,7 +373,6 @@ export function GroupListScreen() {
           <FlatList
             data={filteredOutfits}
             renderItem={({ item }) => {
-              const groupName = groupNameOf(item.groupId);
               return (
                 <TouchableOpacity
                   style={[styles.outfitCard, { width: OUTFIT_CARD_W, height: OUTFIT_CARD_W, backgroundColor: theme.colors.borderLight }]}
@@ -388,18 +386,6 @@ export function GroupListScreen() {
                       <Ionicons name="shirt-outline" size={28} color={theme.colors.textTertiary} />
                     </View>
                   )}
-                  <LinearGradient
-                    colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.7)']}
-                    locations={[0.4, 1]}
-                    style={styles.outfitCardOverlay}
-                  >
-                    <Text style={styles.outfitCardName} numberOfLines={1}>
-                      {item.name || '未命名搭配'}
-                    </Text>
-                    <Text style={styles.outfitCardMeta} numberOfLines={1}>
-                      {groupName} · {item.itemIds.length}件
-                    </Text>
-                  </LinearGradient>
                 </TouchableOpacity>
               );
             }}
@@ -541,25 +527,6 @@ const createStyles = (theme: any, insets: any) =>
     },
     outfitThumbFill: {
       ...StyleSheet.absoluteFillObject,
-    },
-    outfitCardOverlay: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      paddingHorizontal: 8,
-      paddingTop: 18,
-      paddingBottom: 7,
-    },
-    outfitCardName: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: '#FFFFFF',
-      marginBottom: 1,
-    },
-    outfitCardMeta: {
-      fontSize: 10,
-      color: 'rgba(255,255,255,0.85)',
     },
     card: {
       width: CARD_WIDTH,
