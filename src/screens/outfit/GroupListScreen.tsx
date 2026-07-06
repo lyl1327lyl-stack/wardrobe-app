@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -26,6 +27,7 @@ const CARD_WIDTH = (SCREEN_WIDTH - GRID_PADDING * 2 - GRID_GAP) / NUM_COLUMNS;
 
 type RootStackParamList = {
   GroupDetail: { groupId: number; groupName: string };
+  OutfitDetail: { outfitId: number };
   WearCalendar: undefined;
   ClothingSelection: { source?: 'Outfits' | 'Editor'; groupId?: number } | undefined;
 };
@@ -39,6 +41,23 @@ export function GroupListScreen() {
   const outfits = useWardrobeStore(state => state.outfits);
 
   const [showFormModal, setShowFormModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'groups' | 'grid'>('groups');
+  const [selectedGroupId, setSelectedGroupId] = useState<number | 'all'>('all');
+
+  // 网格视图：含搭配的分组（用于筛选 chip）
+  const groupChips = useMemo(() => {
+    return groups.filter(g => outfits.some(o => o.groupId === g.id));
+  }, [groups, outfits]);
+
+  // 网格视图：按分组筛选后的搭配
+  const filteredOutfits = useMemo(() => {
+    if (selectedGroupId === 'all') return outfits;
+    return outfits.filter(o => o.groupId === selectedGroupId);
+  }, [outfits, selectedGroupId]);
+
+  const groupNameOf = useCallback((groupId: number) => {
+    return groups.find(g => g.id === groupId)?.name || '未分组';
+  }, [groups]);
 
   const groupOutfitCount = useCallback((groupId: number) => {
     return outfits.filter(o => o.groupId === groupId).length;
@@ -132,17 +151,31 @@ export function GroupListScreen() {
                  · 共 {groups.length} 个分组
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.headerIconBtn}
-              onPress={() => navigation.navigate('WearCalendar')}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => setViewMode(m => m === 'groups' ? 'grid' : 'groups')}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={viewMode === 'groups' ? 'apps-outline' : 'folder-open-outline'}
+                  size={22}
+                  color={theme.colors.text}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.headerIconBtn}
+                onPress={() => navigation.navigate('WearCalendar')}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </View>
 
+      {viewMode === 'groups' ? (
       <FlatList
         data={data}
         renderItem={({ item }) => {
@@ -186,6 +219,96 @@ export function GroupListScreen() {
           </View>
         }
       />
+      ) : (
+        /* 网格视图：所有搭配 + 分组筛选 */
+        <View style={{ flex: 1 }}>
+          {/* 分组筛选 */}
+          <View style={[styles.outfitFilterBar, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              <TouchableOpacity
+                style={[styles.outfitChip, selectedGroupId === 'all' && styles.outfitChipActive, selectedGroupId === 'all' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}
+                onPress={() => setSelectedGroupId('all')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.outfitChipText, { color: theme.colors.textSecondary }, selectedGroupId === 'all' && { color: theme.colors.white }]}>全部</Text>
+              </TouchableOpacity>
+              {groupChips.map(g => {
+                const active = selectedGroupId === g.id;
+                return (
+                  <TouchableOpacity
+                    key={g.id}
+                    style={[styles.outfitChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }, active && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}
+                    onPress={() => setSelectedGroupId(g.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.outfitChipText, { color: theme.colors.textSecondary }, active && { color: theme.colors.white }]}>{g.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* 汇总条 */}
+          <View style={[styles.outfitSummary, { backgroundColor: theme.colors.primary + '0A', borderBottomColor: theme.colors.border }]}>
+            <Text style={[styles.outfitSummaryText, { color: theme.colors.text }]} numberOfLines={1}>
+              {selectedGroupId === 'all' ? '全部搭配' : groupNameOf(selectedGroupId)}
+              <Text style={{ color: theme.colors.textTertiary, fontWeight: '400' }}> · 共 {filteredOutfits.length} 套</Text>
+            </Text>
+            {selectedGroupId !== 'all' && (
+              <TouchableOpacity style={[styles.outfitSummaryClear, { backgroundColor: theme.colors.card }]} onPress={() => setSelectedGroupId('all')} activeOpacity={0.7}>
+                <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
+                <Text style={[styles.outfitSummaryClearText, { color: theme.colors.primary }]}>全部</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <FlatList
+            data={filteredOutfits}
+            renderItem={({ item }) => {
+              const groupName = groupNameOf(item.groupId);
+              return (
+                <TouchableOpacity
+                  style={[styles.outfitCard, { backgroundColor: theme.colors.card }]}
+                  onPress={() => navigation.navigate('OutfitDetail', { outfitId: item.id })}
+                  activeOpacity={0.85}
+                >
+                  <View style={styles.outfitThumbWrap}>
+                    {item.thumbnailUri ? (
+                      <Image source={{ uri: item.thumbnailUri }} style={styles.outfitThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.outfitThumb, { backgroundColor: theme.colors.borderLight, justifyContent: 'center', alignItems: 'center' }]}>
+                        <Ionicons name="shirt-outline" size={28} color={theme.colors.textTertiary} />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.outfitCardName, { color: theme.colors.text }]} numberOfLines={1}>
+                    {item.name || '未命名搭配'}
+                  </Text>
+                  <Text style={[styles.outfitCardMeta, { color: theme.colors.textTertiary }]} numberOfLines={1}>
+                    {groupName} · {item.itemIds.length}件
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            keyExtractor={item => item.id.toString()}
+            numColumns={2}
+            columnWrapperStyle={styles.gridRow}
+            contentContainerStyle={[styles.gridContent, { paddingBottom: insets.bottom + 20 }]}
+            showsVerticalScrollIndicator={false}
+            ListEmptyComponent={
+              <View style={styles.empty}>
+                <View style={[styles.emptyIconWrap, { backgroundColor: theme.colors.borderLight }]}>
+                  <Ionicons name="grid-outline" size={40} color={theme.colors.textTertiary} />
+                </View>
+                <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>暂无搭配</Text>
+                <Text style={[styles.emptySubtext, { color: theme.colors.textTertiary }]}>
+                  {selectedGroupId !== 'all' ? '该分组下还没有搭配' : '去创建你的第一套搭配吧'}
+                </Text>
+              </View>
+            }
+          />
+        </View>
+      )}
 
       {/* FAB — 新建搭配 */}
       <TouchableOpacity
@@ -234,6 +357,79 @@ const createStyles = (theme: any, insets: any) =>
     },
     gridContent: { padding: GRID_PADDING },
     gridRow: { gap: GRID_GAP, marginBottom: GRID_GAP },
+    // 网格视图：筛选 + 汇总 + 搭配卡
+    outfitFilterBar: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+    },
+    outfitChip: {
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 14,
+      borderWidth: 1,
+    },
+    outfitChipActive: {},
+    outfitChipText: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    outfitSummary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderBottomWidth: 1,
+    },
+    outfitSummaryText: {
+      flex: 1,
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    outfitSummaryClear: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 3,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: 12,
+      marginLeft: 10,
+    },
+    outfitSummaryClearText: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    outfitCard: {
+      width: CARD_WIDTH,
+      borderRadius: 16,
+      padding: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.08,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    outfitThumbWrap: {
+      width: '100%',
+      aspectRatio: 1,
+      borderRadius: 10,
+      overflow: 'hidden',
+      marginBottom: 8,
+    },
+    outfitThumb: {
+      width: '100%',
+      height: '100%',
+      borderRadius: 10,
+    },
+    outfitCardName: {
+      fontSize: 14,
+      fontWeight: '700',
+      marginBottom: 2,
+    },
+    outfitCardMeta: {
+      fontSize: 11,
+    },
     card: {
       width: CARD_WIDTH,
       borderRadius: 16,
