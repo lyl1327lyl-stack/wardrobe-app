@@ -8,6 +8,7 @@ import {
   Image,
   Dimensions,
   ScrollView,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useIsFocused } from '@react-navigation/native';
@@ -16,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
 import { useWardrobeStore } from '../../store/wardrobeStore';
+import { useCustomOptionsStore } from '../../store/customOptionsStore';
 import { OutfitGroup } from '../../types';
 import { GroupFormModal } from './GroupFormModal';
 
@@ -41,23 +43,70 @@ export function GroupListScreen() {
   const outfits = useWardrobeStore(state => state.outfits);
 
   const [showFormModal, setShowFormModal] = useState(false);
-  const [viewMode, setViewMode] = useState<'groups' | 'grid'>('groups');
+  const [viewMode, setViewMode] = useState<'groups' | 'grid'>('grid');
   const [selectedGroupId, setSelectedGroupId] = useState<number | 'all'>('all');
+  const [selectedSeason, setSelectedSeason] = useState<string>('全部');
+  const [selectedTag, setSelectedTag] = useState<string>('全部');
+  const [searchKeyword, setSearchKeyword] = useState('');
+
+  const customSeasons = useCustomOptionsStore(s => s.seasons);
 
   // 网格视图：含搭配的分组（用于筛选 chip）
   const groupChips = useMemo(() => {
     return groups.filter(g => outfits.some(o => o.groupId === g.id));
   }, [groups, outfits]);
 
-  // 网格视图：按分组筛选后的搭配
-  const filteredOutfits = useMemo(() => {
-    if (selectedGroupId === 'all') return outfits;
-    return outfits.filter(o => o.groupId === selectedGroupId);
-  }, [outfits, selectedGroupId]);
+  // 季节选项（固定 春夏秋冬 + 全部）
+  const seasonOptions = useMemo(() => {
+    const base = customSeasons && customSeasons.length > 0 ? customSeasons : ['春', '夏', '秋', '冬'];
+    return ['全部', ...base];
+  }, [customSeasons]);
+
+  // 标签选项：从现有搭配中聚合
+  const tagOptions = useMemo(() => {
+    const set = new Set<string>();
+    outfits.forEach(o => (o.tags || []).forEach(t => set.add(t)));
+    return ['全部', ...[...set].sort()];
+  }, [outfits]);
 
   const groupNameOf = useCallback((groupId: number) => {
     return groups.find(g => g.id === groupId)?.name || '未分组';
   }, [groups]);
+
+  // 网格视图：综合筛选后的搭配
+  const filteredOutfits = useMemo(() => {
+    let list = outfits;
+    if (selectedGroupId !== 'all') list = list.filter(o => o.groupId === selectedGroupId);
+    if (selectedSeason !== '全部') list = list.filter(o => (o.seasons || []).includes(selectedSeason));
+    if (selectedTag !== '全部') list = list.filter(o => (o.tags || []).includes(selectedTag));
+    const kw = searchKeyword.trim().toLowerCase();
+    if (kw) {
+      list = list.filter(o =>
+        (o.name || '').toLowerCase().includes(kw) ||
+        (o.notes || '').toLowerCase().includes(kw) ||
+        groupNameOf(o.groupId).toLowerCase().includes(kw) ||
+        (o.tags || []).some(t => t.toLowerCase().includes(kw))
+      );
+    }
+    return list;
+  }, [outfits, selectedGroupId, selectedSeason, selectedTag, searchKeyword, groupNameOf]);
+
+  // 汇总条：当前生效的筛选
+  const activeOutfitFilters = useMemo(() => {
+    const labels: string[] = [];
+    if (searchKeyword.trim()) labels.push(`“${searchKeyword.trim()}”`);
+    if (selectedGroupId !== 'all') labels.push(groupNameOf(selectedGroupId));
+    if (selectedSeason !== '全部') labels.push(selectedSeason);
+    if (selectedTag !== '全部') labels.push(`#${selectedTag}`);
+    return labels;
+  }, [searchKeyword, selectedGroupId, selectedSeason, selectedTag, groupNameOf]);
+
+  const clearOutfitFilters = useCallback(() => {
+    setSelectedGroupId('all');
+    setSelectedSeason('全部');
+    setSelectedTag('全部');
+    setSearchKeyword('');
+  }, []);
 
   const groupOutfitCount = useCallback((groupId: number) => {
     return outfits.filter(o => o.groupId === groupId).length;
@@ -222,42 +271,99 @@ export function GroupListScreen() {
       ) : (
         /* 网格视图：所有搭配 + 分组筛选 */
         <View style={{ flex: 1 }}>
-          {/* 分组筛选 */}
+          {/* 搜索 */}
+          <View style={[styles.outfitSearchRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
+            <Ionicons name="search" size={16} color={theme.colors.textTertiary} />
+            <TextInput
+              style={[styles.outfitSearchInput, { color: theme.colors.text }]}
+              value={searchKeyword}
+              onChangeText={setSearchKeyword}
+              placeholder="搜索搭配名/分组/标签/备注..."
+              placeholderTextColor={theme.colors.textTertiary}
+            />
+            {searchKeyword.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchKeyword('')} activeOpacity={0.7}>
+                <Ionicons name="close-circle" size={16} color={theme.colors.textTertiary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* 季节筛选 */}
           <View style={[styles.outfitFilterBar, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-              <TouchableOpacity
-                style={[styles.outfitChip, selectedGroupId === 'all' && styles.outfitChipActive, selectedGroupId === 'all' && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}
-                onPress={() => setSelectedGroupId('all')}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.outfitChipText, { color: theme.colors.textSecondary }, selectedGroupId === 'all' && { color: theme.colors.white }]}>全部</Text>
-              </TouchableOpacity>
-              {groupChips.map(g => {
-                const active = selectedGroupId === g.id;
+              {seasonOptions.map(s => {
+                const active = selectedSeason === s;
                 return (
                   <TouchableOpacity
-                    key={g.id}
+                    key={s}
                     style={[styles.outfitChip, { backgroundColor: theme.colors.background, borderColor: theme.colors.border }, active && { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary }]}
-                    onPress={() => setSelectedGroupId(g.id)}
+                    onPress={() => setSelectedSeason(s)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.outfitChipText, { color: theme.colors.textSecondary }, active && { color: theme.colors.white }]}>{g.name}</Text>
+                    <Text style={[styles.outfitChipText, { color: theme.colors.textSecondary }, active && { color: theme.colors.white }]}>{s}</Text>
                   </TouchableOpacity>
                 );
               })}
             </ScrollView>
           </View>
 
+          {/* 分组筛选 */}
+          <View style={[styles.outfitFilterBar, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+              <TouchableOpacity
+                style={[styles.outfitChip, { backgroundColor: selectedGroupId === 'all' ? theme.colors.primary : theme.colors.background, borderColor: selectedGroupId === 'all' ? theme.colors.primary : theme.colors.border }]}
+                onPress={() => setSelectedGroupId('all')}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.outfitChipText, { color: selectedGroupId === 'all' ? theme.colors.white : theme.colors.textSecondary }]}>全部分组</Text>
+              </TouchableOpacity>
+              {groupChips.map(g => {
+                const active = selectedGroupId === g.id;
+                return (
+                  <TouchableOpacity
+                    key={g.id}
+                    style={[styles.outfitChip, { backgroundColor: active ? theme.colors.primary : theme.colors.background, borderColor: active ? theme.colors.primary : theme.colors.border }]}
+                    onPress={() => setSelectedGroupId(g.id)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.outfitChipText, { color: active ? theme.colors.white : theme.colors.textSecondary }]}>{g.name}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+
+          {/* 标签筛选 */}
+          {tagOptions.length > 1 && (
+            <View style={[styles.outfitFilterBar, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                {tagOptions.map(t => {
+                  const active = selectedTag === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.outfitChip, { backgroundColor: active ? theme.colors.primary : theme.colors.background, borderColor: active ? theme.colors.primary : theme.colors.border }]}
+                      onPress={() => setSelectedTag(t)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.outfitChipText, { color: active ? theme.colors.white : theme.colors.textSecondary }]}>{t === '全部' ? '全部标签' : `#${t}`}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+
           {/* 汇总条 */}
           <View style={[styles.outfitSummary, { backgroundColor: theme.colors.primary + '0A', borderBottomColor: theme.colors.border }]}>
             <Text style={[styles.outfitSummaryText, { color: theme.colors.text }]} numberOfLines={1}>
-              {selectedGroupId === 'all' ? '全部搭配' : groupNameOf(selectedGroupId)}
+              {activeOutfitFilters.length > 0 ? activeOutfitFilters.join(' · ') : '全部搭配'}
               <Text style={{ color: theme.colors.textTertiary, fontWeight: '400' }}> · 共 {filteredOutfits.length} 套</Text>
             </Text>
-            {selectedGroupId !== 'all' && (
-              <TouchableOpacity style={[styles.outfitSummaryClear, { backgroundColor: theme.colors.card }]} onPress={() => setSelectedGroupId('all')} activeOpacity={0.7}>
+            {activeOutfitFilters.length > 0 && (
+              <TouchableOpacity style={[styles.outfitSummaryClear, { backgroundColor: theme.colors.card }]} onPress={clearOutfitFilters} activeOpacity={0.7}>
                 <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
-                <Text style={[styles.outfitSummaryClearText, { color: theme.colors.primary }]}>全部</Text>
+                <Text style={[styles.outfitSummaryClearText, { color: theme.colors.primary }]}>清除</Text>
               </TouchableOpacity>
             )}
           </View>
@@ -358,6 +464,23 @@ const createStyles = (theme: any, insets: any) =>
     gridContent: { padding: GRID_PADDING },
     gridRow: { gap: GRID_GAP, marginBottom: GRID_GAP },
     // 网格视图：筛选 + 汇总 + 搭配卡
+    outfitSearchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginHorizontal: 16,
+      marginTop: 12,
+      marginBottom: 4,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+    },
+    outfitSearchInput: {
+      flex: 1,
+      fontSize: 14,
+      padding: 0,
+    },
     outfitFilterBar: {
       paddingHorizontal: 16,
       paddingVertical: 10,
