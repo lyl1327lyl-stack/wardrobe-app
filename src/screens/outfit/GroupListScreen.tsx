@@ -209,9 +209,6 @@ export function GroupListScreen() {
           <View style={styles.headerRow}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
               <Text style={[styles.headerTitle, { color: theme.colors.text }]}>我的搭配</Text>
-              <Text style={[styles.headerSubtitle, { color: theme.colors.textTertiary, marginLeft: 6 }]}>
-                 · 共 {groups.length} 个分组
-              </Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TouchableOpacity
@@ -235,13 +232,6 @@ export function GroupListScreen() {
                   size={22}
                   color={theme.colors.text}
                 />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerIconBtn}
-                onPress={() => navigation.navigate('WearCalendar')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
               </TouchableOpacity>
             </View>
           </View>

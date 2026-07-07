@@ -1052,13 +1052,6 @@ export function WardrobeScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.headerIconBtn}
-                onPress={() => navigation.navigate('WearCalendar')}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="calendar-outline" size={22} color={theme.colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.headerIconBtn}
                 onPress={() => navigation.navigate('Drafts')}
                 activeOpacity={0.7}
               >
