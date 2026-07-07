@@ -46,7 +46,8 @@ export function GroupListScreen() {
 
   const [showFormModal, setShowFormModal] = useState(false);
   const [viewMode, setViewMode] = useState<'groups' | 'grid'>('grid');
-  const [showFilters, setShowFilters] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const [selectedGroupId, setSelectedGroupId] = useState<number | 'all'>('all');
   const [selectedSeason, setSelectedSeason] = useState<string>('全部');
   const [selectedTag, setSelectedTag] = useState<string>('全部');
@@ -215,13 +216,13 @@ export function GroupListScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TouchableOpacity
                 style={styles.headerIconBtn}
-                onPress={() => setShowFilters(v => !v)}
+                onPress={() => setShowSearch(v => !v)}
                 activeOpacity={0.7}
               >
                 <Ionicons
-                  name="filter-outline"
+                  name={showSearch ? 'search' : 'search-outline'}
                   size={22}
-                  color={showFilters ? theme.colors.primary : theme.colors.text}
+                  color={showSearch ? theme.colors.primary : theme.colors.text}
                 />
               </TouchableOpacity>
               <TouchableOpacity
@@ -249,7 +250,7 @@ export function GroupListScreen() {
 
       {viewMode === 'groups' ? (
       <View style={{ flex: 1 }}>
-      {showFilters && (
+      {showSearch && (
         <View style={[styles.outfitSearchRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
           <Ionicons name="search" size={16} color={theme.colors.textTertiary} />
           <TextInput
@@ -313,8 +314,8 @@ export function GroupListScreen() {
       ) : (
         /* 网格视图：所有搭配 + 分组筛选 */
         <View style={{ flex: 1 }}>
-          {showFilters && (<>
           {/* 搜索 */}
+          {showSearch && (
           <View style={[styles.outfitSearchRow, { backgroundColor: theme.colors.card, borderColor: theme.colors.border }]}>
             <Ionicons name="search" size={16} color={theme.colors.textTertiary} />
             <TextInput
@@ -330,7 +331,9 @@ export function GroupListScreen() {
               </TouchableOpacity>
             )}
           </View>
+          )}
 
+          {filtersExpanded && (<>
           {/* 季节筛选 */}
           <View style={[styles.outfitFilterBar, { backgroundColor: theme.colors.card, borderBottomColor: theme.colors.border }]}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
@@ -404,12 +407,22 @@ export function GroupListScreen() {
               {activeOutfitFilters.length > 0 ? activeOutfitFilters.join(' · ') : '全部搭配'}
               <Text style={{ color: theme.colors.textTertiary, fontWeight: '400' }}> · 共 {filteredOutfits.length} 套</Text>
             </Text>
-            {activeOutfitFilters.length > 0 && (
-              <TouchableOpacity style={[styles.outfitSummaryClear, { backgroundColor: theme.colors.card }]} onPress={clearOutfitFilters} activeOpacity={0.7}>
-                <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
-                <Text style={[styles.outfitSummaryClearText, { color: theme.colors.primary }]}>清除</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <TouchableOpacity
+                style={[styles.outfitSummaryClear, { backgroundColor: theme.colors.card }]}
+                onPress={() => setFiltersExpanded(v => !v)}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={filtersExpanded ? 'chevron-up' : 'filter-outline'} size={14} color={theme.colors.primary} />
+                <Text style={[styles.outfitSummaryClearText, { color: theme.colors.primary }]}>{filtersExpanded ? '收起' : '筛选'}</Text>
               </TouchableOpacity>
-            )}
+              {activeOutfitFilters.length > 0 && (
+                <TouchableOpacity style={[styles.outfitSummaryClear, { backgroundColor: theme.colors.card }]} onPress={clearOutfitFilters} activeOpacity={0.7}>
+                  <Ionicons name="close-circle" size={14} color={theme.colors.primary} />
+                  <Text style={[styles.outfitSummaryClearText, { color: theme.colors.primary }]}>清除</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           <FlatList
