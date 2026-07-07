@@ -16,6 +16,7 @@ import { ThemeId, themes } from '../utils/theme';
 import { Theme } from '../utils/theme';
 import { OPTIONS_STORAGE_KEY } from '../utils/customOptions';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { exportBackup, pickBackupFile, restoreBackup } from '../utils/backup';
 
 const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'wood', label: '暖阳原木', icon: 'leaf-outline' },
@@ -44,15 +45,31 @@ const MENU_ITEMS: MenuSection[] = [
     items: [
       { key: 'categories', label: '类型管理', icon: 'shirt-outline', action: 'categories' },
       { key: 'tags', label: '标签管理', icon: 'pricetags-outline', action: 'tags' },
+      { key: 'sizes', label: '尺码管理', icon: 'resize-outline', action: 'sizes' },
     ],
   },
   {
-    title: '数据管理',
+    title: '我的数据',
     items: [
-      { key: 'export', label: '备份导出', icon: 'download-outline', action: 'export' },
+      { key: 'trash', label: '废衣篓', icon: 'trash-outline', action: 'trash' },
+      { key: 'sold', label: '已卖出', icon: 'card-outline', action: 'sold' },
+      { key: 'drafts', label: '草稿箱', icon: 'document-text-outline', action: 'drafts' },
+      { key: 'wardrobes', label: '衣柜管理', icon: 'file-tray-full-outline', action: 'wardrobes' },
+      { key: 'stats', label: '统计详情', icon: 'stats-chart-outline', action: 'stats' },
+    ],
+  },
+  {
+    title: '备份与恢复',
+    items: [
+      { key: 'export', label: '备份导出', icon: 'cloud-download-outline', action: 'export' },
       { key: 'import', label: '数据导入', icon: 'cloud-upload-outline', action: 'import' },
-      { key: 'clearClothes', label: '清空所有衣服', icon: 'trash-outline', action: 'clearClothes', danger: true },
-      { key: 'clearOptions', label: '重置分类选项', icon: 'refresh-outline', action: 'clearOptions' },
+    ],
+  },
+  {
+    title: '危险操作',
+    items: [
+      { key: 'clearClothes', label: '清空所有衣服', icon: 'flame-outline', action: 'clearClothes', danger: true },
+      { key: 'clearOptions', label: '重置分类选项', icon: 'refresh-outline', action: 'clearOptions', danger: true },
     ],
   },
   {
@@ -105,6 +122,36 @@ const makeStyles = (theme: Theme) =>
       color: theme.colors.text,
       marginBottom: 14,
     },
+    // 数据概览
+    statsCard: {
+      marginHorizontal: 16,
+      borderRadius: 16,
+      paddingVertical: 18,
+      backgroundColor: theme.colors.card,
+      ...theme.shadows.sm,
+    },
+    statsRow: {
+      flexDirection: 'row',
+    },
+    statsItem: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    statsValue: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: theme.colors.text,
+    },
+    statsLabel: {
+      fontSize: 11,
+      color: theme.colors.textTertiary,
+      marginTop: 4,
+    },
+    statsDivider: {
+      width: 1,
+      backgroundColor: theme.colors.border,
+      marginVertical: 2,
+    },
     themeGrid: {
       flexDirection: 'row',
       gap: 12,
@@ -115,6 +162,8 @@ const makeStyles = (theme: Theme) =>
       paddingVertical: 16,
       paddingHorizontal: 8,
       borderRadius: 12,
+      borderWidth: 3,
+      borderColor: 'transparent',
       position: 'relative',
     },
     themeIconWrap: {
@@ -170,24 +219,76 @@ export function PersonalCenterScreen() {
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
+  // 数据概览
+  const clothingCount = useWardrobeStore(s => s.clothing.length);
+  const outfitCount = useWardrobeStore(s => s.outfits.length);
+  const wardrobeCount = useWardrobeStore(s => s.wardrobes.length);
+  const groupCount = useWardrobeStore(s => s.groups.length);
+
   const handleThemeChange = async (newThemeId: ThemeId) => {
     if (newThemeId === themeId) return;
     await setTheme(newThemeId);
   };
 
+  const handleExport = async () => {
+    try {
+      await exportBackup();
+    } catch (e: any) {
+      Alert.alert('导出失败', e?.message || '请稍后重试');
+    }
+  };
+
+  const handleImport = () => {
+    Alert.alert(
+      '数据导入',
+      '导入将覆盖当前所有衣物、搭配、穿着记录与分类选项。确定继续？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '选择文件',
+          onPress: async () => {
+            try {
+              const data = await pickBackupFile();
+              if (!data) return;
+              await restoreBackup(data);
+              Alert.alert('导入成功', '数据已恢复，部分页面可能需重新进入以刷新');
+            } catch (e: any) {
+              Alert.alert('导入失败', e?.message || '文件无效或损坏');
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleMenuAction = (action?: string) => {
     if (!action) return;
-
     switch (action) {
       case 'categories':
       case 'tags':
+      case 'sizes':
         (navigation as any).navigate('CustomOptions', { category: action });
         break;
+      case 'trash':
+        (navigation as any).navigate('Trash');
+        break;
+      case 'sold':
+        (navigation as any).navigate('SoldItems');
+        break;
+      case 'drafts':
+        (navigation as any).navigate('Drafts');
+        break;
+      case 'wardrobes':
+        (navigation as any).navigate('WardrobeManagement');
+        break;
+      case 'stats':
+        (navigation as any).navigate('StatsDetail');
+        break;
       case 'export':
-        Alert.alert('备份导出', '功能开发中');
+        handleExport();
         break;
       case 'import':
-        Alert.alert('数据导入', '功能开发中');
+        handleImport();
         break;
       case 'clearOptions':
         Alert.alert(
@@ -237,7 +338,6 @@ export function PersonalCenterScreen() {
 
   return (
     <View style={styles.container}>
-      {/* 统一顶栏 */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerInner}>
           <Text style={styles.headerTitle}>个人中心</Text>
@@ -248,8 +348,33 @@ export function PersonalCenterScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
+        {/* 数据概览 */}
+        <View style={styles.statsCard}>
+          <View style={styles.statsRow}>
+            <View style={styles.statsItem}>
+              <Text style={styles.statsValue}>{clothingCount}</Text>
+              <Text style={styles.statsLabel}>衣物</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsItem}>
+              <Text style={styles.statsValue}>{outfitCount}</Text>
+              <Text style={styles.statsLabel}>搭配</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsItem}>
+              <Text style={styles.statsValue}>{wardrobeCount}</Text>
+              <Text style={styles.statsLabel}>衣柜</Text>
+            </View>
+            <View style={styles.statsDivider} />
+            <View style={styles.statsItem}>
+              <Text style={styles.statsValue}>{groupCount}</Text>
+              <Text style={styles.statsLabel}>分组</Text>
+            </View>
+          </View>
+        </View>
+
         {/* Theme Selection */}
-        <View style={styles.section}>
+        <View style={[styles.section, { marginTop: 12 }]}>
           <Text style={styles.sectionTitle}>主题切换</Text>
           <View style={styles.themeGrid}>
             {THEME_OPTIONS.map((option) => {
@@ -261,24 +386,15 @@ export function PersonalCenterScreen() {
                   style={[
                     styles.themeOption,
                     { backgroundColor: optionTheme.colors.background },
-                    isSelected && { borderColor: theme.colors.primary, borderWidth: 3 },
+                    isSelected && { borderColor: theme.colors.primary },
                   ]}
                   onPress={() => handleThemeChange(option.id)}
                   activeOpacity={0.8}
                 >
                   <View style={[styles.themeIconWrap, { backgroundColor: optionTheme.colors.card }]}>
-                    <Ionicons
-                      name={option.icon}
-                      size={24}
-                      color={optionTheme.colors.primary}
-                    />
+                    <Ionicons name={option.icon} size={24} color={optionTheme.colors.primary} />
                   </View>
-                  <Text
-                    style={[
-                      styles.themeLabel,
-                      { color: optionTheme.colors.text },
-                    ]}
-                  >
+                  <Text style={[styles.themeLabel, { color: optionTheme.colors.text }]}>
                     {option.label}
                   </Text>
                   {isSelected && (
@@ -294,11 +410,8 @@ export function PersonalCenterScreen() {
 
         {/* Menu Sections */}
         {MENU_ITEMS.map((section) => (
-          <View
-            key={section.title}
-            style={[styles.section, { marginTop: 12 }]}
-          >
-            <Text style={styles.sectionTitle}>
+          <View key={section.title} style={[styles.section, { marginTop: 12 }]}>
+            <Text style={section.title === '危险操作' ? [styles.sectionTitle, { color: theme.colors.danger }] : styles.sectionTitle}>
               {section.title}
             </Text>
             {section.items.map((item, itemIndex) => (
@@ -335,11 +448,7 @@ export function PersonalCenterScreen() {
                     {item.value}
                   </Text>
                 ) : item.action ? (
-                  <Ionicons
-                    name="chevron-forward"
-                    size={18}
-                    color={theme.colors.textTertiary}
-                  />
+                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textTertiary} />
                 ) : null}
               </TouchableOpacity>
             ))}
