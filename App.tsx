@@ -19,6 +19,7 @@ import { OutfitEditorScreen } from './src/screens/outfit/OutfitEditorScreen';
 import { OutfitDetailScreen } from './src/screens/outfit/OutfitDetailScreen';
 import { EditOutfitScreen } from './src/screens/outfit/EditOutfitScreen';
 import { StatsDetailScreen } from './src/screens/StatsDetailScreen';
+import { StatsScreen } from './src/screens/StatsScreen';
 import { TrashScreen } from './src/screens/TrashScreen';
 import { SoldItemsScreen } from './src/screens/SoldItemsScreen';
 import { SoldItemEditScreen } from './src/screens/SoldItemEditScreen';
@@ -253,6 +254,14 @@ function AppNavigator() {
         <RootStack.Screen
           name="StatsDetail"
           component={StatsDetailScreen}
+          options={{
+            headerShown: false,
+            presentation: 'card',
+          }}
+        />
+        <RootStack.Screen
+          name="Stats"
+          component={StatsScreen}
           options={{
             headerShown: false,
             presentation: 'card',

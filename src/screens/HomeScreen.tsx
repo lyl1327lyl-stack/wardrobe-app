@@ -561,7 +561,7 @@ export function HomeScreen() {
         <TouchableOpacity
           style={styles.statsCard}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('StatsDetail' as any, { tab: 'efficiency' })}
+          onPress={() => navigation.navigate('Stats' as any)}
         >
           <View style={styles.statsHeader}>
             <View style={styles.statsHeaderLeft}>

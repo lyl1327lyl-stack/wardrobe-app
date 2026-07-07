@@ -282,7 +282,7 @@ export function PersonalCenterScreen() {
         (navigation as any).navigate('WardrobeManagement');
         break;
       case 'stats':
-        (navigation as any).navigate('StatsDetail');
+        (navigation as any).navigate('Stats');
         break;
       case 'export':
         handleExport();
