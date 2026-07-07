@@ -82,7 +82,7 @@ const makeStyles = (theme: Theme) =>
 export function StatsDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<RouteProp<RouteParams, 'StatsDetail'>>();
-  const { tab: initialTab, filterSeason, filterType } = route.params;
+  const { tab: initialTab = 'efficiency', filterSeason, filterType } = route.params || ({} as any);
 
   const { clothing, soldClothing } = useWardrobeStore();
   const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
