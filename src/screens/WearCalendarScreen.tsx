@@ -420,11 +420,10 @@ export function WearCalendarScreen() {
     }
   }, [viewMode, currentYear, yearCountMap, loadYearCountMap]);
 
+  // 月份切换时只重载当月数据；最近一周/今日连续在 useFocusEffect(reloadAll) 中刷新
   useEffect(() => {
     loadMonthData();
-    loadRecentWeek();
-    loadTodayAndStreak();
-  }, [loadMonthData, loadRecentWeek, loadTodayAndStreak]);
+  }, [loadMonthData]);
 
   const goToPrevMonth = () => {
     if (currentMonth === 1) {
@@ -562,6 +561,11 @@ export function WearCalendarScreen() {
             onNextMonth={goToNextMonth}
             outfitMatchMap={outfitMatchMap}
             cellTint={(dateStr, count) => tintForCount(count, theme.colors.primary)}
+            legendItems={[
+              { label: '少穿', color: theme.colors.primary + '22' },
+              { label: '多穿', color: theme.colors.primary + '66' },
+              { label: '今天', icon: 'star', iconColor: theme.colors.primary },
+            ]}
           />
         ) : (
           <View style={{ marginHorizontal: 20, backgroundColor: theme.colors.card, borderRadius: theme.borderRadius.lg, padding: 14, ...theme.shadows.sm }}>
