@@ -16,6 +16,13 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import * as wearRecordsDb from '../db/wearRecords';
 import { MonthCalendar, getDaysInMonth } from '../components/MonthCalendar';
 import { WearCalendarSheet } from '../components/WearCalendarSheet';
+import { TodayOutfitHero } from '../components/TodayOutfitHero';
+import { StreakProgressCard } from '../components/StreakProgressCard';
+import { YearHeatmap } from '../components/YearHeatmap';
+import { CalendarInsights } from '../components/CalendarInsights';
+import {
+  tintForCount, computeStreak, computeMonthProgress, computeInsights, getCurrentSeason, formatDate,
+} from '../utils/calendarStats';
 
 // 穿着记录 → ClothingItem（命中实时数据用实时，否则用记录里的缩略图回退）
 function recordToClothingItem(r: WearRecord, map: Map<number, ClothingItem>): ClothingItem {
@@ -265,6 +272,11 @@ export function WearCalendarScreen() {
   const [recentWeek, setRecentWeek] = useState<{ date: string; items: ClothingItem[] }[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showSheet, setShowSheet] = useState(false);
+  const [todayItems, setTodayItems] = useState<ClothingItem[]>([]);
+  const [streakDays, setStreakDays] = useState(0);
+  const [monthProgress, setMonthProgress] = useState({ recorded: 0, total: 0 });
+  const [yearCountMap, setYearCountMap] = useState<Record<string, number>>({});
+  const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
 
   const today = useMemo(() => {
     const d = new Date();
@@ -311,6 +323,15 @@ export function WearCalendarScreen() {
     return { wearingDays, uniqueItems, maxFreq, topItems };
   }, [wearData, allClothingMap]);
 
+  // 月度智能洞察（跟随当前查看月）
+  const insights = useMemo(() => {
+    return computeInsights({
+      wearData,
+      allClothingMap,
+      currentSeason: getCurrentSeason(),
+    });
+  }, [wearData, allClothingMap]);
+
   const loadMonthData = useCallback(async () => {
     const daysInMonth = getDaysInMonth(currentYear, currentMonth);
     const startDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`;
@@ -348,9 +369,40 @@ export function WearCalendarScreen() {
     setRecentWeek(result);
   }, [allClothingMap]);
 
+  // 加载"今天/连续/本月进度"相关数据（恒定指向今天所在月，不随翻页变）
+  const loadTodayAndStreak = useCallback(async () => {
+    const now = new Date();
+    const todayStr = formatDate(now);
+    // 近 60 天记录 → streak
+    const start60 = new Date(now); start60.setDate(start60.getDate() - 59);
+    const startStr = formatDate(start60);
+    const recs60 = await wearRecordsDb.getWearRecordsByDateRange(startStr, todayStr);
+    const recordedDates = new Set<string>();
+    const todayArr: ClothingItem[] = [];
+    for (const r of recs60) {
+      recordedDates.add(r.wornDate);
+      if (r.wornDate === todayStr) todayArr.push(recordToClothingItem(r, allClothingMap));
+    }
+    setTodayItems(todayArr);
+    setStreakDays(computeStreak(recordedDates, todayStr));
+    // 本月进度（today 所在月）
+    const prog = computeMonthProgress(recordedDates, now.getFullYear(), now.getMonth() + 1);
+    setMonthProgress(prog);
+  }, [allClothingMap]);
+
+  // 懒加载全年 countMap（仅切到「年」时调用）
+  const loadYearCountMap = useCallback(async (year: number) => {
+    const start = `${year}-01-01`;
+    const end = `${year}-12-31`;
+    const recs = await wearRecordsDb.getWearRecordsByDateRange(start, end);
+    const m: Record<string, number> = {};
+    for (const r of recs) m[r.wornDate] = (m[r.wornDate] || 0) + 1;
+    setYearCountMap(m);
+  }, []);
+
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadMonthData(), loadRecentWeek()]);
-  }, [loadMonthData, loadRecentWeek]);
+    await Promise.all([loadMonthData(), loadRecentWeek(), loadTodayAndStreak()]);
+  }, [loadMonthData, loadRecentWeek, loadTodayAndStreak]);
 
   useFocusEffect(
     useCallback(() => {
@@ -363,9 +415,16 @@ export function WearCalendarScreen() {
   }, []);
 
   useEffect(() => {
+    if (viewMode === 'year' && Object.keys(yearCountMap).length === 0) {
+      loadYearCountMap(currentYear);
+    }
+  }, [viewMode, currentYear, yearCountMap, loadYearCountMap]);
+
+  useEffect(() => {
     loadMonthData();
     loadRecentWeek();
-  }, [loadMonthData, loadRecentWeek]);
+    loadTodayAndStreak();
+  }, [loadMonthData, loadRecentWeek, loadTodayAndStreak]);
 
   const goToPrevMonth = () => {
     if (currentMonth === 1) {
@@ -460,16 +519,63 @@ export function WearCalendarScreen() {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        <MonthCalendar
-          year={currentYear}
-          month={currentMonth}
+        <TodayOutfitHero
+          items={todayItems}
           today={today}
-          wearData={wearData}
-          onSelectDate={handleDayPress}
-          onPrevMonth={goToPrevMonth}
-          onNextMonth={goToNextMonth}
-          outfitMatchMap={outfitMatchMap}
+          onPress={() => handleDayPress(today)}
+          onRecord={() => navigation.navigate('RecordWear' as any, { date: today })}
         />
+        <StreakProgressCard
+          streakDays={streakDays}
+          recorded={monthProgress.recorded}
+          total={monthProgress.total}
+        />
+
+        {/* 月/年 视图切换 */}
+        <View style={{ marginHorizontal: 16, marginTop: 16, marginBottom: 8, flexDirection: 'row', justifyContent: 'flex-end' }}>
+          <View style={{ flexDirection: 'row', backgroundColor: theme.colors.card, borderRadius: 8, padding: 3 }}>
+            {(['month', 'year'] as const).map(vm => (
+              <TouchableOpacity
+                key={vm}
+                onPress={() => setViewMode(vm)}
+                style={{
+                  paddingVertical: 5, paddingHorizontal: 14, borderRadius: 6,
+                  backgroundColor: viewMode === vm ? theme.colors.primary : 'transparent',
+                }}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', color: viewMode === vm ? '#fff' : theme.colors.textTertiary }}>
+                  {vm === 'month' ? '月' : '年'}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        {viewMode === 'month' ? (
+          <MonthCalendar
+            year={currentYear}
+            month={currentMonth}
+            today={today}
+            wearData={wearData}
+            onSelectDate={handleDayPress}
+            onPrevMonth={goToPrevMonth}
+            onNextMonth={goToNextMonth}
+            outfitMatchMap={outfitMatchMap}
+            cellTint={(dateStr, count) => tintForCount(count, theme.colors.primary)}
+          />
+        ) : (
+          <View style={{ marginHorizontal: 20, backgroundColor: theme.colors.card, borderRadius: theme.borderRadius.lg, padding: 14, ...theme.shadows.sm }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginBottom: 8 }}>
+              {currentYear}年 全年穿着
+            </Text>
+            <YearHeatmap
+              year={currentYear}
+              countMap={yearCountMap}
+              today={today}
+              onSelectDate={handleDayPress}
+            />
+          </View>
+        )}
 
         {/* 月度概览统计卡片（N3） */}
         {monthStats.wearingDays > 0 && (
@@ -520,6 +626,8 @@ export function WearCalendarScreen() {
             )}
           </View>
         )}
+
+        <CalendarInsights insights={insights} />
 
         {/* Recent Week Card（横排 7 列） */}
         <View style={styles.card}>
