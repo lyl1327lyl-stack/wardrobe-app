@@ -35,6 +35,8 @@ export interface MonthCalendarProps {
   outfitMatchMap?: Record<string, { outfitId: number; outfitName: string; outfitThumb: string; extraItemIds?: number[] }>;
   disableFuture?: boolean;
   legendItems?: LegendItem[];
+  /** 可选：按当天件数返回格子背景色（用于活跃度着色）。返回 undefined 则用默认样式。 */
+  cellTint?: (dateStr: string, count: number) => string | undefined;
 }
 
 export function getDaysInMonth(year: number, month: number): number {
@@ -188,6 +190,7 @@ export function MonthCalendar({
   outfitMatchMap,
   disableFuture,
   legendItems,
+  cellTint,
 }: MonthCalendarProps) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -238,6 +241,9 @@ export function MonthCalendar({
           !isSunday && { marginRight: CELL_MARGIN },
           { marginBottom: CELL_MARGIN },
           showOutfitThumb && { overflow: 'hidden' },
+          cellTint && !isToday && hasRecords && cellTint(dateStr, dayRecords.length)
+            ? { backgroundColor: cellTint(dateStr, dayRecords.length) }
+            : null,
         ]}
         onPress={() => { if (!isFutureDisabled) onSelectDate(dateStr); }}
         disabled={isFutureDisabled}
