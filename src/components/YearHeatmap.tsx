@@ -19,40 +19,41 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
 
-  const months = [];
+  const months: React.ReactNode[] = [];
   for (let m = 1; m <= 12; m++) {
     const daysInMonth = new Date(year, m, 0).getDate();
     const cols = Math.ceil(daysInMonth / 7);
-    const cells = [];
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      const count = countMap[dateStr] || 0;
-      const isFuture = dateStr > today;
-      const bg = isFuture ? theme.colors.borderLight : (tintForCount(count, theme.colors.primary) || theme.colors.borderLight);
-      const isToday = dateStr === today;
-      cells.push(
-        <TouchableOpacity
-          key={dateStr}
-          disabled={isFuture}
-          onPress={() => onSelectDate(dateStr)}
-          style={[styles.cell, { backgroundColor: bg }, isToday && styles.cellToday]}
-        />
-      );
-      // 补齐最后一列空白
-      const isLastInMonth = day === daysInMonth;
-      const cellsInLastCol = daysInMonth - (cols - 1) * 7;
-      if (isLastInMonth) {
-        for (let p = 0; p < 7 - cellsInLastCol; p++) {
-          cells.push(<View key={`pad-${m}-${p}`} style={[styles.cell, styles.cellPad]} />);
+    const columns: React.ReactNode[] = [];
+    for (let c = 0; c < cols; c++) {
+      const colCells: React.ReactNode[] = [];
+      for (let r = 0; r < 7; r++) {
+        const day = c * 7 + r + 1;
+        if (day > daysInMonth) {
+          colCells.push(<View key={`pad-${m}-${c}-${r}`} style={[styles.cell, styles.cellPad]} />);
+          continue;
         }
+        const dateStr = `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const count = countMap[dateStr] || 0;
+        const isFuture = dateStr > today;
+        const bg = isFuture
+          ? theme.colors.borderLight
+          : (tintForCount(count, theme.colors.primary) || theme.colors.borderLight);
+        const isToday = dateStr === today;
+        colCells.push(
+          <TouchableOpacity
+            key={dateStr}
+            disabled={isFuture}
+            onPress={() => onSelectDate(dateStr)}
+            style={[styles.cell, { backgroundColor: bg }, isToday && styles.cellToday]}
+          />
+        );
       }
+      columns.push(<View key={`col-${m}-${c}`} style={styles.gridCol}>{colCells}</View>);
     }
     months.push(
       <View key={m} style={styles.monthBlock}>
         <Text style={styles.monthLabel}>{MONTH_LABELS[m - 1]}</Text>
-        <View style={[styles.grid, { flexDirection: 'column', flexWrap: 'wrap', alignContent: 'flex-start' }]}>
-          {cells}
-        </View>
+        <View style={styles.gridRow}>{columns}</View>
       </View>
     );
   }
@@ -82,7 +83,8 @@ const makeStyles = (theme: Theme) =>
     legendText: { fontSize: 9, color: theme.colors.textTertiary },
     monthBlock: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
     monthLabel: { fontSize: 11, fontWeight: '600', color: theme.colors.textSecondary, width: 30, marginTop: 2 },
-    grid: { width: 7 * 16, height: undefined }, // 7 行 × (cell+gap)
+    gridRow: { flexDirection: 'row' },
+    gridCol: { flexDirection: 'column' },
     cell: { width: 13, height: 13, borderRadius: 3, margin: 1.5 },
     cellPad: { backgroundColor: 'transparent' },
     cellToday: { borderWidth: 2, borderColor: theme.colors.primary },
