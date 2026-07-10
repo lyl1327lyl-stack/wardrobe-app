@@ -61,13 +61,18 @@ export function computeMonthProgress(
   return { recorded, total };
 }
 
+export interface IdleItem {
+  itemId: number;
+  thumb: string;
+  name: string;
+  days: number;
+}
+
 export interface Insight {
   emoji: string;
   text: string;
-  /** 闲置提醒关联的衣物 id（仅 idle 洞察有），用于缩略图展示与点击跳转 */
-  itemId?: number;
-  /** 闲置提醒关联的衣物缩略图（仅 idle 洞察有） */
-  thumb?: string;
+  /** 闲置提醒：当季最久未穿的衣物（最多3件），用于缩略图展示与点击跳转 */
+  items?: IdleItem[];
 }
 
 /**
@@ -118,23 +123,25 @@ export function computeInsights(opts: {
     out.push({ emoji: '📅', text: `周末穿搭比工作日丰富 ${Math.round(weAvg / wdAvg)} 倍` });
   }
 
-  // 3. 闲置提醒（当季、超过 warnDays 未穿的最久一件）
+  // 3. 闲置提醒（仅当季、超过 warnDays 未穿）Top 3
   const now = new Date();
-  let worst: { item: ClothingItem; days: number } | null = null;
+  const idle: { item: ClothingItem; days: number }[] = [];
   for (const c of allClothingMap.values()) {
     if (!c.lastWornAt) continue;
+    // 只统计当季衣物
     if (!c.seasons || !c.seasons.includes(currentSeason)) continue;
     const days = Math.floor((now.getTime() - new Date(c.lastWornAt).getTime()) / 86400000);
-    if (days > warnDays && (!worst || days > worst.days)) worst = { item: c, days };
+    if (days > warnDays) idle.push({ item: c, days });
   }
-  if (worst) {
-    const name = worst.item.type || worst.item.remarks || '该衣物';
-    out.push({
-      emoji: '💤',
-      text: `${name} 已 ${worst.days} 天没穿`,
-      itemId: worst.item.id,
-      thumb: worst.item.thumbnailUri || worst.item.imageUri,
-    });
+  if (idle.length > 0) {
+    idle.sort((a, b) => b.days - a.days);
+    const items = idle.slice(0, 3).map(({ item, days }) => ({
+      itemId: item.id,
+      thumb: item.thumbnailUri || item.imageUri,
+      name: item.type || item.remarks || '该衣物',
+      days,
+    }));
+    out.push({ emoji: '💤', text: '当季闲置未穿', items });
   }
 
   return out.slice(0, 3);
