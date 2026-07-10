@@ -197,9 +197,9 @@ export function WearCalendarScreen() {
   const [yearCountMap, setYearCountMap] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
   const [calendarHeight, setCalendarHeight] = useState(0);
-  // 年视图格子大小：根据月视图实测高度计算，填满卡片；夹在 16~44 之间
+  // 年视图格子大小：2 条半年带 = 14 行；夹在 13~22 之间
   const yearCellSize = calendarHeight > 0
-    ? Math.min(44, Math.max(16, Math.floor((calendarHeight - 89) / 7) - 2))
+    ? Math.min(22, Math.max(13, Math.floor((calendarHeight - 120) / 14) - 2))
     : 16;
 
   const today = useMemo(() => {
