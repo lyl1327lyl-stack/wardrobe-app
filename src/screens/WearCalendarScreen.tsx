@@ -104,95 +104,8 @@ const makeStyles = (theme: Theme) =>
     },
 
     // Card
-    card: {
-      marginHorizontal: 20,
-      marginTop: 16,
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.lg,
-      padding: 18,
-      ...theme.shadows.sm,
-    },
-    cardHeader: {
-      flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14,
-    },
     cardDot: {
       width: 6, height: 6, borderRadius: 3, backgroundColor: theme.colors.primary,
-    },
-    cardTitle: {
-      fontSize: 14, fontWeight: '600', color: theme.colors.text,
-    },
-
-    // 最近一周（横排 7 列）
-    recentWeekRow: {
-      flexDirection: 'row',
-      gap: 6,
-    },
-    recentDayCol: {
-      flex: 1,
-      alignItems: 'center',
-      gap: 5,
-      paddingVertical: 8,
-      borderRadius: 10,
-      backgroundColor: theme.colors.background,
-    },
-    recentDayLabel: {
-      fontSize: 11,
-      fontWeight: '600',
-      color: theme.colors.text,
-    },
-    recentDayLabelToday: {
-      color: theme.colors.primary,
-    },
-    recentDayLabelWeekend: {
-      color: theme.colors.accent,
-    },
-    recentDayLabelEmpty: {
-      color: theme.colors.textTertiary,
-      fontWeight: '500',
-    },
-    recentDayThumbs: {
-      flexDirection: 'column',
-      alignItems: 'center',
-      gap: 3,
-      minHeight: 60,
-      justifyContent: 'center',
-    },
-    recentDayThumbWrap: {
-      width: 30,
-      height: 30,
-      borderRadius: 6,
-      overflow: 'hidden',
-    },
-    recentDayThumb: {
-      width: 30,
-      height: 30,
-      borderRadius: 6,
-      backgroundColor: theme.colors.borderLight,
-    },
-    recentDayMore: {
-      position: 'absolute',
-      bottom: 0,
-      right: 0,
-      backgroundColor: theme.colors.primary,
-      borderRadius: 7,
-      paddingHorizontal: 3,
-      minWidth: 14,
-      alignItems: 'center',
-    },
-    recentDayMoreText: {
-      fontSize: 8,
-      color: theme.colors.white,
-      fontWeight: '700',
-    },
-    recentDayEmptyDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: theme.colors.border,
-    },
-    recentDayCount: {
-      fontSize: 9,
-      color: theme.colors.textTertiary,
     },
     // 月度概览统计卡片（N3）
     statsCard: {
@@ -269,7 +182,6 @@ export function WearCalendarScreen() {
   const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
   const [wearData, setWearData] = useState<Record<string, ClothingItem[]>>({});
-  const [recentWeek, setRecentWeek] = useState<{ date: string; items: ClothingItem[] }[]>([]);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showSheet, setShowSheet] = useState(false);
   const [todayItems, setTodayItems] = useState<ClothingItem[]>([]);
@@ -346,29 +258,6 @@ export function WearCalendarScreen() {
     setWearData(newData);
   }, [currentYear, currentMonth, allClothingMap]);
 
-  const loadRecentWeek = useCallback(async () => {
-    const now = new Date();
-    const start = new Date(now);
-    start.setDate(start.getDate() - 6);
-    const startDate = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-${String(start.getDate()).padStart(2, '0')}`;
-    const endDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    // 单次范围查询替代逐天查询（N10）
-    const allRecords = await wearRecordsDb.getWearRecordsByDateRange(startDate, endDate);
-    const byDate = new Map<string, ClothingItem[]>();
-    for (const r of allRecords) {
-      if (!byDate.has(r.wornDate)) byDate.set(r.wornDate, []);
-      byDate.get(r.wornDate)!.push(recordToClothingItem(r, allClothingMap));
-    }
-    const result: { date: string; items: ClothingItem[] }[] = [];
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
-      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      result.push({ date: dateStr, items: byDate.get(dateStr) || [] });
-    }
-    setRecentWeek(result);
-  }, [allClothingMap]);
-
   // 加载"今天/连续/本月进度"相关数据（恒定指向今天所在月，不随翻页变）
   const loadTodayAndStreak = useCallback(async () => {
     const now = new Date();
@@ -401,8 +290,8 @@ export function WearCalendarScreen() {
   }, []);
 
   const reloadAll = useCallback(async () => {
-    await Promise.all([loadMonthData(), loadRecentWeek(), loadTodayAndStreak()]);
-  }, [loadMonthData, loadRecentWeek, loadTodayAndStreak]);
+    await Promise.all([loadMonthData(), loadTodayAndStreak()]);
+  }, [loadMonthData, loadTodayAndStreak]);
 
   useFocusEffect(
     useCallback(() => {
@@ -477,19 +366,6 @@ export function WearCalendarScreen() {
     if (dateStr === yesterdayStr) return '昨天';
     const weekDays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
     return `${d.getMonth() + 1}/${d.getDate()} ${weekDays[d.getDay()]}`;
-  };
-
-  // 紧凑标签（横排用）：今天 / 昨天 / 周X
-  const getDayShortLabel = (dateStr: string) => {
-    const now = new Date();
-    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
-    if (dateStr === todayStr) return '今天';
-    if (dateStr === yesterdayStr) return '昨天';
-    const weekDays = ['日', '一', '二', '三', '四', '五', '六'];
-    return `周${weekDays[new Date(dateStr).getDay()]}`;
   };
 
   return (
@@ -632,69 +508,6 @@ export function WearCalendarScreen() {
         )}
 
         <CalendarInsights insights={insights} />
-
-        {/* Recent Week Card（横排 7 列） */}
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.cardDot} />
-            <Text style={styles.cardTitle}>最近一周</Text>
-          </View>
-          <View style={styles.recentWeekRow}>
-            {recentWeek.map(({ date: dateStr, items }) => {
-              const d = new Date(dateStr);
-              const isWeekend = d.getDay() === 0 || d.getDay() === 6;
-              return (
-                <TouchableOpacity
-                  key={dateStr}
-                  style={styles.recentDayCol}
-                  onPress={() => handleDayPress(dateStr)}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.recentDayLabel,
-                      dateStr === today && styles.recentDayLabelToday,
-                      isWeekend && dateStr !== today && styles.recentDayLabelWeekend,
-                      items.length === 0 && styles.recentDayLabelEmpty,
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {getDayShortLabel(dateStr)}
-                  </Text>
-                  <View style={styles.recentDayThumbs}>
-                    {items.length === 0 ? (
-                      <View style={styles.recentDayEmptyDot} />
-                    ) : (
-                      items.slice(0, 3).map((item, idx) => (
-                        <View key={item.id} style={styles.recentDayThumbWrap}>
-                          {(item.thumbnailUri || item.imageUri) ? (
-                            <Image
-                              source={{ uri: item.thumbnailUri || item.imageUri }}
-                              style={styles.recentDayThumb}
-                              resizeMode="cover"
-                            />
-                          ) : (
-                            <View style={[styles.recentDayThumb, { justifyContent: 'center', alignItems: 'center' }]}>
-                              <Ionicons name="shirt-outline" size={10} color={theme.colors.textTertiary} />
-                            </View>
-                          )}
-                          {idx === 2 && items.length > 3 && (
-                            <View style={styles.recentDayMore}>
-                              <Text style={styles.recentDayMoreText}>+{items.length - 3}</Text>
-                            </View>
-                          )}
-                        </View>
-                      ))
-                    )}
-                  </View>
-                  {items.length > 0 && (
-                    <Text style={styles.recentDayCount}>{items.length}件</Text>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </View>
       </ScrollView>
 
       {/* 日期详情 Sheet */}
