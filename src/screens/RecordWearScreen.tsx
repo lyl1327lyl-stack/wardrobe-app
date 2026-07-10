@@ -62,12 +62,12 @@ const makeStyles = (theme: Theme) =>
     headerTitle: {
       fontSize: 17, fontWeight: '600', color: theme.colors.text,
     },
-    headerTitleWrap: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      alignItems: 'center',
-      justifyContent: 'center',
+    headerSide: {
+      flex: 1,
+      alignItems: 'flex-start',
+    },
+    headerSideRight: {
+      alignItems: 'flex-end',
     },
     dateBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 4,
@@ -282,15 +282,14 @@ const makeStyles = (theme: Theme) =>
     },
     selectedThumbRemove: {
       position: 'absolute',
-      top: -6,
-      right: -6,
-      width: 20,
-      height: 20,
-      borderRadius: 10,
+      top: 3,
+      right: 3,
+      width: 18,
+      height: 18,
+      borderRadius: 9,
       backgroundColor: theme.colors.danger,
       justifyContent: 'center',
       alignItems: 'center',
-      ...theme.shadows.sm,
     },
     footerCountBadge: {
       minWidth: 26,
@@ -634,13 +633,14 @@ export function RecordWearScreen() {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleWrap} pointerEvents="none">
-          <Text style={styles.headerTitle}>记录穿搭</Text>
+        <View style={styles.headerSide}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
+        <Text style={styles.headerTitle}>记录穿搭</Text>
+        <View style={[styles.headerSide, styles.headerSideRight]}>
+          <TouchableOpacity
           style={styles.dateBtn}
           onPress={() => {
             const d = new Date(selectedDate);
@@ -654,6 +654,7 @@ export function RecordWearScreen() {
           <Text style={styles.dateBtnText}>{formatDateLabel(selectedDate)}</Text>
           <Ionicons name="chevron-down" size={12} color={theme.colors.primary} />
         </TouchableOpacity>
+        </View>
       </View>
 
       {/* Mode toggle */}
