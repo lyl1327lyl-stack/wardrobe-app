@@ -13,50 +13,47 @@ interface Props {
   onSelectDate: (dateStr: string) => void;
 }
 
-const MONTH_LABELS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+interface Cell { dateStr: string; month: number; day: number; firstOfMonth: boolean; }
 
 export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
 
-  const months: React.ReactNode[] = [];
-  for (let m = 1; m <= 12; m++) {
-    const daysInMonth = new Date(year, m, 0).getDate();
-    const cols = Math.ceil(daysInMonth / 7);
-    const columns: React.ReactNode[] = [];
-    for (let c = 0; c < cols; c++) {
-      const colCells: React.ReactNode[] = [];
-      for (let r = 0; r < 7; r++) {
-        const day = c * 7 + r + 1;
-        if (day > daysInMonth) {
-          colCells.push(<View key={`pad-${m}-${c}-${r}`} style={[styles.cell, styles.cellPad]} />);
-          continue;
-        }
-        const dateStr = `${year}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const count = countMap[dateStr] || 0;
-        const isFuture = dateStr > today;
-        const bg = isFuture
-          ? theme.colors.borderLight
-          : (tintForCount(count, theme.colors.primary) || theme.colors.borderLight);
-        const isToday = dateStr === today;
-        colCells.push(
-          <TouchableOpacity
-            key={dateStr}
-            disabled={isFuture}
-            onPress={() => onSelectDate(dateStr)}
-            style={[styles.cell, { backgroundColor: bg }, isToday && styles.cellToday]}
-          />
-        );
-      }
-      columns.push(<View key={`col-${m}-${c}`} style={styles.gridCol}>{colCells}</View>);
-    }
-    months.push(
-      <View key={m} style={styles.monthBlock}>
-        <Text style={styles.monthLabel}>{MONTH_LABELS[m - 1]}</Text>
-        <View style={styles.gridRow}>{columns}</View>
-      </View>
-    );
+  // 构建 GitHub 风格连续网格：列=周，行=周一..周日（周一起）
+  const firstMon = (new Date(year, 0, 1).getDay() + 6) % 7; // 0=周一
+  const daysInYear = Math.floor((+new Date(year, 11, 31) - +new Date(year, 0, 1)) / 86400000) + 1;
+  const numCols = Math.ceil((daysInYear + firstMon) / 7);
+  const grid: (Cell | null)[][] = Array.from({ length: numCols }, () =>
+    Array<Cell | null>(7).fill(null)
+  );
+  for (let off = 0; off < daysInYear; off++) {
+    const d = new Date(year, 0, 1 + off);
+    const col = Math.floor((off + firstMon) / 7);
+    const row = (off + firstMon) % 7;
+    grid[col][row] = {
+      dateStr: `${year}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`,
+      month: d.getMonth() + 1,
+      day: d.getDate(),
+      firstOfMonth: d.getDate() === 1,
+    };
   }
+  // 每列顶部月份标签：列内首个"某月1号"显示该月
+  const colLabels: string[] = grid.map((col) => {
+    for (const cell of col) {
+      if (cell && cell.firstOfMonth) return `${cell.month}月`;
+    }
+    return '';
+  });
+  // 今天所在列（用于初始滚动定位）
+  const todayCol = (() => {
+    if (!today.startsWith(`${year}-`)) return -1;
+    const [ty, tm, td] = today.split('-').map(Number);
+    const t = new Date(ty, tm - 1, td);
+    const off = Math.round((+t - +new Date(year, 0, 1)) / 86400000);
+    if (off < 0 || off >= daysInYear) return -1;
+    return Math.floor((off + firstMon) / 7);
+  })();
+  const initialX = todayCol >= 0 ? Math.max(todayCol * 15 - 40, 0) : 0;
 
   return (
     <View style={styles.wrap}>
@@ -68,8 +65,39 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
         <View style={[styles.legendCell, { backgroundColor: theme.colors.primary + '66' }]} />
         <Text style={styles.legendText}>多</Text>
       </View>
-      <ScrollView style={{ maxHeight: 360 }} showsVerticalScrollIndicator={false}>
-        {months}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentOffset={{ x: initialX, y: 0 }}
+      >
+        <View style={styles.grid}>
+          {grid.map((col, ci) => (
+            <View key={ci} style={styles.col}>
+              <View style={styles.labelBox}>
+                <Text style={styles.labelText} numberOfLines={1}>{colLabels[ci]}</Text>
+              </View>
+              {col.map((cell, ri) => {
+                if (!cell) {
+                  return <View key={ri} style={[styles.cell, styles.cellPad]} />;
+                }
+                const count = countMap[cell.dateStr] || 0;
+                const isFuture = cell.dateStr > today;
+                const bg = isFuture
+                  ? theme.colors.borderLight
+                  : (tintForCount(count, theme.colors.primary) || theme.colors.borderLight);
+                const isToday = cell.dateStr === today;
+                return (
+                  <TouchableOpacity
+                    key={ri}
+                    disabled={isFuture}
+                    onPress={() => onSelectDate(cell.dateStr)}
+                    style={[styles.cell, { backgroundColor: bg }, isToday && styles.cellToday]}
+                  />
+                );
+              })}
+            </View>
+          ))}
+        </View>
       </ScrollView>
     </View>
   );
@@ -77,15 +105,15 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
 
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
-    wrap: { paddingHorizontal: 4, paddingTop: 6 },
+    wrap: { paddingTop: 6 },
     legendRow: { flexDirection: 'row', alignItems: 'center', gap: 4, justifyContent: 'flex-end', marginBottom: 8 },
     legendCell: { width: 10, height: 10, borderRadius: 2 },
     legendText: { fontSize: 9, color: theme.colors.textTertiary },
-    monthBlock: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 10 },
-    monthLabel: { fontSize: 11, fontWeight: '600', color: theme.colors.textSecondary, width: 30, marginTop: 2 },
-    gridRow: { flexDirection: 'row' },
-    gridCol: { flexDirection: 'column' },
-    cell: { width: 13, height: 13, borderRadius: 3, margin: 1.5 },
+    grid: { flexDirection: 'row' },
+    col: { flexDirection: 'column', marginHorizontal: 1 },
+    labelBox: { height: 14, justifyContent: 'center' },
+    labelText: { fontSize: 9, fontWeight: '600', color: theme.colors.textSecondary },
+    cell: { width: 13, height: 13, borderRadius: 3, marginVertical: 1 },
     cellPad: { backgroundColor: 'transparent' },
     cellToday: { borderWidth: 2, borderColor: theme.colors.primary },
   });
