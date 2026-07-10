@@ -37,6 +37,8 @@ export interface MonthCalendarProps {
   legendItems?: LegendItem[];
   /** 可选：按当天件数返回格子背景色（用于活跃度着色）。返回 undefined 则用默认样式。 */
   cellTint?: (dateStr: string, count: number) => string | undefined;
+  /** 可选：卡片布局后回调其高度（用于让其他视图对齐此高度） */
+  onCardLayout?: (height: number) => void;
 }
 
 export function getDaysInMonth(year: number, month: number): number {
@@ -191,6 +193,7 @@ export function MonthCalendar({
   disableFuture,
   legendItems,
   cellTint,
+  onCardLayout,
 }: MonthCalendarProps) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
@@ -322,7 +325,7 @@ export function MonthCalendar({
   }
 
   return (
-    <View style={styles.card}>
+    <View style={styles.card} onLayout={(e) => onCardLayout?.(e.nativeEvent.layout.height)}>
       <View style={styles.monthNav}>
         <TouchableOpacity style={styles.monthBtn} onPress={onPrevMonth} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={20} color={theme.colors.text} />

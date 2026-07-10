@@ -11,13 +11,16 @@ interface Props {
   countMap: Record<string, number>;
   today: string;
   onSelectDate: (dateStr: string) => void;
+  /** 单格尺寸（宽=高）。不传则默认 16。 */
+  cellSize?: number;
 }
 
 interface Cell { dateStr: string; month: number; day: number; firstOfMonth: boolean; }
 
-export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
+export function YearHeatmap({ year, countMap, today, onSelectDate, cellSize }: Props) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
+  const cs = cellSize ?? 16;
 
   // 构建 GitHub 风格连续网格：列=周，行=周一..周日（周一起）
   const firstMon = (new Date(year, 0, 1).getDay() + 6) % 7; // 0=周一
@@ -53,7 +56,7 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
     if (off < 0 || off >= daysInYear) return -1;
     return Math.floor((off + firstMon) / 7);
   })();
-  const initialX = todayCol >= 0 ? Math.max(todayCol * 15 - 40, 0) : 0;
+  const initialX = todayCol >= 0 ? Math.max(todayCol * (cs + 2) - 40, 0) : 0;
 
   return (
     <View style={styles.wrap}>
@@ -76,7 +79,7 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
               </View>
               {col.map((cell, ri) => {
                 if (!cell) {
-                  return <View key={ri} style={[styles.cell, styles.cellPad]} />;
+                  return <View key={ri} style={[styles.cell, { width: cs, height: cs }, styles.cellPad]} />;
                 }
                 const count = countMap[cell.dateStr] || 0;
                 const isFuture = cell.dateStr > today;
@@ -89,7 +92,7 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
                     key={ri}
                     disabled={isFuture}
                     onPress={() => onSelectDate(cell.dateStr)}
-                    style={[styles.cell, { backgroundColor: bg }, isToday && styles.cellToday]}
+                    style={[styles.cell, { width: cs, height: cs }, { backgroundColor: bg }, isToday && styles.cellToday]}
                   />
                 );
               })}
@@ -111,7 +114,7 @@ const makeStyles = (theme: Theme) =>
     col: { flexDirection: 'column', marginHorizontal: 1 },
     labelBox: { height: 14, justifyContent: 'center' },
     labelText: { fontSize: 9, fontWeight: '600', color: theme.colors.textSecondary },
-    cell: { width: 13, height: 13, borderRadius: 3, marginVertical: 1 },
+    cell: { borderRadius: 3, marginVertical: 1 },
     cellPad: { backgroundColor: 'transparent' },
     cellToday: { borderWidth: 2, borderColor: theme.colors.primary },
   });

@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -195,6 +196,11 @@ export function WearCalendarScreen() {
   const [monthProgress, setMonthProgress] = useState({ recorded: 0, total: 0 });
   const [yearCountMap, setYearCountMap] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
+  const [calendarHeight, setCalendarHeight] = useState(0);
+  // 年视图格子大小：根据月视图实测高度计算，填满卡片；夹在 16~44 之间
+  const yearCellSize = calendarHeight > 0
+    ? Math.min(44, Math.max(16, Math.floor((calendarHeight - 89) / 7) - 2))
+    : 16;
 
   const today = useMemo(() => {
     const d = new Date();
@@ -453,9 +459,10 @@ export function WearCalendarScreen() {
               { label: '已穿着', color: theme.colors.primary + '40' },
               { label: '今天', icon: 'star', iconColor: theme.colors.primary },
             ]}
+            onCardLayout={setCalendarHeight}
           />
         ) : (
-          <View style={{ marginHorizontal: 20, backgroundColor: theme.colors.card, borderRadius: theme.borderRadius.lg, padding: 14, ...theme.shadows.sm }}>
+          <View style={{ marginHorizontal: 20, marginTop: 16, height: calendarHeight || undefined, backgroundColor: theme.colors.card, borderRadius: theme.borderRadius.lg, padding: 14, ...theme.shadows.sm }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginBottom: 8 }}>
               {currentYear}年 全年穿着
             </Text>
@@ -464,6 +471,7 @@ export function WearCalendarScreen() {
               countMap={yearCountMap}
               today={today}
               onSelectDate={handleDayPress}
+              cellSize={yearCellSize}
             />
           </View>
         )}
