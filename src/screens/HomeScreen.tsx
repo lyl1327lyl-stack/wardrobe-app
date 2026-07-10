@@ -9,6 +9,7 @@ import {
   Image,
   Dimensions,
   Alert,
+  Modal,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -28,6 +29,7 @@ import { getIdleItems, getActiveSeasons } from '../utils/calendarStats';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_H_PADDING * 2;
+const CAT_COLORS = ['#6B7FD7', '#E8B4A0', '#00B894', '#FDCB6E', '#A29BFE', '#74B9FF'];
 
 /** 温度区间 → 宜穿提示文字（固定映射） */
 function getTempHint(temp: number): string {
@@ -206,6 +208,30 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     marginTop: 2,
   },
 
+  // 类型占比迷你条
+  catBar: {
+    flexDirection: 'row',
+    height: 8,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginTop: 14,
+    backgroundColor: theme.colors.borderLight,
+  },
+  catSeg: {
+    height: 8,
+  },
+  // 衣橱下拉
+  dropdownOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' },
+  dropdownMenu: {
+    position: 'absolute', left: 20, top: 92,
+    backgroundColor: theme.colors.white, borderRadius: 14, paddingVertical: 6,
+    minWidth: 180, borderWidth: 1, borderColor: theme.colors.border,
+    shadowColor: theme.colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 12, elevation: 6,
+  },
+  dropdownItem: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 11, paddingHorizontal: 14 },
+  dropdownItemText: { flex: 1, fontSize: 14, fontWeight: '500', color: theme.colors.text },
+  dropdownItemActive: { color: theme.colors.primary, fontWeight: '700' },
+
   // ── Quick actions ──
   quickActions: {
     marginHorizontal: CARD_H_PADDING,
@@ -279,6 +305,7 @@ export function HomeScreen() {
 
   const clothing = useWardrobeStore(s => s.clothing);
   const outfits = useWardrobeStore(s => s.outfits);
+  const wardrobes = useWardrobeStore(s => s.wardrobes);
   const addWearRecords = useWardrobeStore(s => s.addWearRecords);
   const deleteWearRecordsByDate = useWardrobeStore(s => s.deleteWearRecordsByDate);
 
@@ -288,6 +315,17 @@ export function HomeScreen() {
   const [recLoading, setRecLoading] = useState(true);
   const [todayRecords, setTodayRecords] = useState<WearRecord[]>([]);
   const [showSurveySheet, setShowSurveySheet] = useState(false);
+  // 主页级衣橱范围（null = 全部衣橱；仅影响本页概况，不改动全局）
+  const [scopeWardrobeId, setScopeWardrobeId] = useState<number | null>(null);
+  const [showWardrobeDropdown, setShowWardrobeDropdown] = useState(false);
+
+  const scopedClothing = useMemo(
+    () => (scopeWardrobeId == null ? clothing : clothing.filter(c => c.wardrobeId === scopeWardrobeId)),
+    [clothing, scopeWardrobeId]
+  );
+  const scopeWardrobeName = scopeWardrobeId == null
+    ? '全部衣橱'
+    : (wardrobes.find(w => w.id === scopeWardrobeId)?.name || '衣橱');
 
   // 最近推荐过的单品 ID（有上限滑动窗口，避免集合膨胀导致新鲜度失效）
   const recentRecommendedIdsRef = useRef<number[]>([]);
@@ -310,23 +348,23 @@ export function HomeScreen() {
 
   const recommendation = recommendations[recIndex] || null;
 
-  // Category stats — dynamic from clothing data
+  // Category stats — dynamic from (scoped) clothing data
   const categoryStats = useMemo(() => {
     const counts: Record<string, number> = {};
-    clothing.forEach(c => {
+    scopedClothing.forEach(c => {
       const cat = c.parentType || '其他';
       counts[cat] = (counts[cat] || 0) + 1;
     });
     return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [clothing]);
+  }, [scopedClothing]);
 
-  const totalCount = clothing.length;
+  const totalCount = scopedClothing.length;
 
   const attributeTips = useMemo(() => analyzeAttributeGaps(clothing), [clothing]);
 
   // 统计扩展维度：总价、平均穿着、沉睡件数（沉睡口径与日历闲置一致：当季+在库+含从未穿）
   const wardrobeInsights = useMemo(() => {
-    const active = clothing.filter(c => !c.deletedAt);
+    const active = scopedClothing.filter(c => !c.deletedAt);
     const totalPrice = active.reduce((sum, c) => sum + (c.price || 0), 0);
     const avgWearCount = active.length > 0
       ? active.reduce((sum, c) => sum + (c.wearCount || 0), 0) / active.length
@@ -521,8 +559,8 @@ export function HomeScreen() {
     <View style={styles.container}>
       {/* ── 顶部导航（固定）── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerTitleRow} activeOpacity={0.7}>
-          <Text style={styles.headerTitle}>我的衣橱</Text>
+        <TouchableOpacity style={styles.headerTitleRow} activeOpacity={0.7} onPress={() => setShowWardrobeDropdown(true)}>
+          <Text style={styles.headerTitle}>{scopeWardrobeName}</Text>
           <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
         </TouchableOpacity>
         {weather && (
@@ -573,6 +611,18 @@ export function HomeScreen() {
               </View>
             ))}
           </View>
+
+          {/* 类型占比迷你条 */}
+          {totalCount > 0 && (
+            <View style={styles.catBar}>
+              {categoryStats.slice(0, 6).map(([cat, count], idx) => (
+                <View
+                  key={cat}
+                  style={[styles.catSeg, { flex: count, backgroundColor: CAT_COLORS[idx % CAT_COLORS.length] }]}
+                />
+              ))}
+            </View>
+          )}
 
           <View style={styles.statsDivider} />
 
@@ -671,6 +721,36 @@ export function HomeScreen() {
         onSave={handleSaveSurvey}
         initialPrefs={surveyPrefs}
       />
+
+      {/* 衣橱范围切换下拉 */}
+      <Modal visible={showWardrobeDropdown} transparent animationType="none" onRequestClose={() => setShowWardrobeDropdown(false)}>
+        <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setShowWardrobeDropdown(false)}>
+          <View style={styles.dropdownMenu}>
+            <TouchableOpacity
+              style={styles.dropdownItem}
+              onPress={() => { setScopeWardrobeId(null); setShowWardrobeDropdown(false); }}
+            >
+              <Ionicons name="layers-outline" size={16} color={scopeWardrobeId == null ? theme.colors.primary : theme.colors.textSecondary} />
+              <Text style={[styles.dropdownItemText, scopeWardrobeId == null && styles.dropdownItemActive]}>全部衣橱</Text>
+              {scopeWardrobeId == null && <Ionicons name="checkmark" size={16} color={theme.colors.primary} />}
+            </TouchableOpacity>
+            {wardrobes.map(w => {
+              const isActive = scopeWardrobeId === w.id;
+              return (
+                <TouchableOpacity
+                  key={w.id}
+                  style={styles.dropdownItem}
+                  onPress={() => { setScopeWardrobeId(w.id); setShowWardrobeDropdown(false); }}
+                >
+                  <Ionicons name="file-tray-full-outline" size={16} color={isActive ? theme.colors.primary : theme.colors.textSecondary} />
+                  <Text style={[styles.dropdownItemText, isActive && styles.dropdownItemActive]} numberOfLines={1}>{w.name}</Text>
+                  {isActive && <Ionicons name="checkmark" size={16} color={theme.colors.primary} />}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
     </View>
   );
