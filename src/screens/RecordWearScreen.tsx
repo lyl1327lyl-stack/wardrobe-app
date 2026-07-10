@@ -62,6 +62,13 @@ const makeStyles = (theme: Theme) =>
     headerTitle: {
       fontSize: 17, fontWeight: '600', color: theme.colors.text,
     },
+    headerTitleWrap: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     dateBtn: {
       flexDirection: 'row', alignItems: 'center', gap: 4,
       backgroundColor: theme.colors.primary + '15',
@@ -266,12 +273,24 @@ const makeStyles = (theme: Theme) =>
       borderRadius: 10,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      overflow: 'hidden',
       backgroundColor: theme.colors.background,
     },
     selectedThumb: {
       width: 46,
       height: 46,
+      borderRadius: 9,
+    },
+    selectedThumbRemove: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: theme.colors.danger,
+      justifyContent: 'center',
+      alignItems: 'center',
+      ...theme.shadows.sm,
     },
     footerCountBadge: {
       minWidth: 26,
@@ -618,7 +637,9 @@ export function RecordWearScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>记录穿搭</Text>
+        <View style={styles.headerTitleWrap} pointerEvents="none">
+          <Text style={styles.headerTitle}>记录穿搭</Text>
+        </View>
         <TouchableOpacity
           style={styles.dateBtn}
           onPress={() => {
@@ -790,6 +811,13 @@ export function RecordWearScreen() {
                       style={styles.selectedThumb}
                       resizeMode="cover"
                     />
+                    <TouchableOpacity
+                      style={styles.selectedThumbRemove}
+                      onPress={() => toggleItem(item.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="remove" size={13} color={theme.colors.white} />
+                    </TouchableOpacity>
                   </View>
                 ))}
               </ScrollView>
