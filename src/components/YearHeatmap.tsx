@@ -1,9 +1,11 @@
 // src/components/YearHeatmap.tsx
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { tintForCount } from '../utils/calendarStats';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface Props {
   year: number;
@@ -48,7 +50,9 @@ export function YearHeatmap({ year, countMap, today, cellSize }: Props) {
     }
     return '';
   });
-  const initialX = todayCol >= 0 ? Math.max(todayCol * (cs + 2) - 40, 0) : 0;
+  // 初始滚动定位：把今天所在列放到视口右侧，让最近约3个月的过去格子显示在范围内
+  const visibleW = SCREEN_WIDTH - 68; // 屏宽 - 左右卡片 margin/padding 近似
+  const initialX = todayCol >= 0 ? Math.max((todayCol + 1) * (cs + 2) - visibleW, 0) : 0;
 
   // 月度活跃：每月有穿着记录的天数
   const monthlyDays = Array(12).fill(0);
@@ -70,6 +74,7 @@ export function YearHeatmap({ year, countMap, today, cellSize }: Props) {
       </View>
 
       <ScrollView
+        key={String(year)}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentOffset={{ x: initialX, y: 0 }}

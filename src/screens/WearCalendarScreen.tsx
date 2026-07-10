@@ -196,6 +196,7 @@ export function WearCalendarScreen() {
   const [yearCountMap, setYearCountMap] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
   const [calendarHeight, setCalendarHeight] = useState(0);
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
 
   const today = useMemo(() => {
     const d = new Date();
@@ -311,11 +312,11 @@ export function WearCalendarScreen() {
   }, []);
 
   useEffect(() => {
-    // 每次切到年视图都重新拉取当年数据，保证月视图新增记录后立刻生效
+    // 每次切到年视图/切换年份都重新拉取该年数据，保证月视图新增记录后立刻生效
     if (viewMode === 'year') {
-      loadYearCountMap(currentYear);
+      loadYearCountMap(viewYear);
     }
-  }, [viewMode, currentYear, loadYearCountMap]);
+  }, [viewMode, viewYear, loadYearCountMap]);
 
   // 月份切换时只重载当月数据；最近一周/今日连续在 useFocusEffect(reloadAll) 中刷新
   useEffect(() => {
@@ -422,7 +423,10 @@ export function WearCalendarScreen() {
               return (
                 <TouchableOpacity
                   key={vm}
-                  onPress={() => setViewMode(vm)}
+                  onPress={() => {
+                    if (vm === 'year') setViewYear(currentYear);
+                    setViewMode(vm);
+                  }}
                   style={[styles.viewToggleBtn, active && styles.viewToggleBtnActive]}
                   activeOpacity={0.7}
                 >
@@ -459,11 +463,19 @@ export function WearCalendarScreen() {
           />
         ) : (
           <View style={{ marginHorizontal: 20, marginTop: 16, height: calendarHeight || undefined, backgroundColor: theme.colors.card, borderRadius: theme.borderRadius.lg, padding: 14, ...theme.shadows.sm }}>
-            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text, marginBottom: 8 }}>
-              {currentYear}年 全年穿着
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+              <TouchableOpacity onPress={() => setViewYear(y => y - 1)} activeOpacity={0.7} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="chevron-back" size={18} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text }}>
+                {viewYear}年 全年穿着
+              </Text>
+              <TouchableOpacity onPress={() => setViewYear(y => y + 1)} activeOpacity={0.7} style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="chevron-forward" size={18} color={theme.colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
             <YearHeatmap
-              year={currentYear}
+              year={viewYear}
               countMap={yearCountMap}
               today={today}
             />
