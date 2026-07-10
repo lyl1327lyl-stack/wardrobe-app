@@ -158,6 +158,12 @@ const makeStyles = (theme: Theme) =>
     statsEmpty: {
       fontSize: 12, color: theme.colors.textTertiary, textAlign: 'center', paddingVertical: 8,
     },
+    viewToggleOuter: { marginHorizontal: 16, marginTop: 16, marginBottom: 8, flexDirection: 'row', justifyContent: 'flex-end' },
+    viewToggle: { flexDirection: 'row', backgroundColor: theme.colors.background, borderRadius: 12, padding: 3, gap: 2, borderWidth: 1, borderColor: theme.colors.border },
+    viewToggleBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 6, paddingHorizontal: 12, borderRadius: 9 },
+    viewToggleBtnActive: { backgroundColor: theme.colors.primary, ...theme.shadows.sm },
+    viewToggleText: { fontSize: 12, fontWeight: '600', color: theme.colors.textTertiary },
+    viewToggleTextActive: { color: '#fff' },
   });
 
 export function WearCalendarScreen() {
@@ -407,22 +413,28 @@ export function WearCalendarScreen() {
         />
 
         {/* 月/年 视图切换 */}
-        <View style={{ marginHorizontal: 16, marginTop: 16, marginBottom: 8, flexDirection: 'row', justifyContent: 'flex-end' }}>
-          <View style={{ flexDirection: 'row', backgroundColor: theme.colors.card, borderRadius: 8, padding: 3 }}>
-            {(['month', 'year'] as const).map(vm => (
-              <TouchableOpacity
-                key={vm}
-                onPress={() => setViewMode(vm)}
-                style={{
-                  paddingVertical: 5, paddingHorizontal: 14, borderRadius: 6,
-                  backgroundColor: viewMode === vm ? theme.colors.primary : 'transparent',
-                }}
-              >
-                <Text style={{ fontSize: 12, fontWeight: '600', color: viewMode === vm ? '#fff' : theme.colors.textTertiary }}>
-                  {vm === 'month' ? '月' : '年'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+        <View style={styles.viewToggleOuter}>
+          <View style={styles.viewToggle}>
+            {(['month', 'year'] as const).map(vm => {
+              const active = viewMode === vm;
+              return (
+                <TouchableOpacity
+                  key={vm}
+                  onPress={() => setViewMode(vm)}
+                  style={[styles.viewToggleBtn, active && styles.viewToggleBtnActive]}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={vm === 'month' ? 'calendar-outline' : 'grid-outline'}
+                    size={13}
+                    color={active ? '#fff' : theme.colors.textTertiary}
+                  />
+                  <Text style={[styles.viewToggleText, active && styles.viewToggleTextActive]}>
+                    {vm === 'month' ? '月视图' : '年视图'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
