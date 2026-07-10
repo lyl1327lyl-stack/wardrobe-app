@@ -56,8 +56,8 @@ export function YearHeatmap({ year, countMap, today, onSelectDate, cellSize }: P
   const cs = cellSize ?? 16;
 
   const halves = [
-    { label: '上半年', ...buildHalf(year, 1, 6, today) },
-    { label: '下半年', ...buildHalf(year, 7, 12, today) },
+    buildHalf(year, 1, 6, today),
+    buildHalf(year, 7, 12, today),
   ];
 
   return (
@@ -72,7 +72,6 @@ export function YearHeatmap({ year, countMap, today, onSelectDate, cellSize }: P
         const initialX = half.todayCol >= 0 ? Math.max(half.todayCol * (cs + 2) - 40, 0) : 0;
         return (
           <View key={hi} style={styles.halfBlock}>
-            <Text style={styles.halfLabel}>{half.label}</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -121,7 +120,6 @@ const makeStyles = (theme: Theme) =>
     legendCell: { width: 10, height: 10, borderRadius: 2 },
     legendText: { fontSize: 9, color: theme.colors.textTertiary },
     halfBlock: { marginBottom: 10 },
-    halfLabel: { fontSize: 10, fontWeight: '600', color: theme.colors.textTertiary, marginBottom: 4 },
     grid: { flexDirection: 'row' },
     col: { flexDirection: 'column', marginHorizontal: 1 },
     labelBox: { height: 12, justifyContent: 'center' },
