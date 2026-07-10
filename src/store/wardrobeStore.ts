@@ -145,15 +145,21 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
   loadData: async () => {
     set({ isLoading: true });
     try {
-      const [clothing, trashClothing, soldClothing, draftClothing, outfits, groups] = await Promise.all([
+      const [clothing, trashClothing, soldClothing, draftClothing, outfits, groups, wardrobes] = await Promise.all([
         clothingDb.getAllClothing(),
         clothingDb.getTrashClothing(),
         clothingDb.getSoldClothing(),
         clothingDb.getDraftClothing(),
         outfitDb.getAllOutfits(),
         groupDb.getAllGroups(),
+        wardrobeDb.getAllWardrobes(),
       ]);
-      set({ clothing, trashClothing, soldClothing, draftClothing, outfits, groups, isLoading: false });
+      const defaultWardrobe = wardrobes.find(w => w.isDefault);
+      set({
+        clothing, trashClothing, soldClothing, draftClothing, outfits, groups, wardrobes,
+        currentWardrobeId: defaultWardrobe?.id ?? wardrobes[0]?.id ?? 1,
+        isLoading: false,
+      });
     } catch (error) {
       console.error('Failed to load data:', error);
       set({ isLoading: false });
@@ -292,7 +298,17 @@ export const useWardrobeStore = create<WardrobeState>((set, get) => ({
 
   clearAllClothing: async () => {
     await clothingDb.deleteAllClothing();
-    set({ clothing: [], trashClothing: [], soldClothing: [] });
+    await clothingDb.deleteAllDrafts();
+    await wearRecordsDb.deleteAllWearRecordsGlobal();
+    await outfitDb.deleteAllOutfits();
+    set({
+      clothing: [],
+      trashClothing: [],
+      soldClothing: [],
+      draftClothing: [],
+      outfits: [],
+      groups: [],
+    });
   },
 
   wearClothing: async (id) => {

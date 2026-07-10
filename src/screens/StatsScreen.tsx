@@ -1,10 +1,11 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useMemo, useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Modal } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
-import { Season } from '../types';
+import { Season, WearRecord } from '../types';
+import { getWearRecordsByDateRange } from '../db/wearRecords';
 import { useTheme } from '../hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../utils/theme';
@@ -19,8 +20,6 @@ const SEASON_CONFIG = [
 const TYPE_COLORS = ['#6B7FD7', '#E8B4A0', '#00B894', '#FDCB6E', '#A29BFE', '#74B9FF'];
 const RANK_BG_COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
 
-type FilterScope = 'all' | 'season' | 'type';
-
 const makeStyles = (theme: Theme) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: theme.colors.background },
@@ -30,18 +29,38 @@ const makeStyles = (theme: Theme) =>
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
     },
-    headerInner: {
-      height: 36,
-      justifyContent: 'center',
+    headerRow: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      height: 40,
     },
-    headerTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    headerAccent: { width: 4, height: 24, borderRadius: 2, backgroundColor: theme.colors.primary, marginRight: 10 },
-    titleRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-    title: { fontSize: 18, fontWeight: '700', color: theme.colors.text },
-    headerIcon: {
+    headerIconBtn: {
       width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.background,
       justifyContent: 'center', alignItems: 'center',
     },
+    headerTitleWrap: {
+      position: 'absolute', left: 60, right: 60, alignItems: 'center',
+    },
+    headerTitle: { fontSize: 17, fontWeight: '700', color: theme.colors.text },
+    wardrobePicker: {
+      flexDirection: 'row', alignItems: 'center', gap: 5,
+      paddingHorizontal: 12, height: 34, borderRadius: 17,
+      backgroundColor: theme.colors.primary + '14', borderWidth: 1, borderColor: theme.colors.primary + '30',
+      maxWidth: 140,
+    },
+    wardrobePickerText: { fontSize: 13, fontWeight: '600', color: theme.colors.primary, flexShrink: 1 },
+    // 衣橱下拉菜单
+    dropdownOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.25)' },
+    dropdownMenu: {
+      position: 'absolute', right: 12,
+      backgroundColor: theme.colors.card, borderRadius: 14, paddingVertical: 6,
+      minWidth: 160, ...theme.shadows.md, borderWidth: 1, borderColor: theme.colors.border,
+    },
+    dropdownItem: {
+      flexDirection: 'row', alignItems: 'center', gap: 10,
+      paddingVertical: 11, paddingHorizontal: 14,
+    },
+    dropdownItemText: { flex: 1, fontSize: 14, fontWeight: '500', color: theme.colors.text },
+    dropdownItemActive: { color: theme.colors.primary, fontWeight: '700' },
     subtitle: { fontSize: 14, color: theme.colors.textTertiary, marginTop: 6 },
     // 模块1: 筛选器+顶部4卡片 (合并为一个模块)
     filterStatsModule: {
@@ -49,36 +68,37 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.colors.card, borderRadius: 16, overflow: 'hidden',
       borderWidth: 1, borderColor: theme.colors.border,
     },
-    filterSection: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8, gap: 8 },
-    filterRow: { flexDirection: 'row', gap: 8 },
-    filterChip: {
-      flexDirection: 'row', alignItems: 'center', gap: 5,
-      paddingHorizontal: 14, paddingVertical: 8,
-      borderRadius: 20, backgroundColor: theme.colors.card,
-      borderWidth: 1, borderColor: theme.colors.border,
+    // 汇总条（始终显示）
+    summaryBar: {
+      flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+      paddingHorizontal: 14, paddingVertical: 10,
     },
-    filterChipActive: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-    filterChipText: { fontSize: 13, fontWeight: '500', color: theme.colors.textSecondary },
-    filterChipTextActive: { color: '#fff' },
-    filterSeasonRow: { flexDirection: 'row', gap: 8 },
-    seasonChip: {
-      flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-      paddingVertical: 8, borderRadius: 12, backgroundColor: theme.colors.card,
-      borderWidth: 1, borderColor: theme.colors.border, gap: 4,
+    summaryLeft: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, marginRight: 8 },
+    summaryBadge: {
+      minWidth: 20, height: 20, borderRadius: 10, paddingHorizontal: 5,
+      backgroundColor: theme.colors.primary,
+      alignItems: 'center', justifyContent: 'center',
     },
-    seasonChipActive: { borderColor: 'transparent' },
-    seasonChipText: { fontSize: 12, fontWeight: '500', color: theme.colors.textSecondary },
-    seasonChipTextActive: { color: '#fff' },
-    filterTypeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-    typeChip: {
-      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 10,
-      backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border,
+    summaryBadgeText: { fontSize: 11, fontWeight: '700', color: '#fff' },
+    summaryText: { fontSize: 13, fontWeight: '600', color: theme.colors.text, flexShrink: 1 },
+    summaryRight: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    summaryBtn: { flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 10, paddingVertical: 6 },
+    summaryBtnText: { fontSize: 13, fontWeight: '600', color: theme.colors.primary },
+    summaryBtnClear: { fontSize: 13, fontWeight: '600', color: theme.colors.textTertiary },
+    // 展开后的三维度筛选
+    filterExpanded: { paddingHorizontal: 14, paddingBottom: 12, gap: 12, borderTopWidth: 1, borderTopColor: theme.colors.border, paddingTop: 12 },
+    dimensionChips: { flexDirection: 'row', gap: 8, paddingVertical: 2 },
+    dimChip: {
+      flexDirection: 'row', alignItems: 'center', gap: 3,
+      paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16,
+      backgroundColor: theme.colors.background, borderWidth: 1, borderColor: theme.colors.border,
     },
-    typeChipActive: { borderColor: 'transparent' },
-    typeChipText: { fontSize: 12, fontWeight: '500', color: theme.colors.textSecondary },
-    typeChipTextActive: { color: '#fff' },
+    dimChipActiveAll: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
+    dimChipText: { fontSize: 12, fontWeight: '500', color: theme.colors.textSecondary },
+    dimChipTextActive: { color: '#fff', fontWeight: '600' },
+    dimChipTextActiveAll: { color: '#fff', fontWeight: '600' },
     // 顶部4卡片
-    statsRow: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+    statsRow: { flexDirection: 'row', gap: 8, marginVertical: 4 },
     statCard: {
       flex: 1, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 6,
       alignItems: 'center', backgroundColor: theme.colors.background,
@@ -196,12 +216,62 @@ const makeStyles = (theme: Theme) =>
       position: 'absolute', bottom: 0, left: 0, right: 0, height: 50,
       backgroundColor: theme.colors.card, opacity: 0.85,
     },
+    // 衣橱分析 section
+    analysisSection: {
+      backgroundColor: theme.colors.card, marginHorizontal: 16, marginTop: 12, borderRadius: 16,
+      padding: 16, marginBottom: 12, borderWidth: 1, borderColor: theme.colors.border,
+    },
+    analysisCard: {
+      backgroundColor: theme.colors.background, borderRadius: 12, padding: 14,
+      borderWidth: 1, borderColor: theme.colors.border, marginBottom: 12,
+    },
+    analysisCardNoBorder: { marginBottom: 0 },
+    analysisCardTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text, marginBottom: 16 },
+    analysisCardSubtitle: { fontSize: 11, color: theme.colors.textTertiary, marginTop: 2 },
+    // 闲置率
+    idleTop: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 12 },
+    idleBig: { fontSize: 34, fontWeight: '800', color: theme.colors.warning },
+    idleBigLabel: { fontSize: 12, color: theme.colors.textTertiary },
+    idleProgress: { flexDirection: 'row', height: 10, borderRadius: 5, overflow: 'hidden', backgroundColor: theme.colors.borderLight },
+    idleLegend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 10 },
+    idleLegendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+    idleLegendDot: { width: 9, height: 9, borderRadius: 3 },
+    idleLegendText: { fontSize: 11, color: theme.colors.textSecondary },
+    // 分布列表（颜色/品牌）
+    distRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 9 },
+    distDot: { width: 12, height: 12, borderRadius: 6 },
+    distRank: { width: 16, fontSize: 12, fontWeight: '700', color: theme.colors.textTertiary, textAlign: 'center' },
+    distName: { fontSize: 13, color: theme.colors.text, width: 56 },
+    distBarBg: { flex: 1, height: 8, borderRadius: 4, backgroundColor: theme.colors.borderLight, overflow: 'hidden' },
+    distBarFill: { height: 8, borderRadius: 4 },
+    distCount: { fontSize: 12, fontWeight: '600', color: theme.colors.textSecondary, width: 40, textAlign: 'right' },
+    // 穿着活跃度趋势
+    trendHeader: { flexDirection: 'row', alignItems: 'baseline', gap: 8, marginBottom: 12 },
+    trendTotal: { fontSize: 22, fontWeight: '800', color: theme.colors.primary },
+    trendTotalLabel: { fontSize: 11, color: theme.colors.textTertiary },
+    trendBarRow: { flexDirection: 'row', alignItems: 'flex-end', height: 112, gap: 8 },
+    trendBarCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+    trendBar: { width: '70%', borderRadius: 4, minHeight: 3 },
+    trendBarVal: { fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 3 },
+    trendBarLabel: { fontSize: 10, color: theme.colors.textTertiary, marginTop: 4 },
+    // 价格区间小柱状
+    priceBarRow: { flexDirection: 'row', alignItems: 'flex-end', height: 120, gap: 8 },
+    priceBarCol: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+    priceBar: { width: '70%', borderRadius: 4, minHeight: 3 },
+    priceBarVal: { fontSize: 11, fontWeight: '700', color: theme.colors.textSecondary, marginBottom: 3 },
+    priceBarLabel: { fontSize: 10, color: theme.colors.textTertiary, marginTop: 4 },
+    // 搭配概览 tiles
+    outfitTiles: { flexDirection: 'row' },
+    outfitTile: { flex: 1, alignItems: 'center' },
+    outfitTileVal: { fontSize: 20, fontWeight: '800', color: theme.colors.primary },
+    outfitTileLabel: { fontSize: 11, color: theme.colors.textTertiary, marginTop: 3 },
+    outfitTileDivider: { width: 1, backgroundColor: theme.colors.border, marginVertical: 2 },
     bottom: { height: 40 },
   });
 
 export function StatsScreen() {
   const navigation = useNavigation<any>();
-  const { clothing, soldClothing, trashClothing } = useWardrobeStore();
+  const { clothing, soldClothing, trashClothing, wardrobes, outfits, groups } = useWardrobeStore();
   const categories = useCustomOptionsStore(state => state.categories);
   const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
   const { theme } = useTheme();
@@ -209,14 +279,49 @@ export function StatsScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [statsTab, setStatsTab] = useState<'efficiency' | 'frequency' | 'warn' | 'companion'>('efficiency');
   const [warnDays, setWarnDays] = useState(30);
-  const [filterScope, setFilterScope] = useState<FilterScope>('all');
-  const [filterSeason, setFilterSeason] = useState<Season | null>(null);
-  const [filterType, setFilterType] = useState<string | null>(null);
+  // 页面级衣橱范围（null = 全部衣橱；默认选中默认衣橱）
+  const [scopeWardrobeId, setScopeWardrobeId] = useState<number | null>(null);
+  const [showWardrobeDropdown, setShowWardrobeDropdown] = useState(false);
   const [timeRange, setTimeRange] = useState<'month' | 'year'>('month');
   const [chartValueType, setChartValueType] = useState<'value' | 'count'>('value');
-  const [timelineYear, setTimelineYear] = useState(new Date().getFullYear());
-
   const currentYear = new Date().getFullYear();
+
+  // 衣橱加载后默认选中默认衣橱（"我的衣橱"）
+  useEffect(() => {
+    if (scopeWardrobeId != null) return;
+    const def = wardrobes.find(w => w.isDefault) || wardrobes[0];
+    if (def) setScopeWardrobeId(def.id);
+  }, [wardrobes, scopeWardrobeId]);
+
+  // 页面级衣橱范围过滤（应用到所有卡片）
+  const scopedClothing = useMemo(
+    () => (scopeWardrobeId == null ? clothing : clothing.filter(c => c.wardrobeId === scopeWardrobeId)),
+    [clothing, scopeWardrobeId]
+  );
+  const scopedTrash = useMemo(
+    () => (scopeWardrobeId == null ? trashClothing : trashClothing.filter(c => c.wardrobeId === scopeWardrobeId)),
+    [trashClothing, scopeWardrobeId]
+  );
+  const scopedSold = useMemo(
+    () => (scopeWardrobeId == null ? soldClothing : soldClothing.filter(c => c.wardrobeId === scopeWardrobeId)),
+    [soldClothing, scopeWardrobeId]
+  );
+
+  // 年份列表（基于购买记录，受衣橱范围约束）
+  const availableYears = useMemo(() => {
+    const years = new Set<number>();
+    const allItems = [...scopedClothing, ...scopedTrash, ...scopedSold];
+    allItems.forEach(item => {
+      if (item.purchaseDate) {
+        years.add(new Date(item.purchaseDate).getFullYear());
+      }
+    });
+    return [...years].sort((a, b) => b - a);
+  }, [scopedClothing, scopedTrash, scopedSold]);
+
+  const [timelineYear, setTimelineYear] = useState(
+    availableYears.length > 0 ? availableYears[0] : currentYear
+  );
   const currentSeason = useMemo((): Season => {
     const month = new Date().getMonth() + 1;
     if (month >= 3 && month <= 5) return '春';
@@ -227,23 +332,10 @@ export function StatsScreen() {
 
   const parentCategories = useMemo(() => Object.keys(categories), [categories]);
 
-  // 根据筛选条件过滤衣物
-  const filteredClothing = useMemo(() => {
-    return clothing.filter(item => {
-      if (filterScope === 'all') return true;
-      if (filterScope === 'season') {
-        if (!filterSeason) return true;
-        return item.seasons.includes(filterSeason);
-      }
-      if (filterScope === 'type') {
-        if (!filterType) return true;
-        return item.type === filterType;
-      }
-      return true;
-    });
-  }, [clothing, filterScope, filterSeason, filterType]);
+  // 统计基于衣橱范围（已移除季节/类型细分筛选）
+  const filteredClothing = scopedClothing;
 
-  // 统计计算 - 依赖 clothing 确保实时刷新
+  // 统计计算
   const stats = useMemo(() => {
     const total = filteredClothing.length;
     const byParent: Record<string, number> = {};
@@ -297,9 +389,9 @@ export function StatsScreen() {
       .sort((a, b) => b.daysOwned - a.daysOwned)
       .slice(0, 10);
 
-    // 全部购买时间按年（包含在库+废弃+卖出的衣物）
+    // 全部购买时间按年（在库+废弃+卖出，受衣橱范围约束）
     const timelineByYear: Record<string, { count: number; value: number }> = {};
-    const allItemsForTimeline = [...clothing, ...trashClothing, ...soldClothing];
+    const allItemsForTimeline = [...scopedClothing, ...scopedTrash, ...scopedSold];
     allItemsForTimeline.forEach(item => {
       if (item.purchaseDate) {
         const date = new Date(item.purchaseDate);
@@ -310,10 +402,10 @@ export function StatsScreen() {
       }
     });
 
-    // ROI（不跟随筛选，基于全部已卖出衣物）
-    const soldTotalBuy = soldClothing.reduce((sum, item) => sum + (item.price || 0), 0);
-    const soldTotalSell = soldClothing.reduce((sum, item) => sum + (item.soldPrice || 0), 0);
-    const soldCount = soldClothing.length;
+    // ROI（受衣橱范围约束）
+    const soldTotalBuy = scopedSold.reduce((sum, item) => sum + (item.price || 0), 0);
+    const soldTotalSell = scopedSold.reduce((sum, item) => sum + (item.soldPrice || 0), 0);
+    const soldCount = scopedSold.length;
     const soldProfit = soldTotalSell - soldTotalBuy;
     const soldRate = soldTotalBuy > 0 ? ((soldTotalSell / soldTotalBuy - 1) * 100) : 0;
 
@@ -323,7 +415,7 @@ export function StatsScreen() {
       timelineByYear,
       soldTotalBuy, soldTotalSell, soldCount, soldProfit, soldRate
     };
-  }, [clothing, filteredClothing, soldClothing, trashClothing, getParentOfChild, warnDays, currentSeason]);
+  }, [scopedClothing, scopedTrash, scopedSold, filteredClothing, getParentOfChild, warnDays, currentSeason]);
 
   // 月度购买数据 - 根据选择的年份筛选（包含在库+废弃+卖出的衣物）
   const monthlyData = useMemo(() => {
@@ -332,7 +424,7 @@ export function StatsScreen() {
     const now = new Date();
     const isCurrentYear = timelineYear === now.getFullYear();
     const maxMonth = isCurrentYear ? now.getMonth() + 1 : 12;
-    const allItems = [...clothing, ...trashClothing, ...soldClothing];
+    const allItems = [...scopedClothing, ...scopedTrash, ...scopedSold];
 
     for (let m = 1; m <= maxMonth; m++) {
       const monthClothing = allItems.filter(item => {
@@ -348,7 +440,7 @@ export function StatsScreen() {
       });
     }
     return result;
-  }, [clothing, trashClothing, soldClothing, timelineYear]);
+  }, [scopedClothing, scopedTrash, scopedSold, timelineYear]);
 
   // 年度购买数据
   const yearlyData = useMemo(() => {
@@ -362,142 +454,186 @@ export function StatsScreen() {
       .slice(0, 6);
   }, [stats.timelineByYear]);
 
-  // 可选的年份列表（基于有购买记录的年份）
-  const availableYears = useMemo(() => {
-    const years = new Set<number>();
-    const allItems = [...clothing, ...trashClothing, ...soldClothing];
-    allItems.forEach(item => {
-      if (item.purchaseDate) {
-        years.add(new Date(item.purchaseDate).getFullYear());
-      }
-    });
-    return [...years].sort((a, b) => b - a);
-  }, [clothing, trashClothing, soldClothing]);
+  // 可选年份已在顶部定义
 
   const avgWear = stats.total > 0 ? (stats.totalWear / stats.total).toFixed(1) : '0';
 
-  const formatCurrency = (value: number) => {
+  // 统一格式化金额
+  const fmtCurrency = (value: number) => {
     if (value >= 10000) return `¥${(value / 10000).toFixed(1)}万`;
-    return `¥${value.toLocaleString()}`;
+    if (value >= 1000) return `¥${(value / 1000).toFixed(0)}k`;
+    return `¥${value}`;
   };
+
+  // ============ 衣橱分析 ============
+  // 颜色名 -> 色值（用于颜色分布展示）
+  const colorHexOf = (name: string): string => {
+    const map: Record<string, string> = {
+      '黑': '#2B2B2B', '黑色': '#2B2B2B',
+      '白': '#EDEDED', '白色': '#EDEDED', '米白': '#F2EDE4',
+      '灰': '#9AA0A6', '灰色': '#9AA0A6', '浅灰': '#C9CDD2', '深灰': '#5F6368',
+      '红': '#E53935', '红色': '#E53935', '酒红': '#7B1E22',
+      '橙': '#FB8C00', '橙色': '#FB8C00', '橘': '#FB8C00', '橘色': '#FB8C00',
+      '黄': '#FDD835', '黄色': '#FDD835', '姜黄': '#D49B3C',
+      '绿': '#43A047', '绿色': '#43A047', '墨绿': '#1E5631', '军绿': '#5B6E3C', '薄荷绿': '#9FD8C6',
+      '蓝': '#1E88E5', '蓝色': '#1E88E5', '藏蓝': '#1A2A4F', '牛仔蓝': '#5A7DA0', '天蓝': '#7EC4E3',
+      '紫': '#8E24AA', '紫色': '#8E24AA',
+      '粉': '#EC8FBF', '粉色': '#EC8FBF', '裸粉': '#E6B8B0',
+      '棕': '#6D4C2E', '棕色': '#6D4C2E', '咖': '#6F4E37', '咖啡': '#6F4E37',
+      '卡其': '#BDBA8E', '驼': '#C19A6B', '驼色': '#C19A6B', '杏': '#D8B98A', '杏色': '#D8B98A',
+      '银': '#C0C4CC', '银色': '#C0C4CC',
+      '金': '#D4AF37', '金色': '#D4AF37',
+    };
+    if (map[name]) return map[name];
+    for (const key of Object.keys(map)) { if (name.includes(key)) return map[key]; }
+    return TYPE_COLORS[Math.abs(hashCode(name)) % TYPE_COLORS.length];
+  };
+  const hashCode = (s: string) => { let h = 0; for (let i = 0; i < s.length; i++) { h = (h << 5) - h + s.charCodeAt(i); h |= 0; } return h; };
+
+  // 闲置率（基于衣橱范围，不受季节/类型细分影响）
+  const idle = useMemo(() => {
+    const total = scopedClothing.length;
+    const never = scopedClothing.filter(c => c.wearCount === 0).length;
+    const low = scopedClothing.filter(c => c.wearCount > 0 && c.wearCount < 3).length;
+    const active = scopedClothing.filter(c => c.wearCount >= 3).length;
+    return { total, never, low, active, rate: total > 0 ? Math.round((never / total) * 100) : 0 };
+  }, [scopedClothing]);
+
+  // 颜色分布（受季节/类型细分影响）
+  const colorDist = useMemo(() => {
+    const m: Record<string, number> = {};
+    filteredClothing.forEach(c => { const k = (c.color || '').trim() || '未知'; m[k] = (m[k] || 0) + 1; });
+    return Object.entries(m).map(([name, count]) => ({ name, count, hex: name === '未知' ? theme.colors.border : colorHexOf(name) }))
+      .sort((a, b) => b.count - a.count);
+  }, [filteredClothing, theme]);
+
+  // 价格区间分布
+  const priceBuckets = useMemo(() => {
+    const buckets = [
+      { label: '<100', min: 0, max: 100, count: 0 },
+      { label: '100-300', min: 100, max: 300, count: 0 },
+      { label: '300-1k', min: 300, max: 1000, count: 0 },
+      { label: '1k-3k', min: 1000, max: 3000, count: 0 },
+      { label: '3k+', min: 3000, max: Infinity, count: 0 },
+    ];
+    filteredClothing.forEach(c => {
+      const p = c.price || 0;
+      const b = buckets.find(bk => p >= bk.min && p < bk.max);
+      if (b) b.count++;
+    });
+    return buckets;
+  }, [filteredClothing]);
+
+  // 品牌分布 Top 5
+  const brandDist = useMemo(() => {
+    const m: Record<string, number> = {};
+    filteredClothing.forEach(c => { const k = (c.brand || '').trim(); if (k) m[k] = (m[k] || 0) + 1; });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
+  }, [filteredClothing]);
+
+  // 搭配概览
+  const outfitOverview = useMemo(() => {
+    const total = outfits.length;
+    const totalItems = outfits.reduce((s, o) => s + (o.itemIds?.length || 0), 0);
+    const avg = total > 0 ? (totalItems / total).toFixed(1) : '0';
+    return { total, avg, groupCount: groups.length };
+  }, [outfits, groups]);
+
+  // 穿着活跃度趋势（最近6个月）—— 异步加载穿着记录
+  const [wearRecords, setWearRecords] = useState<WearRecord[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const now = new Date();
+        const start = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`;
+        const endStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const records = await getWearRecordsByDateRange(startStr, endStr);
+        if (!cancelled) setWearRecords(records);
+      } catch (e) {
+        // 静默失败，趋势卡显示空
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const scopedClothingIds = useMemo(() => new Set(scopedClothing.map(c => c.id)), [scopedClothing]);
+  const wearTrend = useMemo(() => {
+    const now = new Date();
+    const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    const result: { month: string; count: number; isCurrent: boolean }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const y = d.getFullYear();
+      const m = d.getMonth() + 1;
+      const prefix = `${y}-${String(m).padStart(2, '0')}`;
+      const count = wearRecords.filter(r => r.wornDate.startsWith(prefix) && scopedClothingIds.has(r.clothingId)).length;
+      result.push({ month: monthNames[m - 1], count, isCurrent: i === 0 });
+    }
+    return result;
+  }, [wearRecords, scopedClothingIds]);
+  const wearTrendTotal = wearTrend.reduce((s, m) => s + m.count, 0);
+
+
 
   const getDaysSinceWorn = (lastWornAt: string | null) => {
     if (!lastWornAt) return 0;
     return Math.floor((new Date().getTime() - new Date(lastWornAt).getTime()) / (1000 * 60 * 60 * 24));
   };
 
-  const getFilterLabel = () => {
-    if (filterScope === 'all') return '全部衣物';
-    if (filterScope === 'season' && filterSeason) return filterSeason + '季';
-    if (filterScope === 'type' && filterType) return filterType;
-    return '全部衣物';
-  };
-
-  const fmtK = (v: number) => {
-    if (v >= 10000) return `${(v / 10000).toFixed(1)}万`;
-    if (v >= 1000) return `${(v / 1000).toFixed(0)}k`;
-    return `¥${v}`;
-  };
+  // 当前衣橱范围名称
+  const scopeName = scopeWardrobeId == null
+    ? '全部衣橱'
+    : (wardrobes.find(w => w.id === scopeWardrobeId)?.name || '衣橱');
 
   return (
+    <>
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <View style={styles.headerInner}>
-        <View style={styles.headerTop}>
-          <View style={styles.titleRow}>
-            <View style={styles.headerAccent} />
-            <Text style={styles.title}>衣橱统计</Text>
-          </View>
-          <View style={styles.headerIcon}>
-            <Ionicons name="analytics-outline" size={20} color={theme.colors.primary} />
-          </View>
-        </View>
+      <View style={[styles.header, { paddingTop: insets.top + 10, paddingBottom: 10 }]}>
+        <View style={styles.headerRow}>
+          {/* 返回 */}
+          <TouchableOpacity style={styles.headerIconBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+          </TouchableOpacity>
+          {/* 衣橱筛选下拉 */}
+          <TouchableOpacity
+            style={styles.wardrobePicker}
+            onPress={() => setShowWardrobeDropdown(true)}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="file-tray-full-outline" size={15} color={theme.colors.primary} />
+            <Text style={styles.wardrobePickerText} numberOfLines={1}>{scopeName}</Text>
+            <Ionicons name="chevron-down" size={14} color={theme.colors.primary} />
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* 模块1: 筛选器 + 顶部4卡片 */}
-      <View style={styles.filterStatsModule}>
-        <View style={styles.filterSection}>
-          <View style={styles.filterRow}>
-            <TouchableOpacity
-              style={[styles.filterChip, filterScope === 'all' && styles.filterChipActive]}
-              onPress={() => { setFilterScope('all'); setFilterSeason(null); setFilterType(null); }}
-            >
-              <Text style={[styles.filterChipText, filterScope === 'all' && styles.filterChipTextActive]}>全部</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, filterScope === 'season' && styles.filterChipActive]}
-              onPress={() => { setFilterScope('season'); setFilterSeason(null); setFilterType(null); }}
-            >
-              <Ionicons name="leaf-outline" size={14} color={filterScope === 'season' ? '#fff' : theme.colors.textSecondary} />
-              <Text style={[styles.filterChipText, filterScope === 'season' && styles.filterChipTextActive]}>季节</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.filterChip, filterScope === 'type' && styles.filterChipActive]}
-              onPress={() => { setFilterScope('type'); setFilterSeason(null); setFilterType(null); }}
-            >
-              <Ionicons name="grid-outline" size={14} color={filterScope === 'type' ? '#fff' : theme.colors.textSecondary} />
-              <Text style={[styles.filterChipText, filterScope === 'type' && styles.filterChipTextActive]}>类型</Text>
-            </TouchableOpacity>
+      {/* 顶部4卡片已并入下方「衣橱分析」模块 */}
+
+      {/* 衣橱分析（整体置顶） */}
+      <View style={styles.analysisSection}>
+        <View style={styles.sectionTitleRow}>
+          <View style={[styles.sectionIcon, { backgroundColor: theme.colors.primary + '15' }]}>
+            <Ionicons name="pie-chart-outline" size={14} color={theme.colors.primary} />
           </View>
-
-          {filterScope === 'season' && (
-            <View style={styles.filterSeasonRow}>
-              {SEASON_CONFIG.map(({ season, icon, color }) => {
-                const isActive = filterSeason === season;
-                return (
-                  <TouchableOpacity
-                    key={season}
-                    style={[
-                      styles.seasonChip,
-                      { backgroundColor: isActive ? color : theme.colors.background, borderColor: isActive ? 'transparent' : theme.colors.border }
-                    ]}
-                    onPress={() => setFilterSeason(isActive ? null : season)}
-                  >
-                    <Ionicons name={icon} size={14} color={isActive ? '#fff' : theme.colors.textSecondary} />
-                    <Text style={[styles.seasonChipText, isActive && styles.seasonChipTextActive]}>{season}季</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          {filterScope === 'type' && (
-            <View style={styles.filterTypeRow}>
-              {parentCategories.map((parent, idx) => {
-                const isActive = filterType === parent;
-                const color = TYPE_COLORS[idx % TYPE_COLORS.length];
-                return (
-                  <TouchableOpacity
-                    key={parent}
-                    style={[
-                      styles.typeChip,
-                      { backgroundColor: isActive ? color : theme.colors.background, borderColor: isActive ? 'transparent' : theme.colors.border }
-                    ]}
-                    onPress={() => setFilterType(isActive ? null : parent)}
-                  >
-                    <Text style={[styles.typeChipText, isActive && styles.typeChipTextActive]}>{parent}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
+          <Text style={styles.sectionTitle}>衣橱分析</Text>
         </View>
 
-        {/* 顶部4卡片 */}
+        {/* 概览 4 指标 */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <View style={[styles.statIconWrap, { backgroundColor: TYPE_COLORS[0] + '20' }]}>
               <Ionicons name="shirt-outline" size={16} color={TYPE_COLORS[0]} />
             </View>
             <Text style={[styles.statValue, { color: TYPE_COLORS[0] }]}>{stats.total}</Text>
-            <Text style={styles.statLabel}>{getFilterLabel()}</Text>
+            <Text style={styles.statLabel}>总件数</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.statIconWrap, { backgroundColor: TYPE_COLORS[1] + '20' }]}>
               <Ionicons name="wallet-outline" size={16} color={TYPE_COLORS[1]} />
             </View>
-            <Text style={[styles.statValue, { color: TYPE_COLORS[1] }]}>{formatCurrency(stats.totalValue)}</Text>
+            <Text style={[styles.statValue, { color: TYPE_COLORS[1] }]}>{fmtCurrency(stats.totalValue)}</Text>
             <Text style={styles.statLabel}>总价值</Text>
           </View>
           <View style={styles.statCard}>
@@ -513,6 +649,146 @@ export function StatsScreen() {
             </View>
             <Text style={[styles.statValue, { color: TYPE_COLORS[3] }]}>{avgWear}</Text>
             <Text style={styles.statLabel}>平均穿着</Text>
+          </View>
+        </View>
+
+        {/* 穿着活跃度趋势（最近6个月） */}
+        <View style={styles.analysisCard}>
+          <View style={styles.trendHeader}>
+            <Text style={styles.trendTotal}>{wearTrendTotal}</Text>
+            <Text style={styles.trendTotalLabel}>近6个月穿着次数</Text>
+          </View>
+          {wearTrendTotal === 0 ? (
+            <Text style={styles.emptyText}>近6个月暂无穿着记录</Text>
+          ) : (
+            <View style={styles.trendBarRow}>
+              {wearTrend.map((m) => {
+                const max = Math.max(...wearTrend.map(x => x.count));
+                const pct = max > 0 ? (m.count / max) * 100 : 0;
+                return (
+                  <View key={m.month + m.count} style={styles.trendBarCol}>
+                    <Text style={styles.trendBarVal}>{m.count}</Text>
+                    <View style={[styles.trendBar, { height: `${Math.max(pct * 0.7, m.count > 0 ? 6 : 0)}%`, backgroundColor: m.count > 0 ? (m.isCurrent ? theme.colors.primary : theme.colors.accent) : theme.colors.borderLight }]} />
+                    <Text style={[styles.trendBarLabel, m.isCurrent && { color: theme.colors.primary, fontWeight: '600' }]}>{m.month}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* 闲置率 */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>闲置率</Text>
+          {idle.total === 0 ? (
+            <Text style={styles.emptyText}>暂无衣物</Text>
+          ) : (
+            <View style={styles.idleTop}>
+              <View>
+                <Text style={styles.idleBig}>{idle.rate}%</Text>
+                <Text style={styles.idleBigLabel}>从未穿过</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.idleProgress}>
+                  <View style={{ flex: idle.never, backgroundColor: theme.colors.warning }} />
+                  <View style={{ flex: idle.low, backgroundColor: '#F2C94C' }} />
+                  <View style={{ flex: idle.active, backgroundColor: '#4CAF50' }} />
+                </View>
+                <View style={styles.idleLegend}>
+                  <View style={styles.idleLegendItem}><View style={[styles.idleLegendDot, { backgroundColor: theme.colors.warning }]} /><Text style={styles.idleLegendText}>从未穿 {idle.never}</Text></View>
+                  <View style={styles.idleLegendItem}><View style={[styles.idleLegendDot, { backgroundColor: '#F2C94C' }]} /><Text style={styles.idleLegendText}>&lt;3次 {idle.low}</Text></View>
+                  <View style={styles.idleLegendItem}><View style={[styles.idleLegendDot, { backgroundColor: '#4CAF50' }]} /><Text style={styles.idleLegendText}>活跃 {idle.active}</Text></View>
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* 颜色分布 */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>颜色分布</Text>
+          {colorDist.length === 0 ? (
+            <Text style={styles.emptyText}>暂无衣物</Text>
+          ) : (
+            colorDist.slice(0, 6).map((c, idx) => {
+              const max = colorDist[0].count;
+              return (
+                <View key={c.name} style={styles.distRow}>
+                  <Text style={styles.distRank}>{idx + 1}</Text>
+                  <View style={[styles.distDot, { backgroundColor: c.hex }]} />
+                  <Text style={styles.distName} numberOfLines={1}>{c.name}</Text>
+                  <View style={styles.distBarBg}>
+                    <View style={[styles.distBarFill, { width: `${Math.max((c.count / max) * 100, 8)}%`, backgroundColor: c.hex }]} />
+                  </View>
+                  <Text style={styles.distCount}>{c.count}</Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* 价格区间分布 */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>价格区间分布</Text>
+          {filteredClothing.length === 0 ? (
+            <Text style={styles.emptyText}>暂无衣物</Text>
+          ) : (
+            <View style={styles.priceBarRow}>
+              {priceBuckets.map((b, idx) => {
+                const max = Math.max(...priceBuckets.map(x => x.count));
+                const pct = max > 0 ? (b.count / max) * 100 : 0;
+                return (
+                  <View key={b.label} style={styles.priceBarCol}>
+                    <Text style={styles.priceBarVal}>{b.count}</Text>
+                    <View style={[styles.priceBar, { height: `${Math.max(pct * 0.7, b.count > 0 ? 6 : 0)}%`, backgroundColor: b.count > 0 ? TYPE_COLORS[idx % TYPE_COLORS.length] : theme.colors.borderLight }]} />
+                    <Text style={styles.priceBarLabel}>{b.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </View>
+
+        {/* 品牌分布 Top 5 */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>品牌分布 Top 5</Text>
+          {brandDist.length === 0 ? (
+            <Text style={styles.emptyText}>暂无品牌信息</Text>
+          ) : (
+            brandDist.map((b, idx) => {
+              const max = brandDist[0].count;
+              return (
+                <View key={b.name} style={styles.distRow}>
+                  <Text style={styles.distRank}>{idx + 1}</Text>
+                  <Text style={[styles.distName, { flex: 1, fontWeight: '500' }]} numberOfLines={1}>{b.name}</Text>
+                  <View style={styles.distBarBg}>
+                    <View style={[styles.distBarFill, { width: `${Math.max((b.count / max) * 100, 8)}%`, backgroundColor: TYPE_COLORS[idx % TYPE_COLORS.length] }]} />
+                  </View>
+                  <Text style={styles.distCount}>{b.count}</Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* 搭配概览 */}
+        <View style={[styles.analysisCard, styles.analysisCardNoBorder]}>
+          <Text style={styles.analysisCardTitle}>搭配概览</Text>
+          <View style={styles.outfitTiles}>
+            <View style={styles.outfitTile}>
+              <Text style={styles.outfitTileVal}>{outfitOverview.total}</Text>
+              <Text style={styles.outfitTileLabel}>已创建搭配</Text>
+            </View>
+            <View style={styles.outfitTileDivider} />
+            <View style={styles.outfitTile}>
+              <Text style={styles.outfitTileVal}>{outfitOverview.avg}</Text>
+              <Text style={styles.outfitTileLabel}>平均件数/套</Text>
+            </View>
+            <View style={styles.outfitTileDivider} />
+            <View style={styles.outfitTile}>
+              <Text style={styles.outfitTileVal}>{outfitOverview.groupCount}</Text>
+              <Text style={styles.outfitTileLabel}>分组数</Text>
+            </View>
           </View>
         </View>
       </View>
@@ -595,7 +871,7 @@ export function StatsScreen() {
                     <View key={item.month} style={styles.barColumn}>
                       {hasData && !showInsideLabel && (
                         <Text style={styles.barTopLabel}>
-                          {chartValueType === 'value' ? fmtK(val) : `${val}件`}
+                          {chartValueType === 'value' ? fmtCurrency(val) : `${val}件`}
                         </Text>
                       )}
                       <View
@@ -612,7 +888,7 @@ export function StatsScreen() {
                       >
                         {showInsideLabel && (
                           <Text style={styles.barInsideLabel}>
-                            {chartValueType === 'value' ? fmtK(val) : `${val}件`}
+                            {chartValueType === 'value' ? fmtCurrency(val) : `${val}件`}
                           </Text>
                         )}
                       </View>
@@ -645,7 +921,7 @@ export function StatsScreen() {
                     <View key={item.year} style={styles.barColumn}>
                       {showInsideLabel ? null : (
                         <Text style={styles.barTopLabel}>
-                          {chartValueType === 'value' ? fmtK(val) : `${val}件`}
+                          {chartValueType === 'value' ? fmtCurrency(val) : `${val}件`}
                         </Text>
                       )}
                       <View
@@ -662,7 +938,7 @@ export function StatsScreen() {
                       >
                         {showInsideLabel && (
                           <Text style={styles.barInsideLabel}>
-                            {chartValueType === 'value' ? fmtK(val) : `${val}件`}
+                            {chartValueType === 'value' ? fmtCurrency(val) : `${val}件`}
                           </Text>
                         )}
                       </View>
@@ -718,6 +994,7 @@ export function StatsScreen() {
         )}
       </View>
 
+
       {/* 详细统计 */}
       <View style={styles.detailSection}>
         <View style={styles.sectionTitleRow}>
@@ -727,7 +1004,7 @@ export function StatsScreen() {
           <Text style={styles.sectionTitle}>详细统计</Text>
           <TouchableOpacity
             style={styles.viewMoreInline}
-            onPress={() => navigation.navigate('StatsDetail', { tab: statsTab, filterSeason, filterType })}
+            onPress={() => navigation.navigate('StatsDetail', { tab: statsTab })}
             activeOpacity={0.7}
           >
             <Text style={styles.viewMoreInlineText}>查看全部</Text>
@@ -912,5 +1189,36 @@ export function StatsScreen() {
 
       <View style={styles.bottom} />
     </ScrollView>
+
+    {/* 衣橱筛选下拉菜单 */}
+    <Modal visible={showWardrobeDropdown} transparent animationType="none" onRequestClose={() => setShowWardrobeDropdown(false)}>
+      <TouchableOpacity style={styles.dropdownOverlay} activeOpacity={1} onPress={() => setShowWardrobeDropdown(false)}>
+        <View style={[styles.dropdownMenu, { top: insets.top + 52 }]}>
+          <TouchableOpacity
+            style={styles.dropdownItem}
+            onPress={() => { setScopeWardrobeId(null); setShowWardrobeDropdown(false); }}
+          >
+            <Ionicons name="layers-outline" size={16} color={scopeWardrobeId == null ? theme.colors.primary : theme.colors.textSecondary} />
+            <Text style={[styles.dropdownItemText, scopeWardrobeId == null && styles.dropdownItemActive]}>全部衣橱</Text>
+            {scopeWardrobeId == null && <Ionicons name="checkmark" size={16} color={theme.colors.primary} />}
+          </TouchableOpacity>
+          {wardrobes.map(w => {
+            const isActive = scopeWardrobeId === w.id;
+            return (
+              <TouchableOpacity
+                key={w.id}
+                style={styles.dropdownItem}
+                onPress={() => { setScopeWardrobeId(w.id); setShowWardrobeDropdown(false); }}
+              >
+                <Ionicons name="file-tray-full-outline" size={16} color={isActive ? theme.colors.primary : theme.colors.textSecondary} />
+                <Text style={[styles.dropdownItemText, isActive && styles.dropdownItemActive]} numberOfLines={1}>{w.name}</Text>
+                {isActive && <Ionicons name="checkmark" size={16} color={theme.colors.primary} />}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+    </>
   );
 }

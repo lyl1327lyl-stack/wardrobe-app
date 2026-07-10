@@ -9,13 +9,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
 import { useTheme } from '../hooks/useTheme';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemeId, themes } from '../utils/theme';
 import { Theme } from '../utils/theme';
-import { OPTIONS_STORAGE_KEY } from '../utils/customOptions';
 import { useWardrobeStore } from '../store/wardrobeStore';
+import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { exportBackup, pickBackupFile, restoreBackup } from '../utils/backup';
 
 const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
@@ -75,7 +75,7 @@ const MENU_ITEMS: MenuSection[] = [
   {
     title: '关于',
     items: [
-      { key: 'version', label: '版本', icon: 'information-circle-outline', value: '1.0.0' },
+      { key: 'version', label: '版本', icon: 'information-circle-outline', value: Constants.expoConfig?.version || '1.0.0' },
     ],
   },
 ];
@@ -121,36 +121,6 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '600',
       color: theme.colors.text,
       marginBottom: 14,
-    },
-    // 数据概览
-    statsCard: {
-      marginHorizontal: 16,
-      borderRadius: 16,
-      paddingVertical: 18,
-      backgroundColor: theme.colors.card,
-      ...theme.shadows.sm,
-    },
-    statsRow: {
-      flexDirection: 'row',
-    },
-    statsItem: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    statsValue: {
-      fontSize: 22,
-      fontWeight: '700',
-      color: theme.colors.text,
-    },
-    statsLabel: {
-      fontSize: 11,
-      color: theme.colors.textTertiary,
-      marginTop: 4,
-    },
-    statsDivider: {
-      width: 1,
-      backgroundColor: theme.colors.border,
-      marginVertical: 2,
     },
     themeGrid: {
       flexDirection: 'row',
@@ -218,12 +188,6 @@ export function PersonalCenterScreen() {
   const { theme, themeId, setTheme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-
-  // 数据概览
-  const clothingCount = useWardrobeStore(s => s.clothing.length);
-  const outfitCount = useWardrobeStore(s => s.outfits.length);
-  const wardrobeCount = useWardrobeStore(s => s.wardrobes.length);
-  const groupCount = useWardrobeStore(s => s.groups.length);
 
   const handleThemeChange = async (newThemeId: ThemeId) => {
     if (newThemeId === themeId) return;
@@ -301,8 +265,8 @@ export function PersonalCenterScreen() {
               style: 'destructive',
               onPress: async () => {
                 try {
-                  await AsyncStorage.removeItem(OPTIONS_STORAGE_KEY);
-                  Alert.alert('已重置', '请重新加载应用');
+                  await useCustomOptionsStore.getState().resetToDefaults();
+                  Alert.alert('已重置', '分类选项已恢复默认');
                 } catch (e) {
                   Alert.alert('错误', '重置失败');
                 }
@@ -348,31 +312,6 @@ export function PersonalCenterScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* 数据概览 */}
-        <View style={styles.statsCard}>
-          <View style={styles.statsRow}>
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{clothingCount}</Text>
-              <Text style={styles.statsLabel}>衣物</Text>
-            </View>
-            <View style={styles.statsDivider} />
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{outfitCount}</Text>
-              <Text style={styles.statsLabel}>搭配</Text>
-            </View>
-            <View style={styles.statsDivider} />
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{wardrobeCount}</Text>
-              <Text style={styles.statsLabel}>衣柜</Text>
-            </View>
-            <View style={styles.statsDivider} />
-            <View style={styles.statsItem}>
-              <Text style={styles.statsValue}>{groupCount}</Text>
-              <Text style={styles.statsLabel}>分组</Text>
-            </View>
-          </View>
-        </View>
-
         {/* Theme Selection */}
         <View style={[styles.section, { marginTop: 12 }]}>
           <Text style={styles.sectionTitle}>主题切换</Text>

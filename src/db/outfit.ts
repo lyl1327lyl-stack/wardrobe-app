@@ -68,6 +68,12 @@ export async function deleteOutfit(id: number): Promise<void> {
   await db.runAsync('DELETE FROM outfits WHERE id = ?', [id]);
 }
 
+// 删除全部搭配
+export async function deleteAllOutfits(): Promise<void> {
+  const db = await getDatabase();
+  await db.runAsync('DELETE FROM outfits');
+}
+
 export async function updateOutfit(
   outfit: Outfit & { canvasData?: CanvasItem[]; canvasBackground?: CanvasBackground; style?: string; groupId: number; thumbnailUri?: string }
 ): Promise<void> {
