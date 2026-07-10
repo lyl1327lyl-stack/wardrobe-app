@@ -450,8 +450,7 @@ export function WearCalendarScreen() {
             outfitMatchMap={outfitMatchMap}
             cellTint={(dateStr, count) => tintForCount(count, theme.colors.primary)}
             legendItems={[
-              { label: '少穿', color: theme.colors.primary + '22' },
-              { label: '多穿', color: theme.colors.primary + '66' },
+              { label: '已穿着', color: theme.colors.primary + '40' },
               { label: '今天', icon: 'star', iconColor: theme.colors.primary },
             ]}
           />

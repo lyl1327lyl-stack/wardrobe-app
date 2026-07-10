@@ -58,12 +58,10 @@ export function YearHeatmap({ year, countMap, today, onSelectDate }: Props) {
   return (
     <View style={styles.wrap}>
       <View style={styles.legendRow}>
-        <Text style={styles.legendText}>少</Text>
         <View style={[styles.legendCell, { backgroundColor: theme.colors.borderLight }]} />
-        <View style={[styles.legendCell, { backgroundColor: theme.colors.primary + '22' }]} />
-        <View style={[styles.legendCell, { backgroundColor: theme.colors.primary + '44' }]} />
-        <View style={[styles.legendCell, { backgroundColor: theme.colors.primary + '66' }]} />
-        <Text style={styles.legendText}>多</Text>
+        <Text style={styles.legendText}>未穿</Text>
+        <View style={[styles.legendCell, { backgroundColor: theme.colors.primary + '40' }]} />
+        <Text style={styles.legendText}>已穿</Text>
       </View>
       <ScrollView
         horizontal

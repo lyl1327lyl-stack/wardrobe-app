@@ -16,14 +16,12 @@ export function formatDate(d: Date): string {
 }
 
 /**
- * 按当天穿着件数返回背景色（primary 的不同 alpha）。
- * 0 → undefined（不着色）；1-2 浅；3-4 中；≥5 深。
+ * 按当天是否有穿着记录返回背景色（二元：有=着色，无=不着色）。
+ * count <= 0 → undefined（不着色）；否则返回 primary + '40'。
  */
 export function tintForCount(count: number, primary: string): string | undefined {
   if (count <= 0) return undefined;
-  if (count <= 2) return primary + '22';
-  if (count <= 4) return primary + '44';
-  return primary + '66';
+  return primary + '40';
 }
 
 /**
