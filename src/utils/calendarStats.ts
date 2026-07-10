@@ -1,13 +1,32 @@
 // src/utils/calendarStats.ts
 import { ClothingItem, Season } from '../types';
 
-/** 当前季节（按月份） */
-export function getCurrentSeason(): Season {
-  const m = new Date().getMonth() + 1;
-  if (m >= 3 && m <= 5) return '春';
-  if (m >= 6 && m <= 8) return '夏';
-  if (m >= 9 && m <= 11) return '秋';
-  return '冬';
+const SEASON_BUFFER_DAYS = 45;
+// 各季节核心区间（day-of-year，气象季节：春3/1-5/31 夏6/1-8/31 秋9/1-11/30 冬跨年末）
+const SEASON_CORES: { name: Season; start: number; end: number }[] = [
+  { name: '春', start: 60, end: 151 },
+  { name: '夏', start: 152, end: 243 },
+  { name: '秋', start: 244, end: 334 },
+];
+
+/**
+ * 指定日期的「活跃季节」集合：每个季节核心区间前后各 SEASON_BUFFER_DAYS 天缓冲内即算活跃。
+ * 例如 7 月初仍落在春季缓冲内 → ['春','夏']。默认取今天。
+ */
+export function getActiveSeasons(date = new Date()): Season[] {
+  const yearStart = new Date(date.getFullYear(), 0, 1);
+  const dayOfYear = Math.floor((+date - +yearStart) / 86400000) + 1; // 1..365/366
+  const result: Season[] = [];
+  for (const s of SEASON_CORES) {
+    if (dayOfYear >= s.start - SEASON_BUFFER_DAYS && dayOfYear <= s.end + SEASON_BUFFER_DAYS) {
+      result.push(s.name);
+    }
+  }
+  // 冬：核心 day 335-365 与 1-59；±45 缓冲 → day >= 290 或 day <= 104
+  if (dayOfYear >= 335 - SEASON_BUFFER_DAYS || dayOfYear <= 59 + SEASON_BUFFER_DAYS) {
+    result.push('冬');
+  }
+  return result;
 }
 
 /** 把 Date 格式化为 YYYY-MM-DD（本地，无时区偏移） */
@@ -83,10 +102,10 @@ export interface Insight {
 export function computeInsights(opts: {
   wearData: Record<string, ClothingItem[]>;
   allClothingMap: Map<number, ClothingItem>;
-  currentSeason: Season;
+  activeSeasons: Season[];
   warnDays?: number;
 }): Insight[] {
-  const { wearData, allClothingMap, currentSeason, warnDays = 30 } = opts;
+  const { wearData, allClothingMap, activeSeasons, warnDays = 30 } = opts;
   const out: Insight[] = [];
 
   // 当月被穿衣物（去重）
@@ -128,8 +147,8 @@ export function computeInsights(opts: {
   const idle: { item: ClothingItem; days: number }[] = [];
   for (const c of allClothingMap.values()) {
     if (!c.lastWornAt) continue;
-    // 只统计当季衣物
-    if (!c.seasons || !c.seasons.includes(currentSeason)) continue;
+    // 只统计当季衣物（命中任一活跃季节即可）
+    if (!c.seasons || !c.seasons.some(s => activeSeasons.includes(s))) continue;
     const days = Math.floor((now.getTime() - new Date(c.lastWornAt).getTime()) / 86400000);
     if (days > warnDays) idle.push({ item: c, days });
   }

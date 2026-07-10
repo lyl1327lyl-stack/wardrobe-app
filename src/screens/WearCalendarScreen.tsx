@@ -21,7 +21,7 @@ import { StreakProgressCard } from '../components/StreakProgressCard';
 import { YearHeatmap } from '../components/YearHeatmap';
 import { CalendarInsights } from '../components/CalendarInsights';
 import {
-  tintForCount, computeStreak, computeMonthProgress, computeInsights, getCurrentSeason, formatDate,
+  tintForCount, computeStreak, computeMonthProgress, computeInsights, getActiveSeasons, formatDate,
 } from '../utils/calendarStats';
 
 // 穿着记录 → ClothingItem（命中实时数据用实时，否则用记录里的缩略图回退）
@@ -248,7 +248,7 @@ export function WearCalendarScreen() {
     return computeInsights({
       wearData,
       allClothingMap,
-      currentSeason: getCurrentSeason(),
+      activeSeasons: getActiveSeasons(),
     });
   }, [wearData, allClothingMap]);
 
