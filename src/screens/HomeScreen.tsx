@@ -25,7 +25,8 @@ import { getWearRecordsByDate, getWearRecordsByDateRange } from '../db/wearRecor
 import { ClothingItem, OutfitRecommendation, Weather, WearRecord } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import { getIdleItems, getActiveSeasons } from '../utils/calendarStats';
+import { getIdleItems, getActiveSeasons, getSeasonTransition, computeStreak, formatDate } from '../utils/calendarStats';
+import { CalendarInsights } from '../components/CalendarInsights';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
@@ -311,6 +312,43 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+
+  // 本周概览
+  weekCard: {
+    marginHorizontal: CARD_H_PADDING, marginTop: 12,
+    backgroundColor: theme.colors.white, borderRadius: 16, paddingVertical: 16,
+    flexDirection: 'row', alignItems: 'center',
+    shadowColor: theme.colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3,
+  },
+  weekItem: { flex: 1, alignItems: 'center' },
+  weekBig: { fontSize: 18 },
+  weekNum: { fontSize: 20, fontWeight: '800', color: theme.colors.text, marginTop: 2 },
+  weekUnit: { fontSize: 11, color: theme.colors.textTertiary, fontWeight: '500' },
+  weekLabel: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 },
+  weekDivider: { width: 1, height: 36, backgroundColor: theme.colors.border },
+
+  // 换季提醒
+  tipCard: {
+    marginHorizontal: CARD_H_PADDING, marginTop: 12,
+    backgroundColor: theme.colors.white, borderRadius: 16, padding: 14,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    shadowColor: theme.colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3,
+  },
+  tipIconWrap: { width: 36, height: 36, borderRadius: 10, backgroundColor: theme.colors.primary + '15', justifyContent: 'center', alignItems: 'center' },
+  tipTitle: { fontSize: 13, fontWeight: '600', color: theme.colors.text },
+  tipSub: { fontSize: 11, color: theme.colors.textTertiary, marginTop: 2 },
+  tipBtn: { backgroundColor: theme.colors.primary + '15', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 7 },
+  tipBtnText: { fontSize: 12, fontWeight: '600', color: theme.colors.primary },
+
+  // 最近搭配速览
+  recentOutfitsWrap: { marginTop: 16 },
+  recentOutfitsHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: CARD_H_PADDING, marginBottom: 10 },
+  recentOutfitsTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.text },
+  recentOutfitsMore: { fontSize: 12, color: theme.colors.primary, fontWeight: '500' },
+  recentOutfitsRow: { paddingHorizontal: CARD_H_PADDING, gap: 10 },
+  recentOutfitCard: { width: 96 },
+  recentOutfitThumb: { width: 96, height: 120, borderRadius: 12, backgroundColor: theme.colors.borderLight, marginBottom: 6 },
+  recentOutfitName: { fontSize: 11, color: theme.colors.textSecondary, textAlign: 'center' },
 });
 
 export function HomeScreen() {
@@ -333,6 +371,7 @@ export function HomeScreen() {
   // 主页级衣橱范围（null = 全部衣橱；仅影响本页概况，不改动全局）
   const [scopeWardrobeId, setScopeWardrobeId] = useState<number | null>(null);
   const [showWardrobeDropdown, setShowWardrobeDropdown] = useState(false);
+  const [weekStats, setWeekStats] = useState<{ streak: number; weekDays: number }>({ streak: 0, weekDays: 0 });
 
   const scopedClothing = useMemo(
     () => (scopeWardrobeId == null ? clothing : clothing.filter(c => c.wardrobeId === scopeWardrobeId)),
@@ -393,6 +432,63 @@ export function HomeScreen() {
     const sleepingCount = getIdleItems(active, getActiveSeasons()).length;
     return { totalPrice, avgWearCount, sleepingCount };
   }, [clothing]);
+
+  // 本周穿搭概览：连续记录天数 + 本周已记录天数（异步加载近 40 天记录）
+  const loadWeekStats = useCallback(async () => {
+    try {
+      const now = new Date();
+      const start = new Date(now); start.setDate(start.getDate() - 39);
+      const startStr = formatDate(start);
+      const todayStr = formatDate(now);
+      const recs = await getWearRecordsByDateRange(startStr, todayStr);
+      const recordedDates = new Set<string>();
+      recs.forEach(r => recordedDates.add(r.wornDate));
+      const streak = computeStreak(recordedDates, todayStr);
+      // 本周(周一~周日)已记录天数
+      const dow = (now.getDay() + 6) % 7; // 0=周一
+      const monday = new Date(now); monday.setDate(now.getDate() - dow);
+      const weekStrs = new Set<string>();
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(monday); d.setDate(monday.getDate() + i);
+        weekStrs.add(formatDate(d));
+      }
+      const weekDays = [...recordedDates].filter(d => weekStrs.has(d)).length;
+      setWeekStats({ streak, weekDays });
+    } catch (e) {
+      // 静默失败
+    }
+  }, []);
+
+  // 换季提醒：若刚进入某季节(7天内)，提示整理该季节衣物
+  const seasonTransition = useMemo(() => {
+    const t = getSeasonTransition();
+    if (!t) return null;
+    const count = scopedClothing.filter(c => c.seasons && c.seasons.includes(t.season)).length;
+    return { season: t.season, count };
+  }, [scopedClothing]);
+
+  // 当季闲置提醒 Top3（复用 getIdleItems）
+  const idleInsight = useMemo(() => {
+    const entries = getIdleItems(scopedClothing.filter(c => !c.deletedAt), getActiveSeasons()).slice(0, 3);
+    if (entries.length === 0) return null;
+    return {
+      emoji: '💤',
+      text: '当季闲置未穿',
+      items: entries.map(({ item, days, neverWorn }) => ({
+        itemId: item.id,
+        thumb: item.thumbnailUri || item.imageUri,
+        name: item.type || item.remarks || '该衣物',
+        days,
+        neverWorn,
+      })),
+    };
+  }, [scopedClothing]);
+
+  // 最近搭配（按创建时间倒序，最多 8 套）
+  const recentOutfits = useMemo(
+    () => [...outfits].sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')).slice(0, 8),
+    [outfits]
+  );
 
   const loadRecommendations = useCallback(async () => {
     const w = await getWeather();
@@ -490,6 +586,7 @@ export function HomeScreen() {
       lastSnapshotRef.current = { clothingCount: s2.clothing.length, outfitCount: s2.outfits.length };
       await refreshTodayRecords();
       await loadRecommendations();
+      await loadWeekStats();
     };
     init();
   }, []);
@@ -501,6 +598,7 @@ export function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshTodayRecords();
+      loadWeekStats();
       const s = useWardrobeStore.getState();
       const prev = lastSnapshotRef.current;
       if (s.clothing.length !== prev.clothingCount || s.outfits.length !== prev.outfitCount) {
@@ -761,6 +859,84 @@ export function HomeScreen() {
                 ? '去添加你的第一件衣服吧'
                 : '需要更多类型单品（如上装+下装）来生成搭配'}
             </Text>
+          </View>
+        )}
+
+        {/* ── 本周穿搭概览 ── */}
+        <View style={styles.weekCard}>
+          <View style={styles.weekItem}>
+            <Text style={styles.weekBig}>{weekStats.streak > 0 ? '🔥' : '💧'}</Text>
+            <Text style={styles.weekNum}>{weekStats.streak}<Text style={styles.weekUnit}> 天</Text></Text>
+            <Text style={styles.weekLabel}>连续记录</Text>
+          </View>
+          <View style={styles.weekDivider} />
+          <View style={styles.weekItem}>
+            <Text style={styles.weekBig}>📅</Text>
+            <Text style={styles.weekNum}>{weekStats.weekDays}<Text style={styles.weekUnit}>/7</Text></Text>
+            <Text style={styles.weekLabel}>本周已记录</Text>
+          </View>
+        </View>
+
+        {/* ── 换季提醒 ── */}
+        {seasonTransition && (
+          <View style={styles.tipCard}>
+            <View style={styles.tipIconWrap}>
+              <Ionicons name="leaf-outline" size={18} color={theme.colors.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.tipTitle}>入{seasonTransition.season}了，整理一下{seasonTransition.season}季衣物？</Text>
+              <Text style={styles.tipSub}>你的{seasonTransition.season}季衣物共 {seasonTransition.count} 件</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.tipBtn}
+              onPress={() => navigation.navigate('衣橱')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.tipBtnText}>去整理</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ── 当季闲置提醒（复用 CalendarInsights）── */}
+        {idleInsight && (
+          <CalendarInsights
+            insights={[idleInsight]}
+            onPressItem={(id) => navigation.navigate('ClothingDetail' as any, { id })}
+          />
+        )}
+
+        {/* ── 最近搭配速览 ── */}
+        {recentOutfits.length > 0 && (
+          <View style={styles.recentOutfitsWrap}>
+            <View style={styles.recentOutfitsHeader}>
+              <Text style={styles.recentOutfitsTitle}>最近搭配</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('搭配')} activeOpacity={0.7}>
+                <Text style={styles.recentOutfitsMore}>全部 ›</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.recentOutfitsRow}>
+              {recentOutfits.map(o => {
+                const firstItem = clothing.find(c => c.id === o.itemIds[0]);
+                const thumb = o.thumbnailUri || firstItem?.thumbnailUri || firstItem?.imageUri || '';
+                return (
+                  <TouchableOpacity
+                    key={o.id}
+                    style={styles.recentOutfitCard}
+                    onPress={() => navigation.navigate('OutfitDetail', { outfitId: o.id })}
+                    activeOpacity={0.7}
+                  >
+                    {thumb ? (
+                      <Image source={{ uri: thumb }} style={styles.recentOutfitThumb} resizeMode="cover" />
+                    ) : (
+                      <View style={[styles.recentOutfitThumb, { alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.borderLight }]}>
+                        <Ionicons name="grid-outline" size={20} color={theme.colors.textTertiary} />
+                      </View>
+                    )}
+                    <Text style={styles.recentOutfitName} numberOfLines={1}>{o.name || '未命名搭配'}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
           </View>
         )}
       </ScrollView>
