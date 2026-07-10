@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { usePreferenceStore } from '../store/preferenceStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
@@ -267,6 +268,20 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     color: theme.colors.text,
   },
 
+  // ── 今日穿搭 Hero（天气+今日+推荐融合）──
+  todayHero: {
+    marginHorizontal: CARD_H_PADDING,
+    marginTop: 16,
+    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  todayHeroTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
+  todayHeroSub: { fontSize: 12, color: 'rgba(255,255,255,0.88)', marginTop: 3 },
+
   // ── Recommendation ──
   recLoading: {
     marginHorizontal: CARD_H_PADDING,
@@ -347,6 +362,12 @@ export function HomeScreen() {
   }
 
   const recommendation = recommendations[recIndex] || null;
+
+  const todayLabel = useMemo(() => {
+    const d = new Date();
+    const wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${wd}`;
+  }, []);
 
   // Category stats — dynamic from (scoped) clothing data
   const categoryStats = useMemo(() => {
@@ -690,7 +711,35 @@ export function HomeScreen() {
             <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>正在生成推荐...</Text>
           </View>
         ) : recommendation ? (
-          <OutfitRecommendationCard
+          <>
+            {/* 今日穿搭 Hero：天气 + 今日 + 推荐融合 */}
+            <View style={styles.todayHero}>
+              <LinearGradient
+                colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFillObject}
+              />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.todayHeroTitle}>今日穿搭</Text>
+                <Text style={styles.todayHeroSub}>
+                  {todayLabel}{weather ? ` · ${weather.temperature}° ${weather.condition}` : ''}
+                </Text>
+              </View>
+              {weather && (
+                <Ionicons
+                  name={
+                    weather.condition === '晴' ? 'sunny' :
+                    weather.condition === '多云' ? 'partly-sunny' :
+                    weather.condition === '阴' ? 'cloudy' :
+                    weather.condition === '雨' ? 'rainy' :
+                    weather.condition === '雪' ? 'snow' : 'cloudy'
+                  }
+                  size={26}
+                  color="#fff"
+                />
+              )}
+            </View>
+            <OutfitRecommendationCard
             recommendation={recommendation}
             allClothing={clothing}
             outfits={outfits}
@@ -703,6 +752,7 @@ export function HomeScreen() {
             recIndex={recIndex}
             attributeTips={attributeTips}
           />
+          </>
         ) : (
           <View style={styles.recEmpty}>
             <Ionicons name="shirt-outline" size={28} color={theme.colors.border} />
