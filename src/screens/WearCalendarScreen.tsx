@@ -248,6 +248,7 @@ export function WearCalendarScreen() {
     return computeInsights({
       wearData,
       allClothingMap,
+      wardrobeItems: clothing,
       activeSeasons: getActiveSeasons(),
     });
   }, [wearData, allClothingMap]);

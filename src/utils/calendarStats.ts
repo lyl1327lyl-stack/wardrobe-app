@@ -2,29 +2,34 @@
 import { ClothingItem, Season } from '../types';
 
 const SEASON_BUFFER_DAYS = 45;
-// 各季节核心区间（day-of-year，气象季节：春3/1-5/31 夏6/1-8/31 秋9/1-11/30 冬跨年末）
+// 节气边界（近似 day-of-year，非闰年）：立春~2/4(35) 立夏~5/5(125) 立秋~8/7(219) 立冬~11/7(311)
+// 各季 core = [节气, 下一节气前一天]；冬跨年(end = 立春前一天 ≡ 399)
 const SEASON_CORES: { name: Season; start: number; end: number }[] = [
-  { name: '春', start: 60, end: 151 },
-  { name: '夏', start: 152, end: 243 },
-  { name: '秋', start: 244, end: 334 },
+  { name: '春', start: 35, end: 124 },
+  { name: '夏', start: 125, end: 218 },
+  { name: '秋', start: 219, end: 310 },
+  { name: '冬', start: 311, end: 399 },
 ];
 
+/** 把 day-of-year 归一化到 1..365 的圆上 */
+const normDay = (n: number) => ((Math.round(n) - 1) % 365 + 365) % 365 + 1;
+/** 圆形区间判定（ws>we 表示跨年） */
+const inWindow = (d: number, ws: number, we: number) =>
+  ws <= we ? d >= ws && d <= we : d >= ws || d <= we;
+
 /**
- * 指定日期的「活跃季节」集合：每个季节核心区间前后各 SEASON_BUFFER_DAYS 天缓冲内即算活跃。
- * 例如 7 月初仍落在春季缓冲内 → ['春','夏']。默认取今天。
+ * 指定日期的「活跃季节」集合：以节气为边界，每个季节 core 前后各 SEASON_BUFFER_DAYS 天缓冲内即算活跃。
+ * 默认取今天。
  */
 export function getActiveSeasons(date = new Date()): Season[] {
   const yearStart = new Date(date.getFullYear(), 0, 1);
-  const dayOfYear = Math.floor((+date - +yearStart) / 86400000) + 1; // 1..365/366
+  let dayOfYear = Math.floor((+date - +yearStart) / 86400000) + 1;
+  if (dayOfYear > 365) dayOfYear = 365; // 闰年末压回，误差≤1天
   const result: Season[] = [];
   for (const s of SEASON_CORES) {
-    if (dayOfYear >= s.start - SEASON_BUFFER_DAYS && dayOfYear <= s.end + SEASON_BUFFER_DAYS) {
-      result.push(s.name);
-    }
-  }
-  // 冬：核心 day 335-365 与 1-59；±45 缓冲 → day >= 290 或 day <= 104
-  if (dayOfYear >= 335 - SEASON_BUFFER_DAYS || dayOfYear <= 59 + SEASON_BUFFER_DAYS) {
-    result.push('冬');
+    const ws = normDay(s.start - SEASON_BUFFER_DAYS);
+    const we = normDay(s.end + SEASON_BUFFER_DAYS);
+    if (inWindow(dayOfYear, ws, we)) result.push(s.name);
   }
   return result;
 }
@@ -85,6 +90,8 @@ export interface IdleItem {
   thumb: string;
   name: string;
   days: number;
+  /** 从未穿过（按购买/创建日算闲置时长） */
+  neverWorn?: boolean;
 }
 
 export interface Insight {
@@ -102,10 +109,12 @@ export interface Insight {
 export function computeInsights(opts: {
   wearData: Record<string, ClothingItem[]>;
   allClothingMap: Map<number, ClothingItem>;
+  /** 当前在库衣物（排除已卖出/废衣篓），用于闲置提醒 */
+  wardrobeItems: ClothingItem[];
   activeSeasons: Season[];
   warnDays?: number;
 }): Insight[] {
-  const { wearData, allClothingMap, activeSeasons, warnDays = 30 } = opts;
+  const { wearData, allClothingMap, wardrobeItems, activeSeasons, warnDays = 30 } = opts;
   const out: Insight[] = [];
 
   // 当月被穿衣物（去重）
@@ -142,23 +151,40 @@ export function computeInsights(opts: {
     out.push({ emoji: '📅', text: `周末穿搭比工作日丰富 ${Math.round(weAvg / wdAvg)} 倍` });
   }
 
-  // 3. 闲置提醒（仅当季、超过 warnDays 未穿）Top 3
+  // 3. 闲置提醒：仅当前在库 + 当季 + 超阈值；纳入从未穿过；新衣物 14 天宽限
   const now = new Date();
-  const idle: { item: ClothingItem; days: number }[] = [];
-  for (const c of allClothingMap.values()) {
-    if (!c.lastWornAt) continue;
+  const GRACE_DAYS = 14;
+  const daysSince = (iso: string) => Math.floor((now.getTime() - new Date(iso).getTime()) / 86400000);
+  const idle: { item: ClothingItem; days: number; neverWorn: boolean }[] = [];
+  for (const c of wardrobeItems) {
     // 只统计当季衣物（命中任一活跃季节即可）
     if (!c.seasons || !c.seasons.some(s => activeSeasons.includes(s))) continue;
-    const days = Math.floor((now.getTime() - new Date(c.lastWornAt).getTime()) / 86400000);
-    if (days > warnDays) idle.push({ item: c, days });
+    // 新衣物宽限：购买不足 14 天不提醒
+    if (c.purchaseDate && daysSince(c.purchaseDate) < GRACE_DAYS) continue;
+    // 闲置时长：穿过按 lastWornAt；从未穿过按购买日(或创建日)
+    let days: number;
+    let neverWorn = false;
+    if (c.lastWornAt) {
+      days = daysSince(c.lastWornAt);
+    } else if (c.purchaseDate) {
+      days = daysSince(c.purchaseDate);
+      neverWorn = true;
+    } else if (c.createdAt) {
+      days = daysSince(c.createdAt);
+      neverWorn = true;
+    } else {
+      continue;
+    }
+    if (days > warnDays) idle.push({ item: c, days, neverWorn });
   }
   if (idle.length > 0) {
     idle.sort((a, b) => b.days - a.days);
-    const items = idle.slice(0, 3).map(({ item, days }) => ({
+    const items = idle.slice(0, 3).map(({ item, days, neverWorn }) => ({
       itemId: item.id,
       thumb: item.thumbnailUri || item.imageUri,
       name: item.type || item.remarks || '该衣物',
       days,
+      neverWorn,
     }));
     out.push({ emoji: '💤', text: '当季闲置未穿', items });
   }

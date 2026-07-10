@@ -37,7 +37,7 @@ export function CalendarInsights({ insights, onPressItem }: Props) {
                   >
                     <Image source={{ uri: it.thumb }} style={styles.itemThumb} resizeMode="cover" />
                     <Text style={styles.itemName} numberOfLines={1}>{it.name}</Text>
-                    <Text style={styles.itemDays}>{it.days}天未穿</Text>
+                    <Text style={styles.itemDays}>{it.neverWorn ? '从未穿' : `${it.days}天未穿`}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
