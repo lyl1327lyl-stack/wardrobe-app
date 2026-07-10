@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Image,
   ScrollView,
-  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -197,10 +196,6 @@ export function WearCalendarScreen() {
   const [yearCountMap, setYearCountMap] = useState<Record<string, number>>({});
   const [viewMode, setViewMode] = useState<'month' | 'year'>('month');
   const [calendarHeight, setCalendarHeight] = useState(0);
-  // 年视图格子大小：2 条半年带 = 14 行；夹在 13~22 之间
-  const yearCellSize = calendarHeight > 0
-    ? Math.min(22, Math.max(13, Math.floor((calendarHeight - 120) / 14) - 2))
-    : 16;
 
   const today = useMemo(() => {
     const d = new Date();
@@ -471,7 +466,6 @@ export function WearCalendarScreen() {
               countMap={yearCountMap}
               today={today}
               onSelectDate={handleDayPress}
-              cellSize={yearCellSize}
             />
           </View>
         )}
