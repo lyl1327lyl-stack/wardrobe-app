@@ -28,6 +28,58 @@ export function getActiveSeasons(date = new Date()): Season[] {
   return [];
 }
 
+/**
+ * 换季提醒：若指定日期刚进入某季节（节气后 withinDays 天内），返回 { season, daysSinceStart }；否则 null。
+ */
+export function getSeasonTransition(date = new Date(), withinDays = 7): { season: Season; daysSinceStart: number } | null {
+  const yearStart = new Date(date.getFullYear(), 0, 1);
+  let dayOfYear = Math.floor((+date - +yearStart) / 86400000) + 1;
+  if (dayOfYear > 365) dayOfYear = 365;
+  for (const s of SEASON_CORES) {
+    let diff = dayOfYear - s.start;
+    if (diff < 0) diff += 365; // 跨年(如初春 vs 冬至start)
+    if (diff <= withinDays) return { season: s.name, daysSinceStart: diff };
+  }
+  return null;
+}
+
+export interface IdleEntry { item: ClothingItem; days: number; neverWorn: boolean; }
+
+/**
+ * 当季闲置衣物（仅在库 + 当季 + 超 warnDays；纳入从未穿过；新衣物 14 天宽限）。
+ * 按闲置天数降序返回，调用方自行 slice。
+ */
+export function getIdleItems(
+  wardrobeItems: ClothingItem[],
+  activeSeasons: Season[],
+  warnDays = 30
+): IdleEntry[] {
+  const now = new Date();
+  const GRACE_DAYS = 14;
+  const daysSince = (iso: string) => Math.floor((now.getTime() - new Date(iso).getTime()) / 86400000);
+  const idle: IdleEntry[] = [];
+  for (const c of wardrobeItems) {
+    if (!c.seasons || !c.seasons.some(s => activeSeasons.includes(s))) continue;
+    if (c.purchaseDate && daysSince(c.purchaseDate) < GRACE_DAYS) continue;
+    let days: number;
+    let neverWorn = false;
+    if (c.lastWornAt) {
+      days = daysSince(c.lastWornAt);
+    } else if (c.purchaseDate) {
+      days = daysSince(c.purchaseDate);
+      neverWorn = true;
+    } else if (c.createdAt) {
+      days = daysSince(c.createdAt);
+      neverWorn = true;
+    } else {
+      continue;
+    }
+    if (days > warnDays) idle.push({ item: c, days, neverWorn });
+  }
+  idle.sort((a, b) => b.days - a.days);
+  return idle;
+}
+
 /** 把 Date 格式化为 YYYY-MM-DD（本地，无时区偏移） */
 export function formatDate(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -145,34 +197,9 @@ export function computeInsights(opts: {
     out.push({ emoji: '📅', text: `周末穿搭比工作日丰富 ${Math.round(weAvg / wdAvg)} 倍` });
   }
 
-  // 3. 闲置提醒：仅当前在库 + 当季 + 超阈值；纳入从未穿过；新衣物 14 天宽限
-  const now = new Date();
-  const GRACE_DAYS = 14;
-  const daysSince = (iso: string) => Math.floor((now.getTime() - new Date(iso).getTime()) / 86400000);
-  const idle: { item: ClothingItem; days: number; neverWorn: boolean }[] = [];
-  for (const c of wardrobeItems) {
-    // 只统计当季衣物（命中任一活跃季节即可）
-    if (!c.seasons || !c.seasons.some(s => activeSeasons.includes(s))) continue;
-    // 新衣物宽限：购买不足 14 天不提醒
-    if (c.purchaseDate && daysSince(c.purchaseDate) < GRACE_DAYS) continue;
-    // 闲置时长：穿过按 lastWornAt；从未穿过按购买日(或创建日)
-    let days: number;
-    let neverWorn = false;
-    if (c.lastWornAt) {
-      days = daysSince(c.lastWornAt);
-    } else if (c.purchaseDate) {
-      days = daysSince(c.purchaseDate);
-      neverWorn = true;
-    } else if (c.createdAt) {
-      days = daysSince(c.createdAt);
-      neverWorn = true;
-    } else {
-      continue;
-    }
-    if (days > warnDays) idle.push({ item: c, days, neverWorn });
-  }
+  // 3. 闲置提醒：复用 getIdleItems（仅在库+当季+超阈值，含从未穿，新衣物14天宽限）
+  const idle = getIdleItems(wardrobeItems, activeSeasons, warnDays);
   if (idle.length > 0) {
-    idle.sort((a, b) => b.days - a.days);
     const items = idle.slice(0, 3).map(({ item, days, neverWorn }) => ({
       itemId: item.id,
       thumb: item.thumbnailUri || item.imageUri,
