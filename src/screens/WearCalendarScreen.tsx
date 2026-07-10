@@ -532,7 +532,10 @@ export function WearCalendarScreen() {
           </View>
         )}
 
-        <CalendarInsights insights={insights} />
+        <CalendarInsights
+          insights={insights}
+          onPressItem={(id) => navigation.navigate('ClothingDetail' as any, { id })}
+        />
       </ScrollView>
 
       {/* 日期详情 Sheet */}

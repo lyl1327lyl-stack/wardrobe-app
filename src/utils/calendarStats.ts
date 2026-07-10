@@ -64,6 +64,10 @@ export function computeMonthProgress(
 export interface Insight {
   emoji: string;
   text: string;
+  /** 闲置提醒关联的衣物 id（仅 idle 洞察有），用于缩略图展示与点击跳转 */
+  itemId?: number;
+  /** 闲置提醒关联的衣物缩略图（仅 idle 洞察有） */
+  thumb?: string;
 }
 
 /**
@@ -125,7 +129,12 @@ export function computeInsights(opts: {
   }
   if (worst) {
     const name = worst.item.type || worst.item.remarks || '该衣物';
-    out.push({ emoji: '💤', text: `${name} 已 ${worst.days} 天没穿` });
+    out.push({
+      emoji: '💤',
+      text: `${name} 已 ${worst.days} 天没穿`,
+      itemId: worst.item.id,
+      thumb: worst.item.thumbnailUri || worst.item.imageUri,
+    });
   }
 
   return out.slice(0, 3);
