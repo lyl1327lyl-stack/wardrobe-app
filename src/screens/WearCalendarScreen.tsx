@@ -311,10 +311,11 @@ export function WearCalendarScreen() {
   }, []);
 
   useEffect(() => {
-    if (viewMode === 'year' && Object.keys(yearCountMap).length === 0) {
+    // 每次切到年视图都重新拉取当年数据，保证月视图新增记录后立刻生效
+    if (viewMode === 'year') {
       loadYearCountMap(currentYear);
     }
-  }, [viewMode, currentYear, yearCountMap, loadYearCountMap]);
+  }, [viewMode, currentYear, loadYearCountMap]);
 
   // 月份切换时只重载当月数据；最近一周/今日连续在 useFocusEffect(reloadAll) 中刷新
   useEffect(() => {
@@ -465,7 +466,6 @@ export function WearCalendarScreen() {
               year={currentYear}
               countMap={yearCountMap}
               today={today}
-              onSelectDate={handleDayPress}
             />
           </View>
         )}

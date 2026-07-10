@@ -1,6 +1,6 @@
 // src/components/YearHeatmap.tsx
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { tintForCount } from '../utils/calendarStats';
@@ -10,17 +10,16 @@ interface Props {
   /** 日期(YYYY-MM-DD) → 当天件数。可只含本年。 */
   countMap: Record<string, number>;
   today: string;
-  onSelectDate: (dateStr: string) => void;
-  /** 单格尺寸（宽=高）。不传则默认 14。 */
+  /** 单格尺寸（宽=高）。不传则默认 16。 */
   cellSize?: number;
 }
 
 interface Cell { dateStr: string; month: number; day: number; firstOfMonth: boolean; }
 
-export function YearHeatmap({ year, countMap, today, onSelectDate, cellSize }: Props) {
+export function YearHeatmap({ year, countMap, today, cellSize }: Props) {
   const { theme } = useTheme();
   const styles = React.useMemo(() => makeStyles(theme), [theme]);
-  const cs = cellSize ?? 14;
+  const cs = cellSize ?? 16;
 
   // 连续全年网格：列=周(周一起), 行=周一..周日
   const firstMon = (new Date(year, 0, 1).getDay() + 6) % 7;
@@ -93,10 +92,8 @@ export function YearHeatmap({ year, countMap, today, onSelectDate, cellSize }: P
                   : (tintForCount(count, theme.colors.primary) || theme.colors.borderLight);
                 const isToday = cell.dateStr === today;
                 return (
-                  <TouchableOpacity
+                  <View
                     key={ri}
-                    disabled={isFuture}
-                    onPress={() => onSelectDate(cell.dateStr)}
                     style={[styles.cell, { width: cs, height: cs, backgroundColor: bg }, isToday && styles.cellToday]}
                   />
                 );
