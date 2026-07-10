@@ -15,7 +15,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { usePreferenceStore } from '../store/preferenceStore';
 import { OutfitRecommendationCard } from '../components/OutfitRecommendationCard';
-import { RecentOutfitCard } from '../components/RecentOutfitCard';
 import { PreferenceSurveySheet } from '../components/PreferenceSurveySheet';
 import { generateRecommendations } from '../services/outfitRecommender';
 import { analyzeAttributeGaps, AttributeTip } from '../services/attributeTips';
@@ -24,6 +23,7 @@ import { getWearRecordsByDate, getWearRecordsByDateRange } from '../db/wearRecor
 import { ClothingItem, OutfitRecommendation, Weather, WearRecord } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
+import { getIdleItems, getActiveSeasons } from '../utils/calendarStats';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
@@ -324,20 +324,14 @@ export function HomeScreen() {
 
   const attributeTips = useMemo(() => analyzeAttributeGaps(clothing), [clothing]);
 
-  // 统计扩展维度：总价、平均穿着、沉睡件数
+  // 统计扩展维度：总价、平均穿着、沉睡件数（沉睡口径与日历闲置一致：当季+在库+含从未穿）
   const wardrobeInsights = useMemo(() => {
     const active = clothing.filter(c => !c.deletedAt);
     const totalPrice = active.reduce((sum, c) => sum + (c.price || 0), 0);
     const avgWearCount = active.length > 0
       ? active.reduce((sum, c) => sum + (c.wearCount || 0), 0) / active.length
       : 0;
-    const SLEEP_THRESHOLD_DAYS = 30;
-    const now = Date.now();
-    const sleepingCount = active.filter(c => {
-      if (!c.lastWornAt) return true; // 从未穿过
-      const days = Math.floor((now - new Date(c.lastWornAt).getTime()) / (1000 * 60 * 60 * 24));
-      return days > SLEEP_THRESHOLD_DAYS;
-    }).length;
+    const sleepingCount = getIdleItems(active, getActiveSeasons()).length;
     return { totalPrice, avgWearCount, sleepingCount };
   }, [clothing]);
 
@@ -508,8 +502,6 @@ export function HomeScreen() {
     navigation.navigate('OutfitEditor', { exitTo: { screen: 'Home' } });
   }, [navigation]);
 
-  const goToCalendar = () => navigation.navigate('WearCalendar');
-
   const surveyPrefs = useMemo(() => {
     const s = usePreferenceStore.getState();
     return {
@@ -633,6 +625,13 @@ export function HomeScreen() {
             </View>
             <Text style={styles.quickActionLabel}>穿搭日历</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={() => setShowSurveySheet(true)} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="color-palette-outline" size={20} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>个性化</Text>
+          </TouchableOpacity>
         </View>
 
         {recLoading ? (
@@ -664,12 +663,6 @@ export function HomeScreen() {
             </Text>
           </View>
         )}
-
-        {/* ── 近期穿搭 ── */}
-        <RecentOutfitCard
-          todayRecords={todayRecords}
-          onViewCalendar={goToCalendar}
-        />
       </ScrollView>
 
       <PreferenceSurveySheet
