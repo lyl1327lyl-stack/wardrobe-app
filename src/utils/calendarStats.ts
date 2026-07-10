@@ -1,37 +1,31 @@
 // src/utils/calendarStats.ts
 import { ClothingItem, Season } from '../types';
 
-const SEASON_BUFFER_DAYS = 45;
-// 节气边界（近似 day-of-year，非闰年）：立春~2/4(35) 立夏~5/5(125) 立秋~8/7(219) 立冬~11/7(311)
-// 各季 core = [节气, 下一节气前一天]；冬跨年(end = 立春前一天 ≡ 399)
+// 节气边界（近似 day-of-year）：立春~2/4(35) 立夏~5/5(125) 立秋~8/7(219) 立冬~11/7(311)
+// 各季 core = [节气, 下一节气前一天]；冬跨年(311→34)。core 连续不重叠，覆盖全年。
 const SEASON_CORES: { name: Season; start: number; end: number }[] = [
   { name: '春', start: 35, end: 124 },
   { name: '夏', start: 125, end: 218 },
   { name: '秋', start: 219, end: 310 },
-  { name: '冬', start: 311, end: 399 },
+  { name: '冬', start: 311, end: 34 },
 ];
 
-/** 把 day-of-year 归一化到 1..365 的圆上 */
-const normDay = (n: number) => ((Math.round(n) - 1) % 365 + 365) % 365 + 1;
-/** 圆形区间判定（ws>we 表示跨年） */
+/** 圆形区间判定（start>end 表示跨年，如冬） */
 const inWindow = (d: number, ws: number, we: number) =>
   ws <= we ? d >= ws && d <= we : d >= ws || d <= we;
 
 /**
- * 指定日期的「活跃季节」集合：以节气为边界，每个季节 core 前后各 SEASON_BUFFER_DAYS 天缓冲内即算活跃。
- * 默认取今天。
+ * 指定日期所在季节（按节气边界，单一季节，无缓冲）。
+ * 例如盛夏(7月) → ['夏']，只限定夏季衣物。默认取今天。
  */
 export function getActiveSeasons(date = new Date()): Season[] {
   const yearStart = new Date(date.getFullYear(), 0, 1);
   let dayOfYear = Math.floor((+date - +yearStart) / 86400000) + 1;
   if (dayOfYear > 365) dayOfYear = 365; // 闰年末压回，误差≤1天
-  const result: Season[] = [];
   for (const s of SEASON_CORES) {
-    const ws = normDay(s.start - SEASON_BUFFER_DAYS);
-    const we = normDay(s.end + SEASON_BUFFER_DAYS);
-    if (inWindow(dayOfYear, ws, we)) result.push(s.name);
+    if (inWindow(dayOfYear, s.start, s.end)) return [s.name];
   }
-  return result;
+  return [];
 }
 
 /** 把 Date 格式化为 YYYY-MM-DD（本地，无时区偏移） */
