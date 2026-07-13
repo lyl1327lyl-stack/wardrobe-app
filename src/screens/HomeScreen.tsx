@@ -25,23 +25,13 @@ import { getWearRecordsByDate, getWearRecordsByDateRange } from '../db/wearRecor
 import { ClothingItem, OutfitRecommendation, Weather, WearRecord } from '../types';
 import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
-import { getIdleItems, getActiveSeasons, getSeasonTransition, computeStreak, formatDate } from '../utils/calendarStats';
+import { getIdleItems, getActiveSeasons, getSeasonTransition } from '../utils/calendarStats';
 import { CalendarInsights } from '../components/CalendarInsights';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_H_PADDING * 2;
 const CAT_COLORS = ['#6B7FD7', '#E8B4A0', '#00B894', '#FDCB6E', '#A29BFE', '#74B9FF'];
-
-/** 温度区间 → 宜穿提示文字（固定映射） */
-function getTempHint(temp: number): string {
-  if (temp < 10) return '宜厚款';
-  if (temp < 15) return '适中外套';
-  if (temp < 20) return '薄外套';
-  if (temp < 25) return '宜薄款';
-  if (temp < 30) return '清凉短袖';
-  return '透气清凉';
-}
 
 function todayDateStr(): string {
   const d = new Date();
@@ -319,20 +309,6 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     elevation: 3,
   },
 
-  // 本周概览
-  weekCard: {
-    marginHorizontal: CARD_H_PADDING, marginTop: 12,
-    backgroundColor: theme.colors.white, borderRadius: 16, paddingVertical: 16,
-    flexDirection: 'row', alignItems: 'center',
-    shadowColor: theme.colors.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 3,
-  },
-  weekItem: { flex: 1, alignItems: 'center' },
-  weekBig: { fontSize: 18 },
-  weekNum: { fontSize: 20, fontWeight: '800', color: theme.colors.text, marginTop: 2 },
-  weekUnit: { fontSize: 11, color: theme.colors.textTertiary, fontWeight: '500' },
-  weekLabel: { fontSize: 11, color: theme.colors.textSecondary, marginTop: 2 },
-  weekDivider: { width: 1, height: 36, backgroundColor: theme.colors.border },
-
   // 换季提醒
   tipCard: {
     marginHorizontal: CARD_H_PADDING, marginTop: 12,
@@ -377,7 +353,6 @@ export function HomeScreen() {
   // 主页级衣橱范围（null = 全部衣橱；仅影响本页概况，不改动全局）
   const [scopeWardrobeId, setScopeWardrobeId] = useState<number | null>(null);
   const [showWardrobeDropdown, setShowWardrobeDropdown] = useState(false);
-  const [weekStats, setWeekStats] = useState<{ streak: number; weekDays: number }>({ streak: 0, weekDays: 0 });
 
   const scopedClothing = useMemo(
     () => (scopeWardrobeId == null ? clothing : clothing.filter(c => c.wardrobeId === scopeWardrobeId)),
@@ -446,32 +421,6 @@ export function HomeScreen() {
     const sleepingCount = getIdleItems(active, getActiveSeasons()).length;
     return { totalPrice, avgWearCount, sleepingCount };
   }, [clothing]);
-
-  // 本周穿搭概览：连续记录天数 + 本周已记录天数（异步加载近 40 天记录）
-  const loadWeekStats = useCallback(async () => {
-    try {
-      const now = new Date();
-      const start = new Date(now); start.setDate(start.getDate() - 39);
-      const startStr = formatDate(start);
-      const todayStr = formatDate(now);
-      const recs = await getWearRecordsByDateRange(startStr, todayStr);
-      const recordedDates = new Set<string>();
-      recs.forEach(r => recordedDates.add(r.wornDate));
-      const streak = computeStreak(recordedDates, todayStr);
-      // 本周(周一~周日)已记录天数
-      const dow = (now.getDay() + 6) % 7; // 0=周一
-      const monday = new Date(now); monday.setDate(now.getDate() - dow);
-      const weekStrs = new Set<string>();
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(monday); d.setDate(monday.getDate() + i);
-        weekStrs.add(formatDate(d));
-      }
-      const weekDays = [...recordedDates].filter(d => weekStrs.has(d)).length;
-      setWeekStats({ streak, weekDays });
-    } catch (e) {
-      // 静默失败
-    }
-  }, []);
 
   // 换季提醒：若刚进入某季节(7天内)，提示整理该季节衣物
   const seasonTransition = useMemo(() => {
@@ -602,7 +551,6 @@ export function HomeScreen() {
       lastSnapshotRef.current = { clothingCount: s2.clothing.length, outfitCount: s2.outfits.length };
       await refreshTodayRecords();
       await loadRecommendations(scopeWardrobeId);
-      await loadWeekStats();
     };
     init();
   }, []);
@@ -621,7 +569,6 @@ export function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       refreshTodayRecords();
-      loadWeekStats();
       const s = useWardrobeStore.getState();
       const prev = lastSnapshotRef.current;
       if (s.clothing.length !== prev.clothingCount || s.outfits.length !== prev.outfitCount) {
@@ -706,23 +653,6 @@ export function HomeScreen() {
           <Text style={styles.headerTitle}>{scopeWardrobeName}</Text>
           <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
         </TouchableOpacity>
-        {weather && (
-          <View style={styles.headerWeather}>
-            <Ionicons
-              name={
-                weather.condition === '晴' ? 'sunny' :
-                weather.condition === '多云' ? 'partly-sunny' :
-                weather.condition === '阴' ? 'cloudy' :
-                weather.condition === '雨' ? 'rainy' :
-                weather.condition === '雪' ? 'snow' :
-                'cloudy'
-              }
-              size={14}
-              color={theme.colors.textSecondary}
-            />
-            <Text style={styles.headerWeatherText}>{weather.temperature}°C · {getTempHint(weather.temperature)}</Text>
-          </View>
-        )}
       </View>
 
       <ScrollView
@@ -789,44 +719,6 @@ export function HomeScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* ── 快捷入口 ── */}
-        <View style={styles.quickActions}>
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('RecordWear')} activeOpacity={0.7}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.quickActionLabel}>记录穿搭</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('AddClothing')} activeOpacity={0.7}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.quickActionLabel}>添加单品</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickAction} onPress={handleNewOutfit} activeOpacity={0.7}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="grid-outline" size={20} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.quickActionLabel}>新建搭配</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('WearCalendar')} activeOpacity={0.7}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.quickActionLabel}>穿搭日历</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.quickAction} onPress={() => setShowSurveySheet(true)} activeOpacity={0.7}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="color-palette-outline" size={20} color={theme.colors.primary} />
-            </View>
-            <Text style={styles.quickActionLabel}>个性化</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* ── 今日穿搭 Hero（常驻：天气 + 今日 + 已记录单品）── */}
         <View style={styles.todayHero}>
           <LinearGradient
@@ -874,6 +766,44 @@ export function HomeScreen() {
           )}
         </View>
 
+        {/* ── 快捷入口 ── */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('RecordWear')} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="create-outline" size={20} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>记录穿搭</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('AddClothing')} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="add-circle-outline" size={20} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>添加单品</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={handleNewOutfit} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="grid-outline" size={20} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>新建搭配</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={() => navigation.navigate('WearCalendar')} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="calendar-outline" size={20} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>穿搭日历</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.quickAction} onPress={() => setShowSurveySheet(true)} activeOpacity={0.7}>
+            <View style={styles.quickActionIcon}>
+              <Ionicons name="color-palette-outline" size={20} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.quickActionLabel}>个性化</Text>
+          </TouchableOpacity>
+        </View>
+
         {recLoading ? (
           <View style={styles.recLoading}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
@@ -903,21 +833,6 @@ export function HomeScreen() {
             </Text>
           </View>
         )}
-
-        {/* ── 本周穿搭概览 ── */}
-        <View style={styles.weekCard}>
-          <View style={styles.weekItem}>
-            <Text style={styles.weekBig}>{weekStats.streak > 0 ? '🔥' : '💧'}</Text>
-            <Text style={styles.weekNum}>{weekStats.streak}<Text style={styles.weekUnit}> 天</Text></Text>
-            <Text style={styles.weekLabel}>连续记录</Text>
-          </View>
-          <View style={styles.weekDivider} />
-          <View style={styles.weekItem}>
-            <Text style={styles.weekBig}>📅</Text>
-            <Text style={styles.weekNum}>{weekStats.weekDays}<Text style={styles.weekUnit}>/7</Text></Text>
-            <Text style={styles.weekLabel}>本周已记录</Text>
-          </View>
-        </View>
 
         {/* ── 换季提醒 ── */}
         {seasonTransition && (
