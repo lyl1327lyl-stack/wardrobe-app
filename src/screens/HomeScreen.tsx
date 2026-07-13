@@ -420,7 +420,7 @@ export function HomeScreen() {
 
   const totalCount = scopedClothing.length;
 
-  const attributeTips = useMemo(() => analyzeAttributeGaps(clothing), [clothing]);
+  const attributeTips = useMemo(() => analyzeAttributeGaps(scopedClothing), [scopedClothing]);
 
   // 统计扩展维度：总价、平均穿着、沉睡件数（沉睡口径与日历闲置一致：当季+在库+含从未穿）
   const wardrobeInsights = useMemo(() => {
@@ -490,14 +490,16 @@ export function HomeScreen() {
     [outfits]
   );
 
-  const loadRecommendations = useCallback(async () => {
+  const loadRecommendations = useCallback(async (wardrobeId: number | null) => {
     const w = await getWeather();
     setWeather(w);
     setRecLoading(true);
     const recentlyWornDays = await buildRecentlyWornDays();
     const s = useWardrobeStore.getState();
     const prefs = usePreferenceStore.getState();
-    const recs = generateRecommendations(s.clothing, s.outfits, w, {
+    const allClothing = s.clothing;
+    const sourceClothing = wardrobeId == null ? allClothing : allClothing.filter(c => c.wardrobeId === wardrobeId);
+    const recs = generateRecommendations(sourceClothing, s.outfits, w, {
       recentRecommendedItemIds: getRecentIdsSet(),
       recentlyWornDays,
       blacklistPairs: prefs.blacklist,
@@ -585,11 +587,18 @@ export function HomeScreen() {
       const s2 = useWardrobeStore.getState();
       lastSnapshotRef.current = { clothingCount: s2.clothing.length, outfitCount: s2.outfits.length };
       await refreshTodayRecords();
-      await loadRecommendations();
+      await loadRecommendations(scopeWardrobeId);
       await loadWeekStats();
     };
     init();
   }, []);
+
+  // 切换衣橱范围后重新生成推荐（跳过首次，由 init 处理）
+  const scopeChangedRef = useRef(false);
+  useEffect(() => {
+    if (!scopeChangedRef.current) { scopeChangedRef.current = true; return; }
+    loadRecommendations(scopeWardrobeId);
+  }, [scopeWardrobeId]);
 
   // 记录上次推荐时的数据快照，用于检测变更
   const lastSnapshotRef = useRef({ clothingCount: 0, outfitCount: 0 });
@@ -604,11 +613,11 @@ export function HomeScreen() {
       if (s.clothing.length !== prev.clothingCount || s.outfits.length !== prev.outfitCount) {
         if (prev.clothingCount > 0) {
           // 非首次加载，数据确实变了才刷新推荐
-          loadRecommendations();
+          loadRecommendations(scopeWardrobeId);
         }
         lastSnapshotRef.current = { clothingCount: s.clothing.length, outfitCount: s.outfits.length };
       }
-    }, [refreshTodayRecords, loadRecommendations])
+    }, [refreshTodayRecords, loadRecommendations, scopeWardrobeId])
   );
 
   const handleRefresh = useCallback(async () => {
@@ -618,7 +627,8 @@ export function HomeScreen() {
       const recentlyWornDays = await buildRecentlyWornDays();
       const s = useWardrobeStore.getState();
       const prefs = usePreferenceStore.getState();
-      const recs = generateRecommendations(s.clothing, s.outfits, weather, {
+      const sourceClothing = scopeWardrobeId == null ? s.clothing : s.clothing.filter(c => c.wardrobeId === scopeWardrobeId);
+      const recs = generateRecommendations(sourceClothing, s.outfits, weather, {
         recentRecommendedItemIds: getRecentIdsSet(),
         recentlyWornDays,
         blacklistPairs: prefs.blacklist,
@@ -638,7 +648,7 @@ export function HomeScreen() {
         setRecIndex(0);
       }
     }
-  }, [recIndex, recommendations.length, weather]);
+  }, [recIndex, recommendations.length, weather, scopeWardrobeId]);
 
   const handleWearRecommendation = useCallback(async (mode: 'append' | 'replace', overrideItems?: ClothingItem[]) => {
     if (!recommendation) return;
@@ -671,8 +681,8 @@ export function HomeScreen() {
 
   const handleSaveSurvey = useCallback(async (prefs: typeof surveyPrefs) => {
     await usePreferenceStore.getState().setSurveyPreferences(prefs);
-    loadRecommendations();
-  }, [loadRecommendations]);
+    loadRecommendations(scopeWardrobeId);
+  }, [loadRecommendations, scopeWardrobeId]);
 
   return (
     <View style={styles.container}>
@@ -839,7 +849,7 @@ export function HomeScreen() {
             </View>
             <OutfitRecommendationCard
             recommendation={recommendation}
-            allClothing={clothing}
+            allClothing={scopedClothing}
             outfits={outfits}
             onRefresh={handleRefresh}
             onWear={handleWearRecommendation}
