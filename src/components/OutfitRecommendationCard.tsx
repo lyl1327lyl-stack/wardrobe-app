@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -29,6 +29,8 @@ interface Props {
   recTotal: number;
   recIndex: number;
   attributeTips?: AttributeTip[];
+  /** 打开个性化偏好面板 */
+  onPersonalize?: () => void;
 }
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -271,21 +273,15 @@ export function OutfitRecommendationCard({
   recTotal,
   recIndex,
   attributeTips,
+  onPersonalize,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { items, scene, reason, score } = recommendation;
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [recExpanded, setRecExpanded] = useState(false);
 
   const hasTodayRecord = todayWornIds.length > 0;
-  // Collapse the recommendation card when today is recorded
-  const showFullRec = !hasTodayRecord || recExpanded;
-
-  useEffect(() => {
-    setRecExpanded(false);
-  }, [hasTodayRecord]);
 
   const todayIdSet = useMemo(() => new Set(todayWornIds), [todayWornIds]);
   const isDuplicate = hasTodayRecord && items.length > 0 && items.every(i => todayIdSet.has(i.id));
@@ -383,8 +379,7 @@ export function OutfitRecommendationCard({
   return (
     <View style={styles.container}>
       <View style={styles.card}>
-        {showFullRec ? (
-          <>
+        <>
             {/* ── Header ── */}
             <View style={styles.header}>
               <View style={styles.headerLeft}>
@@ -409,17 +404,17 @@ export function OutfitRecommendationCard({
                 {attributeTips && attributeTips.length > 0 && (
                   <AttributeTipIcon tips={attributeTips} />
                 )}
+                {onPersonalize && (
+                  <TouchableOpacity style={styles.headerBtn} onPress={onPersonalize} activeOpacity={0.7}>
+                    <Ionicons name="color-palette-outline" size={17} color={theme.colors.textSecondary} />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.headerBtn} onPress={onRefresh} activeOpacity={0.7}>
                   <Ionicons name="refresh" size={18} color={theme.colors.textSecondary} />
                   <View style={styles.refreshBadge}>
                     <Text style={styles.refreshBadgeText}>{recIndex + 1}/{recTotal}</Text>
                   </View>
                 </TouchableOpacity>
-                {hasTodayRecord && (
-                  <TouchableOpacity style={styles.headerBtn} onPress={() => setRecExpanded(false)} activeOpacity={0.7}>
-                    <Ionicons name="chevron-up" size={18} color={theme.colors.textSecondary} />
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
 
@@ -486,41 +481,6 @@ export function OutfitRecommendationCard({
               </TouchableOpacity>
             </View>
           </>
-        ) : (
-          /* ── Collapsed: tappable header-only card ── */
-          <TouchableOpacity
-            onPress={() => setRecExpanded(true)}
-            activeOpacity={0.85}
-            style={styles.header}
-          >
-            <View style={styles.headerLeft}>
-              <View style={styles.titleIcon}>
-                <Ionicons name="sparkles" size={15} color={theme.colors.primary} />
-              </View>
-              <View style={styles.titleGroup}>
-                <View style={styles.titleRow}>
-                  <Text style={styles.title}>今日推荐</Text>
-                  <View style={[styles.sceneBadge, { backgroundColor: sceneCfg.bg }]}>
-                    <Ionicons name={sceneCfg.icon as any} size={9} color={sceneCfg.color} />
-                    <Text style={[styles.sceneBadgeText, { color: sceneCfg.color }]}>{sceneCfg.label}</Text>
-                  </View>
-                </View>
-                <View style={styles.subtitleRow}>
-                  <Text style={styles.scoreText}>{score}分</Text>
-                  <Text style={styles.reasonText} numberOfLines={1}>{reason}</Text>
-                </View>
-              </View>
-            </View>
-            <View style={styles.headerRight}>
-              {attributeTips && attributeTips.length > 0 && (
-                <AttributeTipIcon tips={attributeTips} />
-              )}
-              <View style={styles.headerBtn}>
-                <Ionicons name="chevron-down" size={18} color={theme.colors.textSecondary} />
-              </View>
-            </View>
-          </TouchableOpacity>
-        )}
       </View>
 
       <OutfitConfirmModal

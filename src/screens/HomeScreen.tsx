@@ -350,6 +350,8 @@ export function HomeScreen() {
   const [recLoading, setRecLoading] = useState(true);
   const [todayRecords, setTodayRecords] = useState<WearRecord[]>([]);
   const [showSurveySheet, setShowSurveySheet] = useState(false);
+  // 推荐卡片可见性：今日未记录→自动展开；已记录→自动收起；用户可手动切换
+  const [showRec, setShowRec] = useState(true);
   // 主页级衣橱范围（null = 全部衣橱；仅影响本页概况，不改动全局）
   const [scopeWardrobeId, setScopeWardrobeId] = useState<number | null>(null);
   const [showWardrobeDropdown, setShowWardrobeDropdown] = useState(false);
@@ -396,6 +398,11 @@ export function HomeScreen() {
       .filter((c): c is ClothingItem => !!c),
     [todayRecords, clothing]
   );
+
+  // 今日记录状态变化时自动控制推荐卡片：未记录→展开；已记录→收起
+  useEffect(() => {
+    setShowRec(todayItems.length === 0);
+  }, [todayItems.length]);
 
   // Category stats — dynamic from (scoped) clothing data
   const categoryStats = useMemo(() => {
@@ -796,42 +803,45 @@ export function HomeScreen() {
             <Text style={styles.quickActionLabel}>穿搭日历</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.quickAction} onPress={() => setShowSurveySheet(true)} activeOpacity={0.7}>
-            <View style={styles.quickActionIcon}>
-              <Ionicons name="color-palette-outline" size={20} color={theme.colors.primary} />
+          <TouchableOpacity style={styles.quickAction} onPress={() => setShowRec(v => !v)} activeOpacity={0.7}>
+            <View style={[styles.quickActionIcon, showRec && { backgroundColor: theme.colors.primary }]}>
+              <Ionicons name="sparkles-outline" size={20} color={showRec ? '#fff' : theme.colors.primary} />
             </View>
-            <Text style={styles.quickActionLabel}>个性化</Text>
+            <Text style={[styles.quickActionLabel, showRec && { color: theme.colors.primary, fontWeight: '700' }]}>{showRec ? '收起推荐' : '搭配推荐'}</Text>
           </TouchableOpacity>
         </View>
 
-        {recLoading ? (
-          <View style={styles.recLoading}>
-            <ActivityIndicator size="small" color={theme.colors.primary} />
-            <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>正在生成推荐...</Text>
-          </View>
-        ) : recommendation ? (
-          <OutfitRecommendationCard
-            recommendation={recommendation}
-            allClothing={scopedClothing}
-            outfits={outfits}
-            onRefresh={handleRefresh}
-            onWear={handleWearRecommendation}
-            onSaveAsOutfit={handleSaveAsOutfit}
-            onReplaceItem={handleReplaceItem}
-            todayWornIds={todayRecords.map(r => r.clothingId)}
-            recTotal={recommendations.length}
-            recIndex={recIndex}
-            attributeTips={attributeTips}
-          />
-        ) : (
-          <View style={styles.recEmpty}>
-            <Ionicons name="shirt-outline" size={28} color={theme.colors.border} />
-            <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>
-              {totalCount === 0
-                ? '去添加你的第一件衣服吧'
-                : '需要更多类型单品（如上装+下装）来生成搭配'}
-            </Text>
-          </View>
+        {showRec && (
+          recLoading ? (
+            <View style={styles.recLoading}>
+              <ActivityIndicator size="small" color={theme.colors.primary} />
+              <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>正在生成推荐...</Text>
+            </View>
+          ) : recommendation ? (
+            <OutfitRecommendationCard
+              recommendation={recommendation}
+              allClothing={scopedClothing}
+              outfits={outfits}
+              onRefresh={handleRefresh}
+              onWear={handleWearRecommendation}
+              onSaveAsOutfit={handleSaveAsOutfit}
+              onReplaceItem={handleReplaceItem}
+              todayWornIds={todayRecords.map(r => r.clothingId)}
+              recTotal={recommendations.length}
+              recIndex={recIndex}
+              attributeTips={attributeTips}
+              onPersonalize={() => setShowSurveySheet(true)}
+            />
+          ) : (
+            <View style={styles.recEmpty}>
+              <Ionicons name="shirt-outline" size={28} color={theme.colors.border} />
+              <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>
+                {totalCount === 0
+                  ? '去添加你的第一件衣服吧'
+                  : '需要更多类型单品（如上装+下装）来生成搭配'}
+              </Text>
+            </View>
+          )
         )}
 
         {/* ── 换季提醒 ── */}
