@@ -546,6 +546,7 @@ export function WearCalendarScreen() {
           onClose={() => setShowSheet(false)}
           date={selectedDate}
           onAddRecord={handleAddRecord}
+          onRecordsChanged={() => loadMonthData()}
         />
       )}
     </View>

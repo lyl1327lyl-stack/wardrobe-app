@@ -337,6 +337,23 @@ const makeStyles = (theme: Theme) =>
       fontWeight: '600',
       color: theme.colors.textSecondary,
     },
+    clearDayBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 5,
+      paddingHorizontal: 14,
+      paddingVertical: 13,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: theme.colors.danger + '30',
+      backgroundColor: theme.colors.danger + '10',
+    },
+    clearDayBtnText: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.colors.danger,
+    },
     confirmBtn: {
       flex: 1,
       flexDirection: 'row',
@@ -395,6 +412,7 @@ export function RecordWearScreen() {
   const [mode, setMode] = useState<'items' | 'outfit'>(initialOutfitId ? 'outfit' : 'items');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [selectedDate, setSelectedDate] = useState(initialDate || todayDateStr());
+  const [existingCount, setExistingCount] = useState(0); // 当天已有记录数
   const [searchKeyword, setSearchKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>({});
   const [selectedSeason, setSelectedSeason] = useState<'全部' | Season>('全部');
@@ -465,6 +483,7 @@ export function RecordWearScreen() {
         outfitPresetAppliedRef.current = true;
       }
       setSelectedIds(ids);
+      setExistingCount(records.length);
     })();
   }, [selectedDate, initialOutfitId, outfits]);
 
@@ -567,6 +586,26 @@ export function RecordWearScreen() {
       console.error('RecordWearScreen handleConfirm failed:', error);
       Alert.alert('记录失败', '保存穿着记录时出错，请重试');
     }
+  };
+
+  const handleClearDay = () => {
+    Alert.alert('清空当天记录', `确定要移除 ${selectedDate} 的全部穿着记录吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '清空',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await wearRecordsDb.deleteWearRecordsByDate(selectedDate);
+            setSelectedIds([]);
+            setExistingCount(0);
+            navigation.goBack();
+          } catch (e) {
+            Alert.alert('错误', '清空失败，请重试');
+          }
+        },
+      },
+    ]);
   };
 
   const handleDateSelect = (dateStr: string) => {
@@ -840,6 +879,12 @@ export function RecordWearScreen() {
             <TouchableOpacity style={styles.clearBtn} onPress={() => setSelectedIds([])} activeOpacity={0.7}>
               <Ionicons name="close" size={15} color={theme.colors.textSecondary} />
               <Text style={styles.clearBtnText}>清空</Text>
+            </TouchableOpacity>
+          )}
+          {existingCount > 0 && (
+            <TouchableOpacity style={styles.clearDayBtn} onPress={handleClearDay} activeOpacity={0.7}>
+              <Ionicons name="trash-outline" size={15} color={theme.colors.danger} />
+              <Text style={styles.clearDayBtnText}>清空当天</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity

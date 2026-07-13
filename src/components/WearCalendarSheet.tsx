@@ -7,6 +7,7 @@ import {
   Modal,
   Image,
   FlatList,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +22,8 @@ interface WearCalendarSheetProps {
   onClose: () => void;
   date: string; // YYYY-MM-DD
   onAddRecord?: () => void;
+  /** 清空当天记录后通知父组件刷新 */
+  onRecordsChanged?: () => void;
 }
 
 const makeStyles = (theme: Theme) =>
@@ -234,6 +237,7 @@ export function WearCalendarSheet({
   onClose,
   date,
   onAddRecord,
+  onRecordsChanged,
 }: WearCalendarSheetProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -353,6 +357,26 @@ export function WearCalendarSheet({
     return dateStr;
   };
 
+  const handleClearDay = () => {
+    Alert.alert('清空当天记录', `确定要移除 ${formatDate(date)} 的全部穿着记录吗？`, [
+      { text: '取消', style: 'cancel' },
+      {
+        text: '清空',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await wearRecordsDb.deleteWearRecordsByDate(date);
+            setRecords([]);
+            onRecordsChanged?.();
+            onClose();
+          } catch (e) {
+            Alert.alert('错误', '清空失败，请重试');
+          }
+        },
+      },
+    ]);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -388,17 +412,26 @@ export function WearCalendarSheet({
               </View>
             </View>
             {records.length > 0 && (
-              <TouchableOpacity onPress={() => onAddRecord?.()} activeOpacity={0.85}>
-                <LinearGradient
-                  colors={[theme.colors.primary, theme.colors.primaryDark]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.editBtn}
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                <TouchableOpacity
+                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: theme.colors.danger + '15', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={handleClearDay}
+                  activeOpacity={0.7}
                 >
-                  <Ionicons name="pencil" size={15} color={theme.colors.white} />
-                  <Text style={styles.editBtnText}>编辑</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <Ionicons name="trash-outline" size={17} color={theme.colors.danger} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => onAddRecord?.()} activeOpacity={0.85}>
+                  <LinearGradient
+                    colors={[theme.colors.primary, theme.colors.primaryDark]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.editBtn}
+                  >
+                    <Ionicons name="pencil" size={15} color={theme.colors.white} />
+                    <Text style={styles.editBtnText}>编辑</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             )}
           </View>
 
