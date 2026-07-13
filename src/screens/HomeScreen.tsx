@@ -282,6 +282,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   todayHeroTitle: { fontSize: 16, fontWeight: '700', color: '#fff' },
   todayHeroSub: { fontSize: 12, color: 'rgba(255,255,255,0.88)', marginTop: 3 },
+  todayHeroThumbs: { flexDirection: 'row', marginTop: 10 },
+  todayHeroThumbWrap: { width: 38, height: 38, marginRight: 7, borderRadius: 9, overflow: 'hidden' },
+  todayHeroThumb: { width: 38, height: 38, borderRadius: 9, borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.85)', backgroundColor: 'rgba(255,255,255,0.2)' },
+  todayHeroMore: { position: 'absolute', right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: 'center' },
+  todayHeroMoreText: { fontSize: 9, color: '#fff', fontWeight: '700' },
+  todayHeroHint: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 8 },
 
   // ── Recommendation ──
   recLoading: {
@@ -407,6 +413,14 @@ export function HomeScreen() {
     const wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
     return `${d.getMonth() + 1}月${d.getDate()}日 ${wd}`;
   }, []);
+
+  // 今日已记录的单品（用于 Hero 展示）
+  const todayItems = useMemo(
+    () => todayRecords
+      .map(r => clothing.find(c => c.id === r.clothingId))
+      .filter((c): c is ClothingItem => !!c),
+    [todayRecords, clothing]
+  );
 
   // Category stats — dynamic from (scoped) clothing data
   const categoryStats = useMemo(() => {
@@ -813,41 +827,60 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* ── 今日穿搭 Hero（常驻：天气 + 今日 + 已记录单品）── */}
+        <View style={styles.todayHero}>
+          <LinearGradient
+            colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
+            start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.todayHeroTitle}>今日穿搭</Text>
+            <Text style={styles.todayHeroSub}>
+              {todayLabel}{weather ? ` · ${weather.temperature}° ${weather.condition}` : ''}
+            </Text>
+            {todayItems.length > 0 ? (
+              <View style={styles.todayHeroThumbs}>
+                {todayItems.slice(0, 5).map((it, idx) => {
+                  const extra = idx === 4 && todayItems.length > 5 ? todayItems.length - 5 : 0;
+                  return (
+                    <View key={it.id} style={styles.todayHeroThumbWrap}>
+                      <Image source={{ uri: it.thumbnailUri || it.imageUri }} style={styles.todayHeroThumb} resizeMode="cover" />
+                      {extra > 0 && (
+                        <View style={styles.todayHeroMore}>
+                          <Text style={styles.todayHeroMoreText}>+{extra}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={styles.todayHeroHint}>今天还没记录，看看下方推荐 ›</Text>
+            )}
+          </View>
+          {weather && (
+            <Ionicons
+              name={
+                weather.condition === '晴' ? 'sunny' :
+                weather.condition === '多云' ? 'partly-sunny' :
+                weather.condition === '阴' ? 'cloudy' :
+                weather.condition === '雨' ? 'rainy' :
+                weather.condition === '雪' ? 'snow' : 'cloudy'
+              }
+              size={26}
+              color="#fff"
+            />
+          )}
+        </View>
+
         {recLoading ? (
           <View style={styles.recLoading}>
             <ActivityIndicator size="small" color={theme.colors.primary} />
             <Text style={{ color: theme.colors.textTertiary, fontSize: 13 }}>正在生成推荐...</Text>
           </View>
         ) : recommendation ? (
-          <>
-            {/* 今日穿搭 Hero：天气 + 今日 + 推荐融合 */}
-            <View style={styles.todayHero}>
-              <LinearGradient
-                colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFillObject}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.todayHeroTitle}>今日穿搭</Text>
-                <Text style={styles.todayHeroSub}>
-                  {todayLabel}{weather ? ` · ${weather.temperature}° ${weather.condition}` : ''}
-                </Text>
-              </View>
-              {weather && (
-                <Ionicons
-                  name={
-                    weather.condition === '晴' ? 'sunny' :
-                    weather.condition === '多云' ? 'partly-sunny' :
-                    weather.condition === '阴' ? 'cloudy' :
-                    weather.condition === '雨' ? 'rainy' :
-                    weather.condition === '雪' ? 'snow' : 'cloudy'
-                  }
-                  size={26}
-                  color="#fff"
-                />
-              )}
-            </View>
-            <OutfitRecommendationCard
+          <OutfitRecommendationCard
             recommendation={recommendation}
             allClothing={scopedClothing}
             outfits={outfits}
@@ -860,7 +893,6 @@ export function HomeScreen() {
             recIndex={recIndex}
             attributeTips={attributeTips}
           />
-          </>
         ) : (
           <View style={styles.recEmpty}>
             <Ionicons name="shirt-outline" size={28} color={theme.colors.border} />
