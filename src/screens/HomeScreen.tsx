@@ -474,6 +474,12 @@ export function HomeScreen() {
     setWeather(w);
     setRecLoading(true);
     const recentlyWornDays = await buildRecentlyWornDays();
+    // Fetch 30-day wear records for implicit signal analysis
+    const d30 = new Date();
+    const end30 = `${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, '0')}-${String(d30.getDate()).padStart(2, '0')}`;
+    d30.setDate(d30.getDate() - 30);
+    const start30 = `${d30.getFullYear()}-${String(d30.getMonth() + 1).padStart(2, '0')}-${String(d30.getDate()).padStart(2, '0')}`;
+    const wearRecords30 = await getWearRecordsByDateRange(start30, end30);
     const s = useWardrobeStore.getState();
     const prefs = usePreferenceStore.getState();
     const allClothing = s.clothing;
@@ -487,6 +493,12 @@ export function HomeScreen() {
       preferredColors: prefs.preferredColors,
       comfortVsAppearance: prefs.comfortVsAppearance,
       preferredScenes: prefs.preferredScenes,
+      repeatInterval: prefs.repeatInterval,
+      explorationLevel: prefs.explorationLevel,
+      colorBoldness: prefs.colorBoldness,
+      layeringPreference: prefs.layeringPreference,
+      accessoryUsage: prefs.accessoryUsage,
+      wearRecords: wearRecords30,
     });
     const allIds: number[] = [];
     for (const rec of recs) {
@@ -604,6 +616,12 @@ export function HomeScreen() {
       const recentlyWornDays = await buildRecentlyWornDays();
       const s = useWardrobeStore.getState();
       const prefs = usePreferenceStore.getState();
+      // Fetch 30-day records
+      const d30r = new Date();
+      const end30r = `${d30r.getFullYear()}-${String(d30r.getMonth() + 1).padStart(2, '0')}-${String(d30r.getDate()).padStart(2, '0')}`;
+      d30r.setDate(d30r.getDate() - 30);
+      const start30r = `${d30r.getFullYear()}-${String(d30r.getMonth() + 1).padStart(2, '0')}-${String(d30r.getDate()).padStart(2, '0')}`;
+      const wr30 = await getWearRecordsByDateRange(start30r, end30r);
       const sourceClothing = scopeWardrobeId == null ? s.clothing : s.clothing.filter(c => c.wardrobeId === scopeWardrobeId);
       const recs = generateRecommendations(sourceClothing, s.outfits, weather, {
         recentRecommendedItemIds: getRecentIdsSet(),
@@ -614,6 +632,12 @@ export function HomeScreen() {
         preferredColors: prefs.preferredColors,
         comfortVsAppearance: prefs.comfortVsAppearance,
         preferredScenes: prefs.preferredScenes,
+        repeatInterval: prefs.repeatInterval,
+        explorationLevel: prefs.explorationLevel,
+        colorBoldness: prefs.colorBoldness,
+        layeringPreference: prefs.layeringPreference,
+        accessoryUsage: prefs.accessoryUsage,
+        wearRecords: wr30,
       });
       if (recs.length > 0) {
         const allIds: number[] = [];
