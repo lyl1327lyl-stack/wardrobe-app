@@ -278,6 +278,15 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   todayHeroMore: { position: 'absolute', right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 8, paddingHorizontal: 4, minWidth: 16, alignItems: 'center' },
   todayHeroMoreText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   todayHeroHint: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 8 },
+  todayHeroRecordBtn: {
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  todayHeroRecordBtnText: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
   // ── Recommendation ──
   recLoading: {
@@ -644,6 +653,11 @@ export function HomeScreen() {
       preferredColors: s.preferredColors,
       comfortVsAppearance: s.comfortVsAppearance,
       preferredScenes: s.preferredScenes,
+      repeatInterval: s.repeatInterval,
+      explorationLevel: s.explorationLevel,
+      colorBoldness: s.colorBoldness,
+      layeringPreference: s.layeringPreference,
+      accessoryUsage: s.accessoryUsage,
     };
   }, [showSurveySheet]);
 
@@ -735,9 +749,24 @@ export function HomeScreen() {
           />
           <View style={{ flex: 1 }}>
             <Text style={styles.todayHeroTitle}>今日穿搭</Text>
-            <Text style={styles.todayHeroSub}>
-              {todayLabel}{weather ? ` · ${weather.temperature}° ${weather.condition}` : ''}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <Text style={styles.todayHeroSub}>
+                {todayLabel}{weather ? ` · ${weather.temperature}° ${weather.condition}` : ''}
+              </Text>
+              {weather && (
+                <Ionicons
+                  name={
+                    weather.condition === '晴' ? 'sunny' :
+                    weather.condition === '多云' ? 'partly-sunny' :
+                    weather.condition === '阴' ? 'cloudy' :
+                    weather.condition === '雨' ? 'rainy' :
+                    weather.condition === '雪' ? 'snow' : 'cloudy'
+                  }
+                  size={14}
+                  color="rgba(255,255,255,0.88)"
+                />
+              )}
+            </View>
             {todayItems.length > 0 ? (
               <View style={styles.todayHeroThumbs}>
                 {todayItems.slice(0, 5).map((it, idx) => {
@@ -758,18 +787,14 @@ export function HomeScreen() {
               <Text style={styles.todayHeroHint}>今天还没记录，看看下方推荐 ›</Text>
             )}
           </View>
-          {weather && (
-            <Ionicons
-              name={
-                weather.condition === '晴' ? 'sunny' :
-                weather.condition === '多云' ? 'partly-sunny' :
-                weather.condition === '阴' ? 'cloudy' :
-                weather.condition === '雨' ? 'rainy' :
-                weather.condition === '雪' ? 'snow' : 'cloudy'
-              }
-              size={26}
-              color="#fff"
-            />
+          {todayItems.length === 0 && (
+            <TouchableOpacity
+              style={styles.todayHeroRecordBtn}
+              onPress={() => navigation.navigate('RecordWear')}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.todayHeroRecordBtnText}>记录</Text>
+            </TouchableOpacity>
           )}
         </View>
 

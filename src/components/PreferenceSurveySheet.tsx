@@ -155,6 +155,19 @@ export function PreferenceSurveySheet({
     initialPrefs?.comfortVsAppearance ?? 'balanced',
   );
   const [scenes, setScenes] = useState<string[]>(initialPrefs?.preferredScenes ?? []);
+  const [repeatInterval, setRepeatInterval] = useState<number | null>(initialPrefs?.repeatInterval ?? null);
+  const [explorationLevel, setExplorationLevel] = useState<'explore' | 'balanced' | 'conservative'>(
+    initialPrefs?.explorationLevel ?? 'balanced',
+  );
+  const [colorBoldness, setColorBoldness] = useState<'safe' | 'moderate' | 'bold'>(
+    initialPrefs?.colorBoldness ?? 'moderate',
+  );
+  const [layeringPreference, setLayeringPreference] = useState<'often' | 'sometimes' | 'rarely'>(
+    initialPrefs?.layeringPreference ?? 'sometimes',
+  );
+  const [accessoryUsage, setAccessoryUsage] = useState<'often' | 'sometimes' | 'rarely'>(
+    initialPrefs?.accessoryUsage ?? 'sometimes',
+  );
 
   const toggleMulti = (arr: string[], v: string, setter: (a: string[]) => void) => {
     setter(arr.includes(v) ? arr.filter(x => x !== v) : [...arr, v]);
@@ -166,6 +179,11 @@ export function PreferenceSurveySheet({
       preferredColors: colors_sel,
       comfortVsAppearance: comfort,
       preferredScenes: scenes,
+      repeatInterval,
+      explorationLevel,
+      colorBoldness,
+      layeringPreference,
+      accessoryUsage,
     });
     onClose();
   };

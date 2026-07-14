@@ -4,12 +4,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const PREFS_KEY = 'user_preferences';
 
 export type ComfortVsAppearance = 'comfort' | 'balanced' | 'appearance';
+export type ExplorationLevel = 'explore' | 'balanced' | 'conservative';
+export type ColorBoldness = 'safe' | 'moderate' | 'bold';
+export type LayeringPreference = 'often' | 'sometimes' | 'rarely';
+export type AccessoryUsage = 'often' | 'sometimes' | 'rarely';
 
 export interface SurveyPreferences {
   preferredStyles: string[];
   preferredColors: string[];
   comfortVsAppearance: ComfortVsAppearance;
   preferredScenes: string[];
+  // 穿着习惯偏好
+  repeatInterval: number | null;          // 1 | 3 | 7 | null（null=无所谓）
+  explorationLevel: ExplorationLevel;
+  colorBoldness: ColorBoldness;
+  layeringPreference: LayeringPreference;
+  accessoryUsage: AccessoryUsage;
 }
 
 interface PreferenceState {
@@ -25,6 +35,12 @@ interface PreferenceState {
   preferredColors: string[];
   comfortVsAppearance: ComfortVsAppearance;
   preferredScenes: string[];
+  // 穿着习惯偏好
+  repeatInterval: number | null;
+  explorationLevel: ExplorationLevel;
+  colorBoldness: ColorBoldness;
+  layeringPreference: LayeringPreference;
+  accessoryUsage: AccessoryUsage;
 
   // Actions
   load: () => Promise<void>;
@@ -45,6 +61,11 @@ interface StoredPrefs {
   preferredColors: string[];
   comfortVsAppearance: ComfortVsAppearance;
   preferredScenes: string[];
+  repeatInterval: number | null;
+  explorationLevel: ExplorationLevel;
+  colorBoldness: ColorBoldness;
+  layeringPreference: LayeringPreference;
+  accessoryUsage: AccessoryUsage;
 }
 
 function toItemKey(ids: number[]): string {
@@ -60,6 +81,11 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
   preferredColors: [],
   comfortVsAppearance: 'balanced',
   preferredScenes: [],
+  repeatInterval: null,
+  explorationLevel: 'balanced',
+  colorBoldness: 'moderate',
+  layeringPreference: 'sometimes',
+  accessoryUsage: 'sometimes',
 
   load: async () => {
     try {
@@ -74,6 +100,11 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
           preferredColors: p.preferredColors ?? [],
           comfortVsAppearance: p.comfortVsAppearance ?? 'balanced',
           preferredScenes: p.preferredScenes ?? [],
+          repeatInterval: p.repeatInterval ?? null,
+          explorationLevel: p.explorationLevel ?? 'balanced',
+          colorBoldness: p.colorBoldness ?? 'moderate',
+          layeringPreference: p.layeringPreference ?? 'sometimes',
+          accessoryUsage: p.accessoryUsage ?? 'sometimes',
           isLoading: false,
         });
       } else {
@@ -125,6 +156,11 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
       preferredColors: prefs.preferredColors,
       comfortVsAppearance: prefs.comfortVsAppearance,
       preferredScenes: prefs.preferredScenes,
+      repeatInterval: prefs.repeatInterval,
+      explorationLevel: prefs.explorationLevel,
+      colorBoldness: prefs.colorBoldness,
+      layeringPreference: prefs.layeringPreference,
+      accessoryUsage: prefs.accessoryUsage,
     });
     await persist(get());
   },
@@ -136,6 +172,11 @@ export const usePreferenceStore = create<PreferenceState>((set, get) => ({
       preferredColors: [],
       comfortVsAppearance: 'balanced',
       preferredScenes: [],
+      repeatInterval: null,
+      explorationLevel: 'balanced',
+      colorBoldness: 'moderate',
+      layeringPreference: 'sometimes',
+      accessoryUsage: 'sometimes',
     });
     await persist(get());
   },
@@ -151,6 +192,11 @@ async function persist(state: PreferenceState): Promise<void> {
       preferredColors: state.preferredColors,
       comfortVsAppearance: state.comfortVsAppearance,
       preferredScenes: state.preferredScenes,
+      repeatInterval: state.repeatInterval,
+      explorationLevel: state.explorationLevel,
+      colorBoldness: state.colorBoldness,
+      layeringPreference: state.layeringPreference,
+      accessoryUsage: state.accessoryUsage,
     };
     await AsyncStorage.setItem(PREFS_KEY, JSON.stringify(data));
   } catch (e) {
