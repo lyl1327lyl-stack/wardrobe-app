@@ -4,6 +4,7 @@ import {
   OutfitRecommendation,
   Weather,
 } from '../types';
+import { getIdleBoost, getBrandAffinity, getThicknessTempComfort } from './implicitSignals';
 
 // ── 色相家族（HSL 回退用） ──
 const HUE_FAMILY: Record<string, string> = {
@@ -330,12 +331,16 @@ function recencyMultiplier(
   id: number,
   recentlyWornDays?: Map<number, number>,
   season?: string,
+  userRepeatInterval?: number | null,
 ): number {
   if (!recentlyWornDays) return 1.0;
   const daysAgo = recentlyWornDays.get(id);
   if (daysAgo === undefined) return 1.0; // 没穿过，满分
   if (daysAgo === 0) return 0.01;        // 今天刚穿，几乎不推荐
-  const window = season === '夏' ? 7 : season === '冬' ? 4 : 5;
+  // User preference takes priority; season defaults as fallback
+  const window = userRepeatInterval != null
+    ? userRepeatInterval
+    : season === '夏' ? 7 : season === '冬' ? 4 : 5;
   if (daysAgo >= window) return 1.0;      // 超出窗口，不受影响
   return daysAgo / window;                // 线性恢复：1天前 → 0.14~0.25, 越靠近窗口越接近 1.0
 }
@@ -373,6 +378,11 @@ function generateCandidates(
   pairFreq?: Map<string, number>,
   season?: string,
   recentlyWornDays?: Map<number, number>,
+  idleBoost?: Map<number, number>,
+  brandAffinity?: Map<number, number>,
+  userRepeatInterval?: number | null,
+  userLayering?: 'often' | 'sometimes' | 'rarely',
+  userAccessory?: 'often' | 'sometimes' | 'rarely',
 ): ClothingItem[][] {
   const tops = items.filter(i => effectiveParent(i) === '上装');
   const bottoms = items.filter(i => effectiveParent(i) === '下装');
@@ -381,9 +391,12 @@ function generateCandidates(
   const dresses = items.filter(i => effectiveParent(i) === '连衣裙');
   const bags = items.filter(i => effectiveParent(i) === '包包');
 
-  // 按季节调整外套概率：春秋常需叠穿，冬季几乎必备，夏季很少
-  const outerProb = season === '冬' ? 0.70 : season === '夏' ? 0.15 : 0.50;
-  const bagProb = bags.length > 0 ? 0.55 : 0;
+  // Layering preference affects outer probability
+  const outerBase = userLayering === 'often' ? 0.70 : userLayering === 'rarely' ? 0.15 : 0.50;
+  const outerProb = season === '冬' ? Math.min(1, outerBase + 0.20) : season === '夏' ? Math.max(0.05, outerBase - 0.35) : outerBase;
+  // Accessory preference affects bag probability
+  const bagBase = userAccessory === 'often' ? 0.70 : userAccessory === 'rarely' ? 0.20 : 0.55;
+  const bagProb = bags.length > 0 ? bagBase : 0;
 
   // 搭配历史太少（< 5 个 outfit）时 compat gate 反而有害：矩阵太稀疏，
   // 大部分 compat() 返回空集后回退到全量，导致少数有历史记录的单品被反复选中。
@@ -408,8 +421,10 @@ function generateCandidates(
   function fw(id: number): number {
     const fresh = recentRecommendedItemIds?.has(id) ? 0.05 : 1.0;
     const diversity = 1 + (itemDiversity?.get(id) || 0);
-    const recency = recencyMultiplier(id, recentlyWornDays, season);
-    return fresh * recency * diversity;
+    const recency = recencyMultiplier(id, recentlyWornDays, season, userRepeatInterval);
+    const idle = 1 + (idleBoost?.get(id) || 0);
+    const brand = 1 + (brandAffinity?.get(id) || 0);
+    return fresh * recency * diversity * idle * brand;
   }
 
   // 兼容性过滤：只保留历史上与 targetId 搭配过的单品
@@ -570,6 +585,18 @@ interface ScoredOutfit {
   totalScore: number;
 }
 
+function computeThicknessBoost(
+  items: ClothingItem[],
+  thicknessComfort?: Map<number, number>,
+): number {
+  if (!thicknessComfort || thicknessComfort.size === 0) return 0;
+  let sum = 0;
+  for (const item of items) {
+    sum += thicknessComfort.get(item.id) || 0;
+  }
+  return items.length > 0 ? sum / items.length : 0;
+}
+
 function scoreOutfits(
   candidates: ClothingItem[][],
   pairFreq: Map<string, number>,
@@ -584,9 +611,12 @@ function scoreOutfits(
   preferredColors?: string[],
   comfortVsAppearance?: 'comfort' | 'balanced' | 'appearance',
   preferredScenes?: string[],
+  explorationLevel?: 'explore' | 'balanced' | 'conservative',
+  colorBoldness?: 'safe' | 'moderate' | 'bold',
+  thicknessComfort?: Map<number, number>,
 ): ScoredOutfit[] {
   // 权重方案：根据用户舒适/外观偏好调整
-  const w = getWeights(comfortVsAppearance);
+  const w = getWeights(comfortVsAppearance, explorationLevel);
 
   return candidates.map(items => {
     // 1. 共现频率
@@ -597,6 +627,13 @@ function scoreOutfits(
 
     // 3. 颜色协调度
     const colorScore = computeColorScore(items);
+
+    // Color boldness adjustment
+    const adjustedColorScore = colorBoldness === 'bold'
+      ? Math.min(1, colorScore * 1.15)
+      : colorBoldness === 'safe'
+      ? colorScore * 0.9
+      : colorScore;
 
     // 4. 天气匹配度
     const weatherScore = computeWeatherScore(items, weather, currentSeason);
@@ -626,10 +663,12 @@ function scoreOutfits(
     // 用户场景偏好加成
     const sceneBoost = computeSceneBoost(preferredScenes, weather);
 
+    const thicknessBoost = computeThicknessBoost(items, thicknessComfort);
+
     const totalScore =
       w.pairFreq * pairFreqScore +
       w.style * styleScore +
-      w.color * colorScore +
+      w.color * adjustedColorScore +
       w.weather * weatherScore +
       w.favorite * favoriteScore +
       w.freshness * freshnessScore +
@@ -638,17 +677,30 @@ function scoreOutfits(
       likedBoost +
       stylePrefBoost +
       colorPrefBoost +
-      sceneBoost;
+      sceneBoost +
+      thicknessBoost;
 
     return { items, pairFreqScore, styleScore, colorScore, weatherScore, favoriteScore, freshnessScore, recencyScore, userOutfitBoost, totalScore };
   });
 }
 
-function getWeights(preference?: 'comfort' | 'balanced' | 'appearance') {
+function getWeights(
+  preference?: 'comfort' | 'balanced' | 'appearance',
+  exploration?: 'explore' | 'balanced' | 'conservative',
+) {
+  const exploreWeights = exploration === 'explore'
+    ? { pairFreq: 0.05, freshness: 0.30 }
+    : exploration === 'conservative'
+    ? { pairFreq: 0.25, freshness: 0.10 }
+    : { pairFreq: 0.15, freshness: 0.20 };
+
   switch (preference) {
-    case 'comfort':    return { pairFreq: 0.15, style: 0.20, color: 0.15, weather: 0.15, favorite: 0.10, freshness: 0.20, recency: 0.05 };
-    case 'appearance': return { pairFreq: 0.15, style: 0.30, color: 0.15, weather: 0.05, favorite: 0.10, freshness: 0.20, recency: 0.05 };
-    default:           return { pairFreq: 0.15, style: 0.25, color: 0.15, weather: 0.10, favorite: 0.10, freshness: 0.20, recency: 0.05 };
+    case 'comfort':
+      return { ...exploreWeights, style: 0.20, color: 0.15, weather: 0.15, favorite: 0.10, recency: 0.05 };
+    case 'appearance':
+      return { ...exploreWeights, style: 0.30, color: 0.15, weather: 0.05, favorite: 0.10, recency: 0.05 };
+    default:
+      return { ...exploreWeights, style: 0.25, color: 0.15, weather: 0.10, favorite: 0.10, recency: 0.05 };
   }
 }
 
@@ -884,6 +936,12 @@ export function generateRecommendations(
     preferredColors?: string[];
     comfortVsAppearance?: 'comfort' | 'balanced' | 'appearance';
     preferredScenes?: string[];
+    repeatInterval?: number | null;
+    explorationLevel?: 'explore' | 'balanced' | 'conservative';
+    colorBoldness?: 'safe' | 'moderate' | 'bold';
+    layeringPreference?: 'often' | 'sometimes' | 'rarely';
+    accessoryUsage?: 'often' | 'sometimes' | 'rarely';
+    wearRecords?: import('../types').WearRecord[];
   },
 ): OutfitRecommendation[] {
   if (clothing.length === 0) return [];
@@ -900,6 +958,13 @@ export function generateRecommendations(
   // 准备数据（模块级缓存，outfits 不变时复用）
   const { pairFreq, itemDiversity } = getCachedMatrices(outfits);
   const currentSeason = weather ? getSeasonFromTemp(weather.temperature) : '春';
+
+  // Build implicit signals (cold start = empty maps)
+  const today = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+  const wearRecords = options?.wearRecords ?? [];
+  const idleBoost = wearRecords.length > 0 ? getIdleBoost(filtered, today) : new Map<number, number>();
+  const brandAffinity = wearRecords.length > 0 ? getBrandAffinity(filtered, wearRecords) : new Map<number, number>();
+  const thicknessComfort = weather ? getThicknessTempComfort(filtered, wearRecords, weather) : new Map<number, number>();
 
   // 偏好单品：穿着次数前 25%
   const maxWear = Math.max(1, ...clothing.map(c => c.wearCount));
@@ -918,7 +983,15 @@ export function generateRecommendations(
   }
 
   // Step 2 & 3: 生成候选 + 评分
-  let candidates = generateCandidates(filtered, options?.selectedItem, 40, options?.recentRecommendedItemIds, itemDiversity, effectivePairFreq, currentSeason, options?.recentlyWornDays);
+  let candidates = generateCandidates(
+    filtered, options?.selectedItem, 40,
+    options?.recentRecommendedItemIds, itemDiversity,
+    effectivePairFreq, currentSeason, options?.recentlyWornDays,
+    idleBoost, brandAffinity,
+    options?.repeatInterval ?? null,
+    options?.layeringPreference ?? 'sometimes',
+    options?.accessoryUsage ?? 'sometimes',
+  );
 
   // 候选太少则回退到简单生成
   if (candidates.length === 0) {
@@ -933,7 +1006,11 @@ export function generateRecommendations(
     });
   }
 
-  const scored = scoreOutfits(candidates, pairFreq, weather, favoriteSet, userOutfitSets, currentSeason, options?.recentRecommendedItemIds, options?.recentlyWornDays, options?.likedItemIds, options?.preferredStyles, options?.preferredColors, options?.comfortVsAppearance, options?.preferredScenes);
+  const scored = scoreOutfits(candidates, pairFreq, weather, favoriteSet, userOutfitSets, currentSeason, options?.recentRecommendedItemIds, options?.recentlyWornDays, options?.likedItemIds, options?.preferredStyles, options?.preferredColors, options?.comfortVsAppearance, options?.preferredScenes,
+    options?.explorationLevel ?? 'balanced',
+    options?.colorBoldness ?? 'moderate',
+    thicknessComfort,
+  );
 
   // 排序，去重（同一件上装不出现太多次）
   scored.sort((a, b) => b.totalScore - a.totalScore);
