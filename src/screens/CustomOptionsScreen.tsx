@@ -10,6 +10,7 @@ import {
   Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
@@ -34,71 +35,82 @@ const CATEGORIES: CategoryConfig[] = [
   { key: 'sizes', label: '尺码', icon: 'resize-outline' },
 ];
 
-const makeStyles = (theme: Theme) =>
-  StyleSheet.create({
+const makeStyles = (theme: Theme) => {
+  const { colors } = theme;
+
+  return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: theme.colors.background,
+      backgroundColor: colors.background,
     },
+
+    // ── Header ──
     header: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: 16,
       paddingTop: 56,
-      paddingBottom: 12,
-      backgroundColor: theme.colors.card,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      paddingBottom: 14,
+      paddingHorizontal: 20,
+      backgroundColor: colors.card,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
     },
     headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.colors.background,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
     },
     headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: theme.colors.text,
+      fontSize: 17,
+      fontWeight: '700',
+      color: colors.text,
+      letterSpacing: -0.2,
     },
-    headerRight: {
-      width: 40,
-    },
-    headerSaveBtn: {
+    headerDoneBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingVertical: 9,
       paddingHorizontal: 14,
-      paddingVertical: 6,
-      borderRadius: 14,
-      backgroundColor: theme.colors.primary,
+      borderRadius: 16,
+      overflow: 'hidden',
     },
-    headerSaveBtnText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.white,
+    headerDoneBtnText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: '#fff',
     },
+
+    // ── Content ──
     content: {
       flex: 1,
     },
+    list: {
+      padding: 16,
+      paddingBottom: 40,
+    },
+
+    // ── Section Card ──
     section: {
-      marginTop: 12,
-      marginHorizontal: 16,
-      backgroundColor: theme.colors.card,
+      marginBottom: 12,
+      backgroundColor: colors.card,
       borderRadius: 16,
-      overflow: 'hidden',
+      ...theme.shadows.sm,
     },
     sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
       padding: 16,
-      gap: 12,
+      gap: 14,
     },
-    sectionIcon: {
-      width: 40,
-      height: 40,
-      borderRadius: 10,
-      backgroundColor: theme.colors.background,
+    sectionIconWrap: {
+      width: 42,
+      height: 42,
+      borderRadius: 13,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -108,22 +120,22 @@ const makeStyles = (theme: Theme) =>
     sectionTitle: {
       fontSize: 16,
       fontWeight: '600',
-      color: theme.colors.text,
+      color: colors.text,
     },
     sectionCount: {
       fontSize: 12,
-      color: theme.colors.textTertiary,
+      color: colors.textTertiary,
       marginTop: 2,
     },
-    expandIcon: {},
     optionList: {
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: colors.border,
     },
-    // 两级分类样式 - 重新设计
+
+    // ── Parent Card ──
     parentCard: {
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
     },
     parentCardLast: {
       borderBottomWidth: 0,
@@ -136,10 +148,10 @@ const makeStyles = (theme: Theme) =>
       gap: 10,
     },
     parentExpandBtn: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: theme.colors.background,
+      width: 30,
+      height: 30,
+      borderRadius: 10,
+      backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
     },
@@ -149,125 +161,143 @@ const makeStyles = (theme: Theme) =>
     parentName: {
       fontSize: 15,
       fontWeight: '600',
-      color: theme.colors.text,
+      color: colors.text,
     },
     parentMeta: {
       fontSize: 12,
-      color: theme.colors.textTertiary,
+      color: colors.textTertiary,
       marginTop: 2,
     },
     parentActions: {
       flexDirection: 'row',
-      gap: 4,
+      gap: 6,
     },
     actionBtn: {
       width: 32,
       height: 32,
-      borderRadius: 8,
-      backgroundColor: theme.colors.background,
+      borderRadius: 10,
+      backgroundColor: colors.background,
       justifyContent: 'center',
       alignItems: 'center',
     },
-    // 子分类列表
+    actionBtnDanger: {
+      backgroundColor: colors.danger + '14',
+    },
+
+    // ── Child List ──
     childList: {
-      backgroundColor: theme.colors.background,
-      paddingLeft: 16,
+      backgroundColor: colors.background,
+      borderBottomLeftRadius: 16,
+      borderBottomRightRadius: 16,
     },
     childRow: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingVertical: 12,
-      paddingRight: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      paddingLeft: 20,
+      paddingRight: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
       gap: 10,
     },
     childRowLast: {
       borderBottomWidth: 0,
     },
     childDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: theme.colors.textTertiary,
-      marginLeft: 8,
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      backgroundColor: colors.primary + '60',
     },
     childName: {
       flex: 1,
       fontSize: 14,
-      color: theme.colors.textSecondary,
+      color: colors.textSecondary,
     },
     childActions: {
       flexDirection: 'row',
-      gap: 2,
+      gap: 4,
     },
     childActionBtn: {
-      width: 28,
-      height: 28,
-      borderRadius: 6,
+      width: 30,
+      height: 30,
+      borderRadius: 8,
       justifyContent: 'center',
       alignItems: 'center',
+      backgroundColor: colors.background,
     },
-    // 添加子分类按钮
+
+    // ── Add Child Button ──
     addChildBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 12,
-      marginLeft: 16,
-      marginRight: 16,
-      marginBottom: 12,
-      borderRadius: 10,
+      gap: 7,
+      paddingVertical: 13,
+      marginHorizontal: 16,
+      marginBottom: 14,
+      borderRadius: 12,
       borderWidth: 1.5,
-      borderColor: theme.colors.primary,
+      borderColor: colors.primary + '50',
       borderStyle: 'dashed',
     },
     addChildBtnText: {
       fontSize: 13,
-      color: theme.colors.primary,
-      fontWeight: '500',
+      color: colors.primary,
+      fontWeight: '600',
     },
-    // 一维分类选项
+
+    // ── Flat Option Item ──
     optionItem: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 14,
+      paddingVertical: 13,
       paddingHorizontal: 16,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: colors.border,
+      gap: 10,
     },
     optionItemLast: {
       borderBottomWidth: 0,
     },
+    optionDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.textTertiary,
+    },
     optionText: {
       flex: 1,
       fontSize: 15,
-      color: theme.colors.text,
+      color: colors.text,
     },
     optionInUse: {
-      color: theme.colors.textTertiary,
+      color: colors.textTertiary,
     },
-    deleteBtn: {
+    optionLock: {
       padding: 8,
     },
-    addBtn: {
+
+    // ── Bottom Add Button ──
+    bottomAddBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: 6,
-      paddingVertical: 12,
-      borderTopWidth: 1,
-      borderTopColor: theme.colors.border,
+      gap: 7,
+      paddingVertical: 14,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      borderRadius: 14,
+      overflow: 'hidden',
+      ...theme.shadows.sm,
     },
-    addBtnText: {
+    bottomAddBtnText: {
       fontSize: 14,
-      color: theme.colors.primary,
-      fontWeight: '500',
+      fontWeight: '700',
+      color: '#fff',
     },
-    bottom: {
-      height: 40,
-    },
+
+    // ── Modal ──
     modalOverlay: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.5)',
@@ -276,35 +306,44 @@ const makeStyles = (theme: Theme) =>
       padding: 24,
     },
     modal: {
-      backgroundColor: theme.colors.card,
-      borderRadius: theme.borderRadius.xl,
+      backgroundColor: colors.card,
+      borderRadius: 20,
       padding: 24,
       width: '100%',
       maxWidth: 340,
+      ...theme.shadows.lg,
     },
     modalTitle: {
       fontSize: 18,
       fontWeight: '700',
-      color: theme.colors.text,
-      marginBottom: 16,
+      color: colors.text,
+      marginBottom: 4,
       textAlign: 'center',
     },
     modalSubtitle: {
-      fontSize: 14,
-      color: theme.colors.textTertiary,
-      marginBottom: 16,
+      fontSize: 13,
+      color: colors.textTertiary,
+      marginBottom: 20,
       textAlign: 'center',
     },
-    modalInput: {
+    modalInputWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
       borderWidth: 1.5,
-      borderColor: theme.colors.border,
-      borderRadius: theme.borderRadius.md,
+      borderColor: colors.border,
+      borderRadius: 14,
       paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 15,
-      color: theme.colors.text,
-      backgroundColor: theme.colors.background,
-      marginBottom: 16,
+      backgroundColor: colors.background,
+      marginBottom: 20,
+    },
+    modalInputIcon: {
+      marginRight: 10,
+    },
+    modalInput: {
+      flex: 1,
+      paddingVertical: 13,
+      fontSize: 16,
+      color: colors.text,
     },
     modalActions: {
       flexDirection: 'row',
@@ -313,33 +352,31 @@ const makeStyles = (theme: Theme) =>
     modalCancel: {
       flex: 1,
       paddingVertical: 13,
-      borderRadius: theme.borderRadius.md,
+      borderRadius: 14,
       borderWidth: 1.5,
-      borderColor: theme.colors.border,
+      borderColor: colors.border,
       alignItems: 'center',
     },
     modalCancelText: {
       fontSize: 15,
-      color: theme.colors.textSecondary,
-      fontWeight: '500',
+      color: colors.textSecondary,
+      fontWeight: '600',
     },
     modalConfirm: {
-      flex: 2,
+      flex: 1,
       paddingVertical: 13,
-      borderRadius: theme.borderRadius.md,
-      backgroundColor: theme.colors.primary,
+      borderRadius: 14,
+      overflow: 'hidden',
       alignItems: 'center',
+      justifyContent: 'center',
     },
     modalConfirmText: {
       fontSize: 15,
-      color: theme.colors.white,
-      fontWeight: '600',
-    },
-    actionRow: {
-      flexDirection: 'row',
-      gap: 8,
+      color: '#fff',
+      fontWeight: '700',
     },
   });
+};
 
 export function CustomOptionsScreen() {
   const navigation = useNavigation<any>();
@@ -649,15 +686,22 @@ export function CustomOptionsScreen() {
     return undefined;
   };
 
+  // ── Icon palette (rotating) ──
+  const ICON_PALETTES: [string, string][] = [
+    ['#6B7FD7', '#8B9FE8'],
+    ['#E8B4A0', '#F0C8B4'],
+    ['#00B894', '#34D399'],
+  ];
+
   if (isLoading) {
     return (
       <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
         <View style={styles.header}>
           <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-            <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+            <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>管理分类选项</Text>
-          <View style={styles.headerRight} />
+          <View style={{ width: 36 }} />
         </View>
       </View>
     );
@@ -665,94 +709,94 @@ export function CustomOptionsScreen() {
 
   return (
     <View style={styles.container}>
+      {/* ── Header ── */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={theme.colors.text} />
+        <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>
           {forcedCategory ? `${CATEGORIES.find(c => c.key === forcedCategory)?.label}管理` : '管理分类选项'}
         </Text>
         {forcedCategory ? (
-          <TouchableOpacity style={styles.headerSaveBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-            <Text style={styles.headerSaveBtnText}>完成</Text>
+          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.85}>
+            <LinearGradient
+              colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
+              start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+              style={styles.headerDoneBtn}
+            >
+              <Ionicons name="checkmark" size={16} color="#fff" />
+              <Text style={styles.headerDoneBtnText}>完成</Text>
+            </LinearGradient>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity style={styles.headerBtn} onPress={handleReset}>
-            <Ionicons name="refresh" size={20} color={theme.colors.textSecondary} />
+            <Ionicons name="refresh-outline" size={20} color={theme.colors.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* 如果传入了特定分类参数，只显示该分类；否则显示所有分类列表 */}
-        {(forcedCategory ? CATEGORIES.filter(c => c.key === forcedCategory) : CATEGORIES).map((cat) => {
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false} contentContainerStyle={styles.list}>
+        {(forcedCategory ? CATEGORIES.filter(c => c.key === forcedCategory) : CATEGORIES).map((cat, catIdx) => {
           const catOptions = getOptionsForCategory(cat.key);
           const isExpanded = expandedCategory === cat.key;
           const isSingleCategoryMode = !!forcedCategory;
           const isCategories = cat.key === 'categories';
+          const [iconC1, iconC2] = ICON_PALETTES[catIdx % ICON_PALETTES.length];
 
           return (
             <View key={cat.key} style={styles.section}>
-              {!isSingleCategoryMode && (
-                <TouchableOpacity
-                  style={styles.sectionHeader}
-                  onPress={() => handleToggleExpand(cat.key)}
-                  activeOpacity={0.7}
+              {/* Section Header */}
+              <TouchableOpacity
+                style={styles.sectionHeader}
+                onPress={() => !isSingleCategoryMode && handleToggleExpand(cat.key)}
+                activeOpacity={isSingleCategoryMode ? 1 : 0.7}
+                disabled={isSingleCategoryMode}
+              >
+                <LinearGradient
+                  colors={[iconC1, iconC2]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.sectionIconWrap}
                 >
-                  <View style={styles.sectionIcon}>
-                    <Ionicons name={cat.icon} size={20} color={theme.colors.primary} />
-                  </View>
-                  <View style={styles.sectionInfo}>
-                    <Text style={styles.sectionTitle}>{cat.label}</Text>
-                    <Text style={styles.sectionCount}>
-                      {isCategories ? `${catOptions.length} 个分类` : `${catOptions.length} 个选项`}
-                    </Text>
-                  </View>
+                  <Ionicons name={cat.icon} size={20} color="#fff" />
+                </LinearGradient>
+                <View style={styles.sectionInfo}>
+                  <Text style={styles.sectionTitle}>{cat.label}</Text>
+                  <Text style={styles.sectionCount}>
+                    {isCategories ? `${catOptions.length} 个分类` : `${catOptions.length} 个选项`}
+                  </Text>
+                </View>
+                {!isSingleCategoryMode && (
                   <Ionicons
                     name={isExpanded ? 'chevron-up' : 'chevron-down'}
-                    size={20}
+                    size={18}
                     color={theme.colors.textTertiary}
                   />
-                </TouchableOpacity>
-              )}
+                )}
+              </TouchableOpacity>
 
-              {/* 单分类模式下显示分类标题 */}
-              {isSingleCategoryMode && (
-                <View style={styles.sectionHeader}>
-                  <View style={styles.sectionIcon}>
-                    <Ionicons name={cat.icon} size={20} color={theme.colors.primary} />
-                  </View>
-                  <View style={styles.sectionInfo}>
-                    <Text style={styles.sectionTitle}>{cat.label}</Text>
-                    <Text style={styles.sectionCount}>
-                      {isCategories ? `${catOptions.length} 个分类` : `${catOptions.length} 个选项`}
-                    </Text>
-                  </View>
-                </View>
-              )}
-
-              {/* 两级分类：类型 */}
+              {/* ── Two-level: Categories ── */}
               {isCategories && (isSingleCategoryMode || isExpanded) && (
                 <View style={styles.optionList}>
                   {catOptions.map((parent, idx) => {
                     const children = getChildrenOf(parent);
                     const isParentExpanded = expandedParent === parent;
                     const isLastParent = idx === catOptions.length - 1;
+
                     return (
                       <View key={parent} style={[styles.parentCard, isLastParent && styles.parentCardLast]}>
-                        {/* 父分类行 */}
-                        <View style={styles.parentHeader}>
-                          <TouchableOpacity
-                            style={styles.parentExpandBtn}
-                            onPress={() => handleToggleParent(parent)}
-                            activeOpacity={0.7}
-                          >
+                        {/* Parent row */}
+                        <TouchableOpacity
+                          style={styles.parentHeader}
+                          onPress={() => handleToggleParent(parent)}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.parentExpandBtn}>
                             <Ionicons
                               name={isParentExpanded ? 'chevron-down' : 'chevron-forward'}
                               size={16}
                               color={theme.colors.textSecondary}
                             />
-                          </TouchableOpacity>
+                          </View>
                           <View style={styles.parentInfo}>
                             <Text style={styles.parentName}>{parent}</Text>
                             <Text style={styles.parentMeta}>{children.length} 个子分类</Text>
@@ -763,81 +807,86 @@ export function CustomOptionsScreen() {
                               onPress={() => handleEditOption('categories', parent)}
                               activeOpacity={0.7}
                             >
-                              <Ionicons name="pencil-outline" size={16} color={theme.colors.textSecondary} />
+                              <Ionicons name="pencil" size={15} color={theme.colors.textSecondary} />
                             </TouchableOpacity>
                             <TouchableOpacity
-                              style={styles.actionBtn}
+                              style={[styles.actionBtn, styles.actionBtnDanger]}
                               onPress={() => handleDeleteParent(parent)}
                               activeOpacity={0.7}
                             >
-                              <Ionicons name="close-circle-outline" size={16} color={theme.colors.textTertiary} />
+                              <Ionicons name="trash-outline" size={15} color={theme.colors.danger} />
                             </TouchableOpacity>
                           </View>
-                        </View>
+                        </TouchableOpacity>
 
-                        {/* 子分类列表 */}
-                        {isParentExpanded && children.length > 0 && (
-                          <View style={styles.childList}>
-                            {children.map((child, childIdx) => {
-                              const inUse = isChildInUse(parent, child);
-                              const isLast = childIdx === children.length - 1;
-                              return (
-                                <View key={child} style={[styles.childRow, isLast && styles.childRowLast]}>
-                                  <View style={styles.childDot} />
-                                  <Text style={styles.childName}>{child}</Text>
-                                  <View style={styles.childActions}>
-                                    <TouchableOpacity
-                                      style={styles.childActionBtn}
-                                      onPress={() => handleEditOption('categories', parent, child)}
-                                      activeOpacity={0.7}
-                                    >
-                                      <Ionicons name="pencil-outline" size={14} color={theme.colors.textTertiary} />
-                                    </TouchableOpacity>
-                                    {!inUse ? (
-                                      <TouchableOpacity
-                                        style={styles.childActionBtn}
-                                        onPress={() => handleDeleteChild(parent, child)}
-                                        activeOpacity={0.7}
-                                      >
-                                        <Ionicons name="close-circle-outline" size={14} color={theme.colors.textTertiary} />
-                                      </TouchableOpacity>
-                                    ) : (
-                                      <Ionicons name="lock-closed-outline" size={14} color={theme.colors.textTertiary} />
-                                    )}
-                                  </View>
-                                </View>
-                              );
-                            })}
-                          </View>
-                        )}
-
-                        {/* 添加子分类按钮 */}
+                        {/* Child list */}
                         {isParentExpanded && (
-                          <TouchableOpacity
-                            style={styles.addChildBtn}
-                            onPress={() => handleAddOption('categories', parent)}
-                            activeOpacity={0.7}
-                          >
-                            <Ionicons name="add-outline" size={16} color={theme.colors.primary} />
-                            <Text style={styles.addChildBtnText}>添加子分类</Text>
-                          </TouchableOpacity>
+                          <>
+                            {children.length > 0 && (
+                              <View style={styles.childList}>
+                                {children.map((child, childIdx) => {
+                                  const inUse = isChildInUse(parent, child);
+                                  const isLast = childIdx === children.length - 1;
+                                  return (
+                                    <View key={child} style={[styles.childRow, isLast && styles.childRowLast]}>
+                                      <View style={styles.childDot} />
+                                      <Text style={[styles.childName, inUse && styles.optionInUse]}>{child}</Text>
+                                      <View style={styles.childActions}>
+                                        <TouchableOpacity
+                                          style={styles.childActionBtn}
+                                          onPress={() => handleEditOption('categories', parent, child)}
+                                          activeOpacity={0.7}
+                                        >
+                                          <Ionicons name="pencil" size={13} color={theme.colors.textTertiary} />
+                                        </TouchableOpacity>
+                                        {inUse ? (
+                                          <Ionicons name="lock-closed-outline" size={14} color={theme.colors.textTertiary} style={{ marginHorizontal: 4 }} />
+                                        ) : (
+                                          <TouchableOpacity
+                                            style={styles.childActionBtn}
+                                            onPress={() => handleDeleteChild(parent, child)}
+                                            activeOpacity={0.7}
+                                          >
+                                            <Ionicons name="trash-outline" size={13} color={theme.colors.danger} />
+                                          </TouchableOpacity>
+                                        )}
+                                      </View>
+                                    </View>
+                                  );
+                                })}
+                              </View>
+                            )}
+
+                            {/* Add sub-category */}
+                            <TouchableOpacity
+                              style={styles.addChildBtn}
+                              onPress={() => handleAddOption('categories', parent)}
+                              activeOpacity={0.7}
+                            >
+                              <Ionicons name="add-outline" size={16} color={theme.colors.primary} />
+                              <Text style={styles.addChildBtnText}>添加子分类</Text>
+                            </TouchableOpacity>
+                          </>
                         )}
                       </View>
                     );
                   })}
-                  {/* 添加分类按钮 */}
-                  <TouchableOpacity
-                    style={styles.addChildBtn}
-                    onPress={() => handleAddOption('categories')}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add-outline" size={18} color={theme.colors.primary} />
-                    <Text style={styles.addChildBtnText}>添加分类</Text>
+
+                  {/* Add parent category */}
+                  <TouchableOpacity onPress={() => handleAddOption('categories')} activeOpacity={0.85}>
+                    <LinearGradient
+                      colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={styles.bottomAddBtn}
+                    >
+                      <Ionicons name="add" size={18} color="#fff" />
+                      <Text style={styles.bottomAddBtnText}>添加分类</Text>
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               )}
 
-              {/* 一维分类：季节/标签 */}
+              {/* ── Flat: Tags / Sizes ── */}
               {!isCategories && (isSingleCategoryMode || isExpanded) && (
                 <View style={styles.optionList}>
                   {catOptions.map((opt, idx) => {
@@ -845,78 +894,77 @@ export function CustomOptionsScreen() {
                     return (
                       <TouchableOpacity
                         key={opt}
-                        style={[
-                          styles.optionItem,
-                          idx === catOptions.length - 1 && styles.optionItemLast,
-                        ]}
+                        style={[styles.optionItem, idx === catOptions.length - 1 && styles.optionItemLast]}
                         onPress={() => handleEditOption(cat.key, opt as any)}
                         activeOpacity={0.7}
                       >
-                        <Text
-                          style={[
-                            styles.optionText,
-                            inUse && styles.optionInUse,
-                          ]}
+                        <View style={styles.optionDot} />
+                        <Text style={[styles.optionText, inUse && styles.optionInUse]}>{opt}</Text>
+                        <TouchableOpacity
+                          style={styles.actionBtn}
+                          onPress={() => handleEditOption(cat.key, opt as any)}
+                          activeOpacity={0.7}
                         >
-                          {opt}
-                        </Text>
-                        {!inUse && (
+                          <Ionicons name="pencil" size={15} color={theme.colors.textSecondary} />
+                        </TouchableOpacity>
+                        {inUse ? (
+                          <View style={styles.optionLock}>
+                            <Ionicons name="lock-closed-outline" size={16} color={theme.colors.textTertiary} />
+                          </View>
+                        ) : (
                           <TouchableOpacity
-                            style={styles.deleteBtn}
+                            style={[styles.actionBtn, styles.actionBtnDanger]}
                             onPress={() => handleDeleteOption(cat.key, idx)}
-                            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                            activeOpacity={0.7}
                           >
-                            <Ionicons
-                              name="close-circle-outline"
-                              size={20}
-                              color={theme.colors.textTertiary}
-                            />
+                            <Ionicons name="trash-outline" size={15} color={theme.colors.danger} />
                           </TouchableOpacity>
-                        )}
-                        {inUse && (
-                          <Ionicons
-                            name="lock-closed-outline"
-                            size={16}
-                            color={theme.colors.textTertiary}
-                          />
                         )}
                       </TouchableOpacity>
                     );
                   })}
-                  <TouchableOpacity
-                    style={styles.addBtn}
-                    onPress={() => handleAddOption(cat.key)}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="add-circle-outline" size={18} color={theme.colors.primary} />
-                    <Text style={styles.addBtnText}>添加选项</Text>
+                  <TouchableOpacity onPress={() => handleAddOption(cat.key)} activeOpacity={0.85}>
+                    <LinearGradient
+                      colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
+                      start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                      style={styles.bottomAddBtn}
+                    >
+                      <Ionicons name="add" size={18} color="#fff" />
+                      <Text style={styles.bottomAddBtnText}>添加选项</Text>
+                    </LinearGradient>
                   </TouchableOpacity>
                 </View>
               )}
             </View>
           );
         })}
-
-        <View style={styles.bottom} />
       </ScrollView>
 
-      {/* Add/Edit Modal */}
+      {/* ── Add/Edit Modal ── */}
       <Modal visible={showAddModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
             <Text style={styles.modalTitle}>{getModalTitle()}</Text>
-            {getModalSubtitle() && (
+            {getModalSubtitle() ? (
               <Text style={styles.modalSubtitle}>{getModalSubtitle()}</Text>
-            )}
-            <TextInput
-              style={styles.modalInput}
-              value={newOptionText}
-              onChangeText={setNewOptionText}
-              placeholder="输入选项名称"
-              placeholderTextColor={theme.colors.textTertiary}
-              autoFocus
-              maxLength={20}
-            />
+            ) : null}
+            <View style={styles.modalInputWrap}>
+              <Ionicons
+                name="create-outline"
+                size={18}
+                color={theme.colors.textTertiary}
+                style={styles.modalInputIcon}
+              />
+              <TextInput
+                style={styles.modalInput}
+                value={newOptionText}
+                onChangeText={setNewOptionText}
+                placeholder="输入名称"
+                placeholderTextColor={theme.colors.textTertiary}
+                autoFocus
+                maxLength={20}
+              />
+            </View>
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.modalCancel}
@@ -926,12 +974,18 @@ export function CustomOptionsScreen() {
                 <Text style={styles.modalCancelText}>取消</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.modalConfirm, isSaving && { opacity: 0.6 }]}
+                style={{ flex: 1 }}
                 onPress={handleSaveOption}
-                activeOpacity={0.8}
+                activeOpacity={0.85}
                 disabled={isSaving}
               >
-                <Text style={styles.modalConfirmText}>{isSaving ? '保存中...' : '保存'}</Text>
+                <LinearGradient
+                  colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
+                  style={styles.modalConfirm}
+                >
+                  <Text style={styles.modalConfirmText}>{isSaving ? '保存中...' : '保存'}</Text>
+                </LinearGradient>
               </TouchableOpacity>
             </View>
           </View>

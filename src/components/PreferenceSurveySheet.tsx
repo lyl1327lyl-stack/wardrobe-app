@@ -77,7 +77,6 @@ const makeStyles = (theme: Theme) =>
       backgroundColor: theme.colors.card,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      paddingBottom: 50,
       maxHeight: '85%',
     },
     handle: {
@@ -113,6 +112,14 @@ const makeStyles = (theme: Theme) =>
     content: {
       paddingHorizontal: 20,
       paddingTop: 20,
+      paddingBottom: 8,
+    },
+    footer: {
+      paddingHorizontal: 20,
+      paddingBottom: 34,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.colors.border,
+      paddingTop: 12,
     },
     section: {
       marginBottom: 24,
@@ -424,6 +431,10 @@ export function PreferenceSurveySheet({
               </View>
             </View>
 
+          </ScrollView>
+
+          {/* 底部固定操作区 */}
+          <View style={styles.footer}>
             <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.85}>
               <Text style={styles.saveBtnText}>保存</Text>
             </TouchableOpacity>
@@ -431,7 +442,7 @@ export function PreferenceSurveySheet({
             <TouchableOpacity style={styles.skipLink} onPress={onClose}>
               <Text style={styles.skipText}>跳过，使用默认推荐</Text>
             </TouchableOpacity>
-          </ScrollView>
+          </View>
         </View>
       </View>
     </Modal>
