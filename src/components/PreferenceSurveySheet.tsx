@@ -26,6 +26,36 @@ const COMFORT_OPTIONS = [
 
 const SCENE_OPTIONS = ['工作', '运动', '约会', '宅家'];
 
+const REPEAT_OPTIONS = [
+  { label: '每天可重复', value: null as number | null },
+  { label: '隔 3 天', value: 3 },
+  { label: '隔 7 天', value: 7 },
+];
+
+const EXPLORE_OPTIONS = [
+  { label: '多试新组合', value: 'explore' as const },
+  { label: '均衡', value: 'balanced' as const },
+  { label: '穿已验证', value: 'conservative' as const },
+];
+
+const BOLDNESS_OPTIONS = [
+  { label: '中性保守', value: 'safe' as const },
+  { label: '适中', value: 'moderate' as const },
+  { label: '大胆撞色', value: 'bold' as const },
+];
+
+const LAYERING_OPTIONS = [
+  { label: '经常叠穿', value: 'often' as const },
+  { label: '偶尔', value: 'sometimes' as const },
+  { label: '几乎不', value: 'rarely' as const },
+];
+
+const ACCESSORY_OPTIONS = [
+  { label: '经常搭配', value: 'often' as const },
+  { label: '偶尔', value: 'sometimes' as const },
+  { label: '很少用', value: 'rarely' as const },
+];
+
 interface PreferenceSurveySheetProps {
   visible: boolean;
   onClose: () => void;
@@ -279,6 +309,115 @@ export function PreferenceSurveySheet({
                       activeOpacity={0.7}
                     >
                       <Text style={[styles.chipText, active && styles.chipTextActive]}>{s}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* ─── 穿着习惯 ─── */}
+            <View style={{ marginTop: 4, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <View style={{ height: 1, flex: 1, backgroundColor: theme.colors.border }} />
+                <Text style={{ fontSize: 11, color: theme.colors.textTertiary, fontWeight: '500' }}>穿着习惯</Text>
+                <View style={{ height: 1, flex: 1, backgroundColor: theme.colors.border }} />
+              </View>
+            </View>
+
+            {/* Q5: 重复间隔 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>同一件单品希望隔多久再穿？</Text>
+              <View style={styles.chipGrid}>
+                {REPEAT_OPTIONS.map(o => {
+                  const active = repeatInterval === o.value;
+                  return (
+                    <TouchableOpacity
+                      key={String(o.value)}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setRepeatInterval(o.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Q6: 探索度 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>搭配探索意愿？</Text>
+              <View style={styles.chipGrid}>
+                {EXPLORE_OPTIONS.map(o => {
+                  const active = explorationLevel === o.value;
+                  return (
+                    <TouchableOpacity
+                      key={o.value}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setExplorationLevel(o.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Q7: 配色大胆度 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>配色大胆程度？</Text>
+              <View style={styles.chipGrid}>
+                {BOLDNESS_OPTIONS.map(o => {
+                  const active = colorBoldness === o.value;
+                  return (
+                    <TouchableOpacity
+                      key={o.value}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setColorBoldness(o.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Q8: 叠穿 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>外套/叠穿习惯？</Text>
+              <View style={styles.chipGrid}>
+                {LAYERING_OPTIONS.map(o => {
+                  const active = layeringPreference === o.value;
+                  return (
+                    <TouchableOpacity
+                      key={o.value}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setLayeringPreference(o.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+
+            {/* Q9: 配饰 */}
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>包包/配饰使用频率？</Text>
+              <View style={styles.chipGrid}>
+                {ACCESSORY_OPTIONS.map(o => {
+                  const active = accessoryUsage === o.value;
+                  return (
+                    <TouchableOpacity
+                      key={o.value}
+                      style={[styles.chip, active && styles.chipActive]}
+                      onPress={() => setAccessoryUsage(o.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[styles.chipText, active && styles.chipTextActive]}>{o.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
