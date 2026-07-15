@@ -1,6 +1,7 @@
 import React, { ReactNode } from 'react';
-import { View, ViewStyle, StyleProp } from 'react-native';
+import { Animated, ViewStyle, StyleProp } from 'react-native';
 import { useTheme } from '../../hooks/useTheme';
+import { useMountEntrance } from './useEntrance';
 
 interface StickerBadgeProps {
   children: ReactNode;
@@ -17,13 +18,14 @@ export function StickerBadge({
 }: StickerBadgeProps) {
   const { theme } = useTheme();
   const deco = theme.decoration;
+  const scale = useMountEntrance({ from: 0.5, to: 1, kind: 'spring', spring: { tension: 80, friction: 5 } });
 
   if (!deco) return <>{children}</>;
 
   const color = deco.accentPalette[paletteIndex % deco.accentPalette.length];
 
   return (
-    <View
+    <Animated.View
       style={[
         {
           backgroundColor: color,
@@ -32,13 +34,13 @@ export function StickerBadge({
           paddingVertical: 4,
           alignItems: 'center',
           justifyContent: 'center',
-          transform: [{ rotate: `${rotate}deg` }],
+          transform: [{ rotate: `${rotate}deg` }, { scale }],
           ...theme.shadows.sm,
         },
         style,
       ]}
     >
       {children}
-    </View>
+    </Animated.View>
   );
 }

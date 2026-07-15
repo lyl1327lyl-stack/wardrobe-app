@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ViewStyle, StyleProp } from 'react-native';
+import { StyleSheet, View, Animated, ViewStyle, StyleProp } from 'react-native';
 import Svg, { Path, Line } from 'react-native-svg';
 import { useTheme } from '../../hooks/useTheme';
+import { useMountEntrance } from './useEntrance';
 
 interface DoodleDividerProps {
   variant?: 'wave' | 'dash';
@@ -31,6 +32,7 @@ export function DoodleDivider({
   const { theme } = useTheme();
   const deco = theme.decoration;
   const [width, setWidth] = useState(0);
+  const t = useMountEntrance({ from: 0, to: 1, kind: 'timing', timing: { duration: 300 } });
 
   if (!deco) {
     return (
@@ -48,8 +50,15 @@ export function DoodleDivider({
   const rightStart = mid + half;
 
   return (
-    <View
-      style={[{ height: DOODLE_W }, style]}
+    <Animated.View
+      style={[
+        {
+          height: DOODLE_W,
+          opacity: t,
+          transform: [{ translateY: t.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+        },
+        style,
+      ]}
       onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
       pointerEvents="none"
     >
@@ -71,6 +80,6 @@ export function DoodleDivider({
           )}
         </Svg>
       )}
-    </View>
+    </Animated.View>
   );
 }
