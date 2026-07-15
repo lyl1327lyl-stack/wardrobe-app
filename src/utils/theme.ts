@@ -1,4 +1,4 @@
-export type ThemeId = 'wood' | 'spring' | 'summer' | 'winter';
+export type ThemeId = 'wood' | 'spring' | 'summer' | 'winter' | 'journal';
 
 export interface Theme {
   id: ThemeId;
@@ -61,6 +61,17 @@ export interface Theme {
       shadowRadius: number;
       elevation: number;
     };
+  };
+  decoration?: {
+    paper: 'none' | 'grid' | 'dots' | 'lined';
+    paperLineColor: string;
+    washiTape: boolean;
+    stickerStyle: boolean;
+    doodleStyle: boolean;
+    accentPalette: string[];
+  };
+  fonts?: {
+    heading: string;
   };
 }
 
@@ -221,11 +232,52 @@ export const winterTheme: Theme = {
   shadows: baseShadows,
 };
 
+export const journalTheme: Theme = {
+  id: 'journal',
+  name: '手账少女',
+  colors: {
+    primary: '#C27D8E',
+    primaryLight: '#E6C6CE',
+    primaryDark: '#A96677',
+    accent: '#A99CC9',
+    accentLight: '#CFC6E5',
+    secondary: '#F3EEF6',
+    background: '#FAF6EE',
+    card: '#FFFDF7',
+    text: '#473F38',
+    textSecondary: '#7B7068',
+    textTertiary: '#A89D92',
+    border: '#E6DCCF',
+    borderLight: '#F1EAE0',
+    success: '#6FAE8E',
+    warning: '#D9A441',
+    danger: '#CF8A8A',
+    shadow: '#000000',
+    white: '#FFFFFF',
+    black: '#000000',
+  },
+  decoration: {
+    paper: 'grid',
+    paperLineColor: 'rgba(169,156,201,0.16)',
+    washiTape: true,
+    stickerStyle: true,
+    doodleStyle: true,
+    accentPalette: ['#9CCFB8', '#A8C8E8', '#B5A8D6', '#E8B4C0'],
+  },
+  fonts: {
+    heading: 'LXGWWenKai',
+  },
+  spacing: baseSpacing,
+  borderRadius: baseBorderRadius,
+  shadows: baseShadows,
+};
+
 export const themes: Record<ThemeId, Theme> = {
   wood: woodTheme,
   spring: springTheme,
   summer: summerTheme,
   winter: winterTheme,
+  journal: journalTheme,
 };
 
 // Backward compatibility - default export is wood theme
