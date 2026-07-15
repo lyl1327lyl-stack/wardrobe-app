@@ -23,6 +23,7 @@ const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.g
   { id: 'spring', label: '春日樱花', icon: 'flower-outline' },
   { id: 'summer', label: '夏日海洋', icon: 'water-outline' },
   { id: 'winter', label: '冬日初雪', icon: 'snow-outline' },
+  { id: 'journal', label: '手账少女', icon: 'book-outline' },
 ];
 
 interface MenuItem {
