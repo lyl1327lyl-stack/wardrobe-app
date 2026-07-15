@@ -713,7 +713,7 @@ export function HomeScreen() {
       </View>
 
       <ScrollView
-        style={styles.container}
+        style={[styles.container, { backgroundColor: 'transparent' }]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
