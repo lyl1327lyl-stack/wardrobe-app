@@ -161,11 +161,16 @@ function LoadingScreen() {
 
 // 修复穿着次数（只统计截至今天的记录）
 function WearCountFixer({ children }: { children: React.ReactNode }) {
-  const { recalculateAllWearCounts } = useWardrobeStore();
+  const { recalculateAllWearCounts, loadData } = useWardrobeStore();
 
   useEffect(() => {
-    // 应用启动时修复穿着次数
-    recalculateAllWearCounts();
+    // 应用启动时先加载衣物/搭配数据（确保首个挂载的 tab 也能立即拿到数据，
+    // 否则首屏主页的"换季提醒/当季闲置/最近搭配"等依赖 store 的区块会空白，
+    // 要切到其他 tab 触发 loadData 后才出现），再修复穿着次数
+    (async () => {
+      await loadData();
+      recalculateAllWearCounts();
+    })();
   }, []);
 
   return <>{children}</>;
