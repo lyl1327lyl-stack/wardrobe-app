@@ -17,8 +17,8 @@ type EntranceOpts = {
   from: number;
   to: number;
   kind: 'spring' | 'timing';
-  spring?: Animated.SpringAnimationConfig;
-  timing?: Animated.TimingAnimationConfig;
+  spring?: Omit<Animated.SpringAnimationConfig, 'toValue' | 'useNativeDriver'>;
+  timing?: Omit<Animated.TimingAnimationConfig, 'toValue' | 'useNativeDriver'>;
 };
 
 /**
