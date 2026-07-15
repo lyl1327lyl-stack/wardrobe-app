@@ -6,7 +6,7 @@ const THEME_STORAGE_KEY = 'app_theme';
 export async function getStoredThemeId(): Promise<ThemeId> {
   try {
     const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-    if (stored && ['wood', 'spring', 'summer', 'winter'].includes(stored)) {
+    if (stored && ['wood', 'spring', 'summer', 'winter', 'journal'].includes(stored)) {
       return stored as ThemeId;
     }
   } catch (e) {
