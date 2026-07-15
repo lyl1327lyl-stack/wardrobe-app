@@ -17,6 +17,10 @@ import { Theme } from '../utils/theme';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { exportBackup, pickBackupFile, restoreBackup } from '../utils/backup';
+import { ThemedScreen } from '../components/decoration/ThemedScreen';
+import { WashiTape } from '../components/decoration/WashiTape';
+import { StickerBadge } from '../components/decoration/StickerBadge';
+import { DoodleDivider } from '../components/decoration/DoodleDivider';
 
 const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
   { id: 'wood', label: '暖阳原木', icon: 'leaf-outline' },
@@ -151,13 +155,8 @@ const makeStyles = (theme: Theme) =>
     },
     checkBadge: {
       position: 'absolute',
-      top: 8,
-      right: 8,
-      width: 22,
-      height: 22,
-      borderRadius: 11,
-      alignItems: 'center',
-      justifyContent: 'center',
+      top: 6,
+      right: 6,
     },
     menuItem: {
       flexDirection: 'row',
@@ -302,7 +301,7 @@ export function PersonalCenterScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ThemedScreen style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerInner}>
           <Text
@@ -324,6 +323,10 @@ export function PersonalCenterScreen() {
       >
         {/* Theme Selection */}
         <View style={[styles.section, { marginTop: 12 }]}>
+          <WashiTape
+            paletteIndex={2}
+            style={{ position: 'absolute', top: -6, right: 12 }}
+          />
           <Text
             style={[
               styles.sectionTitle,
@@ -364,8 +367,10 @@ export function PersonalCenterScreen() {
                     {option.label}
                   </Text>
                   {isSelected && (
-                    <View style={[styles.checkBadge, { backgroundColor: theme.colors.primary }]}>
-                      <Ionicons name="checkmark" size={14} color={theme.colors.white} />
+                    <View style={styles.checkBadge}>
+                      <StickerBadge paletteIndex={0} rotate={-6}>
+                        <Ionicons name="checkmark" size={13} color={theme.colors.white} />
+                      </StickerBadge>
                     </View>
                   )}
                 </TouchableOpacity>
@@ -374,9 +379,15 @@ export function PersonalCenterScreen() {
           </View>
         </View>
 
+        <DoodleDivider doodle="star" style={{ marginVertical: 4 }} />
+
         {/* Menu Sections */}
         {MENU_ITEMS.map((section) => (
-          <View key={section.title} style={[styles.section, { marginTop: 12 }]}>
+          <React.Fragment key={section.title}>
+            {section.title === '危险操作' && (
+              <DoodleDivider doodle="heart" style={{ marginVertical: 4 }} />
+            )}
+            <View style={[styles.section, { marginTop: 12 }]}>
             <Text
               style={[
                 styles.sectionTitle,
@@ -427,10 +438,11 @@ export function PersonalCenterScreen() {
               </TouchableOpacity>
             ))}
           </View>
+          </React.Fragment>
         ))}
 
         <View style={styles.bottom} />
       </ScrollView>
-    </View>
+    </ThemedScreen>
   );
 }
