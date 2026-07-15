@@ -51,8 +51,8 @@ type Opts = {
   from: number;
   to: number;
   kind: 'spring' | 'timing';
-  spring?: Animated.SpringConfig;
-  timing?: Animated.TimingConfig;
+  spring?: Animated.SpringAnimationConfig;
+  timing?: Animated.TimingAnimationConfig;
 };
 
 export function useMountEntrance(opts: Opts): Animated.Value {

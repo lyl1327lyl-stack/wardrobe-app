@@ -53,8 +53,8 @@ type EntranceOpts = {
   from: number;
   to: number;
   kind: 'spring' | 'timing';
-  spring?: Animated.SpringConfig;
-  timing?: Animated.TimingConfig;
+  spring?: Animated.SpringAnimationConfig;
+  timing?: Animated.TimingAnimationConfig;
 };
 
 /**
