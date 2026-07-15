@@ -27,6 +27,9 @@ import { useTheme } from '../hooks/useTheme';
 import { Theme } from '../utils/theme';
 import { getIdleItems, getActiveSeasons, getSeasonTransition } from '../utils/calendarStats';
 import { CalendarInsights } from '../components/CalendarInsights';
+import { ThemedScreen } from '../components/decoration/ThemedScreen';
+import { WashiTape } from '../components/decoration/WashiTape';
+import { DoodleDivider } from '../components/decoration/DoodleDivider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_H_PADDING = 20;
@@ -691,7 +694,7 @@ export function HomeScreen() {
   }, [loadRecommendations, scopeWardrobeId]);
 
   return (
-    <View style={styles.container}>
+    <ThemedScreen style={styles.container}>
       {/* ── 顶部导航（固定）── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerTitleRow} activeOpacity={0.7} onPress={() => setShowWardrobeDropdown(true)}>
@@ -773,6 +776,8 @@ export function HomeScreen() {
           </View>
         </TouchableOpacity>
 
+        <DoodleDivider doodle="star" style={{ marginVertical: 4 }} />
+
         {/* ── 今日穿搭 Hero（常驻：天气 + 今日 + 已记录单品）── */}
         <View style={styles.todayHero}>
           <LinearGradient
@@ -829,7 +834,13 @@ export function HomeScreen() {
               <Text style={styles.todayHeroRecordBtnText}>记录</Text>
             </TouchableOpacity>
           )}
+          <WashiTape
+            paletteIndex={1}
+            style={{ position: 'absolute', top: 6, right: 14 }}
+          />
         </View>
+
+        <DoodleDivider doodle="leaf" style={{ marginVertical: 4 }} />
 
         {/* ── 快捷入口 ── */}
         <View style={styles.quickActions}>
@@ -1003,6 +1014,6 @@ export function HomeScreen() {
         </TouchableOpacity>
       </Modal>
 
-    </View>
+    </ThemedScreen>
   );
 }
