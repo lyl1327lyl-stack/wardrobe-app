@@ -707,6 +707,17 @@ export function WardrobeScreen() {
     getCurrentWardrobe,
   } = useWardrobeStore();
   const { theme } = useTheme();
+  const stickerCard = theme.decoration
+    ? {
+        borderWidth: 3,
+        borderColor: theme.colors.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 4 },
+        shadowOpacity: 0.16,
+        shadowRadius: 10,
+        elevation: 5,
+      }
+    : null;
   const insets = useSafeAreaInsets();
   const categories = useCustomOptionsStore(state => state.categories);
   const isLoading = useCustomOptionsStore(state => state.isLoading);
@@ -1307,7 +1318,8 @@ export function WardrobeScreen() {
                   style={[
                     styles.gridItemTransparentWrap,
                     { width: gridItemSize, height: gridItemSize },
-                    isSelecting && isSelected && styles.gridItemSelected
+                    isSelecting && isSelected && styles.gridItemSelected,
+                    stickerCard,
                   ]}
                   onPress={() => isSelecting ? toggleSelect(itemId) : handlePress(item)}
                   onLongPress={() => handleLongPress(itemId)}

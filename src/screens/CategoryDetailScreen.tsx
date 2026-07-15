@@ -117,6 +117,17 @@ export function CategoryDetailScreen() {
   const { clothing, loadData } = useWardrobeStore();
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
   const { theme } = useTheme();
+  const stickerCard = theme.decoration
+    ? {
+        borderWidth: 3,
+        borderColor: theme.colors.white,
+        shadowColor: '#000',
+        shadowOffset: { width: 2, height: 4 },
+        shadowOpacity: 0.16,
+        shadowRadius: 10,
+        elevation: 5,
+      }
+    : null;
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const { type, season } = route.params;
@@ -154,7 +165,8 @@ export function CategoryDetailScreen() {
         style={[
           styles.card,
           index % COLUMN_COUNT !== 0 && styles.cardMargin,
-          isTransparent && { backgroundColor: theme.colors.background }
+          isTransparent && { backgroundColor: theme.colors.background },
+          stickerCard,
         ]}
         onPress={() => handlePress(item)}
         activeOpacity={0.8}
