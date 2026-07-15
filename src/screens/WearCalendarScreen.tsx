@@ -20,6 +20,8 @@ import { TodayOutfitHero } from '../components/TodayOutfitHero';
 import { StreakProgressCard } from '../components/StreakProgressCard';
 import { YearHeatmap } from '../components/YearHeatmap';
 import { CalendarInsights } from '../components/CalendarInsights';
+import { ThemedScreen } from '../components/decoration/ThemedScreen';
+import { DoodleDivider } from '../components/decoration/DoodleDivider';
 import {
   tintForCount, computeStreak, computeMonthProgress, computeInsights, getActiveSeasons, formatDate,
 } from '../utils/calendarStats';
@@ -379,7 +381,7 @@ export function WearCalendarScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ThemedScreen style={styles.container}>
       {/* 顶栏 */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
@@ -415,6 +417,8 @@ export function WearCalendarScreen() {
           recorded={monthProgress.recorded}
           total={monthProgress.total}
         />
+
+        <DoodleDivider doodle="star" style={{ marginVertical: 4 }} />
 
         {/* 月/年 视图切换 */}
         <View style={styles.viewToggleOuter}>
@@ -549,6 +553,6 @@ export function WearCalendarScreen() {
           onRecordsChanged={() => loadMonthData()}
         />
       )}
-    </View>
+    </ThemedScreen>
   );
 }
