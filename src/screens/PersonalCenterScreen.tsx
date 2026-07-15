@@ -305,7 +305,16 @@ export function PersonalCenterScreen() {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerInner}>
-          <Text style={styles.headerTitle}>个人中心</Text>
+          <Text
+            style={[
+              styles.headerTitle,
+              theme.fonts?.heading
+                ? { fontFamily: theme.fonts.heading, fontWeight: '400' }
+                : null,
+            ]}
+          >
+            个人中心
+          </Text>
         </View>
       </View>
       <ScrollView
@@ -315,7 +324,16 @@ export function PersonalCenterScreen() {
       >
         {/* Theme Selection */}
         <View style={[styles.section, { marginTop: 12 }]}>
-          <Text style={styles.sectionTitle}>主题切换</Text>
+          <Text
+            style={[
+              styles.sectionTitle,
+              theme.fonts?.heading
+                ? { fontFamily: theme.fonts.heading, fontWeight: '400' }
+                : null,
+            ]}
+          >
+            主题切换
+          </Text>
           <View style={styles.themeGrid}>
             {THEME_OPTIONS.map((option) => {
               const isSelected = themeId === option.id;
@@ -334,7 +352,15 @@ export function PersonalCenterScreen() {
                   <View style={[styles.themeIconWrap, { backgroundColor: optionTheme.colors.card }]}>
                     <Ionicons name={option.icon} size={24} color={optionTheme.colors.primary} />
                   </View>
-                  <Text style={[styles.themeLabel, { color: optionTheme.colors.text }]}>
+                  <Text
+                    style={[
+                      styles.themeLabel,
+                      { color: optionTheme.colors.text },
+                      optionTheme.fonts?.heading
+                        ? { fontFamily: optionTheme.fonts.heading, fontWeight: '400' }
+                        : null,
+                    ]}
+                  >
                     {option.label}
                   </Text>
                   {isSelected && (
@@ -351,7 +377,15 @@ export function PersonalCenterScreen() {
         {/* Menu Sections */}
         {MENU_ITEMS.map((section) => (
           <View key={section.title} style={[styles.section, { marginTop: 12 }]}>
-            <Text style={section.title === '危险操作' ? [styles.sectionTitle, { color: theme.colors.danger }] : styles.sectionTitle}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                section.title === '危险操作' ? { color: theme.colors.danger } : null,
+                theme.fonts?.heading
+                  ? { fontFamily: theme.fonts.heading, fontWeight: '400' }
+                  : null,
+              ]}
+            >
               {section.title}
             </Text>
             {section.items.map((item, itemIndex) => (

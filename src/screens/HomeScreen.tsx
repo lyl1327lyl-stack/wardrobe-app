@@ -695,7 +695,16 @@ export function HomeScreen() {
       {/* ── 顶部导航（固定）── */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.headerTitleRow} activeOpacity={0.7} onPress={() => setShowWardrobeDropdown(true)}>
-          <Text style={styles.headerTitle}>{scopeWardrobeName}</Text>
+          <Text
+            style={[
+              styles.headerTitle,
+              theme.fonts?.heading
+                ? { fontFamily: theme.fonts.heading, fontWeight: '400' }
+                : null,
+            ]}
+          >
+            {scopeWardrobeName}
+          </Text>
           <Ionicons name="chevron-down" size={16} color={theme.colors.textSecondary} />
         </TouchableOpacity>
       </View>
