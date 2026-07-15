@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { View, Text, TouchableOpacity } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFonts } from 'expo-font';
 
 import { WardrobeScreen } from './src/screens/WardrobeScreen';
 import { AddClothingScreen } from './src/screens/AddClothingScreen';
@@ -173,8 +174,11 @@ function WearCountFixer({ children }: { children: React.ReactNode }) {
 // Main navigator that uses theme
 function AppNavigator() {
   const { theme, isLoading } = useTheme();
+  const [fontsLoaded] = useFonts({
+    LXGWWenKai: require('./assets/fonts/LXGWWenKai-Regular.ttf'),
+  });
 
-  if (isLoading) {
+  if (isLoading || !fontsLoaded) {
     return <LoadingScreen />;
   }
 
