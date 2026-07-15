@@ -19,6 +19,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { useCustomOptionsStore } from '../../store/customOptionsStore';
 import { OutfitGroup } from '../../types';
+import { ThemedScreen } from '../../components/decoration/ThemedScreen';
 import { GroupFormModal } from './GroupFormModal';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
@@ -203,7 +204,7 @@ export function GroupListScreen() {
   }, [groups, outfits, searchKeyword]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+    <ThemedScreen style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <View style={[styles.header, { backgroundColor: theme.colors.card, paddingTop: insets.top + 12 }]}>
         <View style={styles.headerInner}>
           <View style={styles.headerRow}>
@@ -467,7 +468,7 @@ export function GroupListScreen() {
         visible={showFormModal}
         onClose={() => setShowFormModal(false)}
       />
-    </View>
+    </ThemedScreen>
   );
 }
 

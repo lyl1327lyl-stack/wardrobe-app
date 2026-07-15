@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../utils/theme';
 import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
 import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
+import { ThemedScreen } from '../components/decoration/ThemedScreen';
 import * as wearRecordsDb from '../db/wearRecords';
 
 const SEASON_FILTER_KEY = 'wardrobe_season_filter';
@@ -1014,7 +1015,7 @@ export function WardrobeScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <ThemedScreen style={styles.container}>
       {/* 统一顶栏 */}
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <View style={styles.headerInner}>
@@ -1507,6 +1508,6 @@ export function WardrobeScreen() {
         onClose={() => setShowMoveSheet(false)}
         onSelect={handleMoveToWardrobe}
       />
-    </View>
+    </ThemedScreen>
   );
 }
