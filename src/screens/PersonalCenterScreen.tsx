@@ -368,7 +368,7 @@ export function PersonalCenterScreen() {
                   </Text>
                   {isSelected && (
                     <View style={styles.checkBadge}>
-                      <StickerBadge paletteIndex={0} rotate={-6}>
+                      <StickerBadge color={theme.colors.primary} rotate={-6}>
                         <Ionicons name="checkmark" size={13} color={theme.colors.white} />
                       </StickerBadge>
                     </View>

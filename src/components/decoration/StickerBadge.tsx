@@ -7,6 +7,7 @@ interface StickerBadgeProps {
   children: ReactNode;
   paletteIndex?: number;
   rotate?: number;
+  color?: string;            // 新增：提供则覆盖 accentPalette 取色
   style?: StyleProp<ViewStyle>;
 }
 
@@ -14,6 +15,7 @@ export function StickerBadge({
   children,
   paletteIndex = 1,
   rotate = -3,
+  color,
   style,
 }: StickerBadgeProps) {
   const { theme } = useTheme();
@@ -22,13 +24,13 @@ export function StickerBadge({
 
   if (!deco) return <>{children}</>;
 
-  const color = deco.accentPalette[paletteIndex % deco.accentPalette.length];
+  const bg = color ?? deco.accentPalette[paletteIndex % deco.accentPalette.length];
 
   return (
     <Animated.View
       style={[
         {
-          backgroundColor: color,
+          backgroundColor: bg,
           borderRadius: 10,
           paddingHorizontal: 6,
           paddingVertical: 4,
