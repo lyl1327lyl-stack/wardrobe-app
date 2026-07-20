@@ -133,7 +133,7 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   },
   statsHeroImage: {
     width: '100%',
-    aspectRatio: 1536 / 1024,
+    height: 150,
     borderRadius: 12,
     marginTop: 12,
   },
@@ -749,7 +749,7 @@ export function HomeScreen() {
           </View>
 
           <Image
-            source={require('../../assets/wardrobe-illustration-handdrawn.png')}
+            source={require('../../assets/wardrobe-illustration-handdrawn.jpg')}
             style={styles.statsHeroImage}
             resizeMode="cover"
           />
