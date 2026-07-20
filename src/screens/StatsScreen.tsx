@@ -286,6 +286,7 @@ export function StatsScreen() {
   const [showWardrobeDropdown, setShowWardrobeDropdown] = useState(false);
   const [timeRange, setTimeRange] = useState<'month' | 'year'>('month');
   const [chartValueType, setChartValueType] = useState<'value' | 'count'>('value');
+  const [distView, setDistView] = useState<'count' | 'percent'>('count');
   const currentYear = new Date().getFullYear();
 
   // 衣橱加载后默认选中默认衣橱（"我的衣橱"）
@@ -549,6 +550,27 @@ export function StatsScreen() {
     return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
   }, [filteredClothing]);
 
+  // 分布卡片显示模式（件数 / 占比）+ 复用切换按钮 + 取值
+  const distTotal = filteredClothing.length || 1;
+  const distVal = (n: number) =>
+    distView === 'percent' ? `${Math.round((n / distTotal) * 100)}%` : `${n}`;
+  const distToggle = (
+    <View style={styles.valueToggle}>
+      <TouchableOpacity
+        style={[styles.valueToggleBtn, distView === 'count' && styles.valueToggleBtnActive]}
+        onPress={() => setDistView('count')}
+      >
+        <Text style={[styles.valueToggleText, distView === 'count' && styles.valueToggleTextActive]}>件数</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.valueToggleBtn, distView === 'percent' && styles.valueToggleBtnActive]}
+        onPress={() => setDistView('percent')}
+      >
+        <Text style={[styles.valueToggleText, distView === 'percent' && styles.valueToggleTextActive]}>占比</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   // 搭配概览
   const outfitOverview = useMemo(() => {
     const total = outfits.length;
@@ -724,7 +746,10 @@ export function StatsScreen() {
 
         {/* 颜色分布 */}
         <View style={styles.analysisCard}>
-          <Text style={styles.analysisCardTitle}>颜色分布</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.analysisCardTitle, { marginBottom: 0 }]}>颜色分布</Text>
+            {distToggle}
+          </View>
           {colorDist.length === 0 ? (
             <Text style={styles.emptyText}>暂无衣物</Text>
           ) : (
@@ -738,7 +763,7 @@ export function StatsScreen() {
                   <View style={styles.distBarBg}>
                     <View style={[styles.distBarFill, { width: `${Math.max((c.count / max) * 100, 8)}%`, backgroundColor: c.hex }]} />
                   </View>
-                  <Text style={styles.distCount}>{c.count}</Text>
+                  <Text style={styles.distCount}>{distVal(c.count)}</Text>
                 </View>
               );
             })
@@ -747,14 +772,15 @@ export function StatsScreen() {
 
         {/* 季节分布 */}
         <View style={styles.analysisCard}>
-          <Text style={styles.analysisCardTitle}>季节分布</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.analysisCardTitle, { marginBottom: 0 }]}>季节分布</Text>
+            {distToggle}
+          </View>
           {filteredClothing.length === 0 ? (
             <Text style={styles.emptyText}>暂无衣物</Text>
           ) : (
             seasonDist.map((s, idx) => {
               const max = Math.max(...seasonDist.map(x => x.count), 1);
-              const total = filteredClothing.length;
-              const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
               return (
                 <View key={s.name} style={styles.distRow}>
                   <Text style={styles.distRank}>{idx + 1}</Text>
@@ -763,7 +789,7 @@ export function StatsScreen() {
                   <View style={styles.distBarBg}>
                     <View style={[styles.distBarFill, { width: `${Math.max((s.count / max) * 100, s.count > 0 ? 8 : 0)}%`, backgroundColor: s.color }]} />
                   </View>
-                  <Text style={styles.distCount}>{s.count} · {pct}%</Text>
+                  <Text style={styles.distCount}>{distVal(s.count)}</Text>
                 </View>
               );
             })
@@ -772,14 +798,15 @@ export function StatsScreen() {
 
         {/* 大类型分布 */}
         <View style={styles.analysisCard}>
-          <Text style={styles.analysisCardTitle}>类型分布（大类型）</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.analysisCardTitle, { marginBottom: 0 }]}>类型分布（大类型）</Text>
+            {distToggle}
+          </View>
           {parentTypeDist.length === 0 ? (
             <Text style={styles.emptyText}>暂无衣物</Text>
           ) : (
             parentTypeDist.map((p, idx) => {
               const max = parentTypeDist[0].count;
-              const total = filteredClothing.length;
-              const pct = total > 0 ? Math.round((p.count / total) * 100) : 0;
               return (
                 <View key={p.name} style={styles.distRow}>
                   <Text style={styles.distRank}>{idx + 1}</Text>
@@ -787,7 +814,7 @@ export function StatsScreen() {
                   <View style={styles.distBarBg}>
                     <View style={[styles.distBarFill, { width: `${Math.max((p.count / max) * 100, 8)}%`, backgroundColor: TYPE_COLORS[idx % TYPE_COLORS.length] }]} />
                   </View>
-                  <Text style={styles.distCount}>{p.count} · {pct}%</Text>
+                  <Text style={styles.distCount}>{distVal(p.count)}</Text>
                 </View>
               );
             })
@@ -818,7 +845,10 @@ export function StatsScreen() {
 
         {/* 品牌分布 Top 5 */}
         <View style={styles.analysisCard}>
-          <Text style={styles.analysisCardTitle}>品牌分布 Top 5</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Text style={[styles.analysisCardTitle, { marginBottom: 0 }]}>品牌分布 Top 5</Text>
+            {distToggle}
+          </View>
           {brandDist.length === 0 ? (
             <Text style={styles.emptyText}>暂无品牌信息</Text>
           ) : (
@@ -831,7 +861,7 @@ export function StatsScreen() {
                   <View style={styles.distBarBg}>
                     <View style={[styles.distBarFill, { width: `${Math.max((b.count / max) * 100, 8)}%`, backgroundColor: TYPE_COLORS[idx % TYPE_COLORS.length] }]} />
                   </View>
-                  <Text style={styles.distCount}>{b.count}</Text>
+                  <Text style={styles.distCount}>{distVal(b.count)}</Text>
                 </View>
               );
             })
