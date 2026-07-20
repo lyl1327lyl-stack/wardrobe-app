@@ -131,6 +131,12 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
     shadowRadius: 10,
     elevation: 3,
   },
+  statsHeroImage: {
+    width: '100%',
+    aspectRatio: 1536 / 1024,
+    borderRadius: 12,
+    marginTop: 12,
+  },
   statsHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -416,16 +422,6 @@ export function HomeScreen() {
     setShowRec(todayItems.length === 0);
   }, [todayItems.length]);
 
-  // Category stats — dynamic from (scoped) clothing data
-  const categoryStats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    scopedClothing.forEach(c => {
-      const cat = c.parentType || '其他';
-      counts[cat] = (counts[cat] || 0) + 1;
-    });
-    return Object.entries(counts).sort((a, b) => b[1] - a[1]);
-  }, [scopedClothing]);
-
   const totalCount = scopedClothing.length;
 
   const attributeTips = useMemo(() => analyzeAttributeGaps(scopedClothing), [scopedClothing]);
@@ -434,11 +430,11 @@ export function HomeScreen() {
   const wardrobeInsights = useMemo(() => {
     const active = scopedClothing.filter(c => !c.deletedAt);
     const totalPrice = active.reduce((sum, c) => sum + (c.price || 0), 0);
-    const avgWearCount = active.length > 0
-      ? active.reduce((sum, c) => sum + (c.wearCount || 0), 0) / active.length
-      : 0;
+    const totalWear = active.reduce((sum, c) => sum + (c.wearCount || 0), 0);
+    const avgWearCount = active.length > 0 ? totalWear / active.length : 0;
     const sleepingCount = getIdleItems(active, getActiveSeasons()).length;
-    return { totalPrice, avgWearCount, sleepingCount };
+    const costPerWear = totalWear > 0 ? totalPrice / totalWear : 0;
+    return { totalPrice, totalWear, avgWearCount, sleepingCount, costPerWear };
   }, [clothing]);
 
   // 换季提醒：若刚进入某季节(7天内)，提示整理该季节衣物
@@ -733,47 +729,30 @@ export function HomeScreen() {
             <Text style={styles.statsHeaderLink}>查看详情 ›</Text>
           </View>
 
-          <View style={styles.categoryRow}>
-            {categoryStats.slice(0, 4).map(([cat, count]) => (
-              <View key={cat} style={styles.categoryItem}>
-                <Text style={styles.categoryCount}>{count}</Text>
-                <Text style={styles.categoryName}>{cat}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* 类型占比迷你条 */}
-          {totalCount > 0 && (
-            <View style={styles.catBar}>
-              {categoryStats.slice(0, 6).map(([cat, count], idx) => (
-                <View
-                  key={cat}
-                  style={[styles.catSeg, { flex: count, backgroundColor: CAT_COLORS[idx % CAT_COLORS.length] }]}
-                />
-              ))}
-            </View>
-          )}
-
-          <View style={styles.statsDivider} />
-
           <View style={styles.insightsRow}>
             <View style={styles.insightItem}>
               <Text style={styles.insightValue}>¥{wardrobeInsights.totalPrice.toLocaleString()}</Text>
               <Text style={styles.insightLabel}>总价</Text>
             </View>
             <View style={styles.insightItem}>
-              <Text style={styles.insightValue}>{wardrobeInsights.avgWearCount.toFixed(1)}</Text>
-              <Text style={styles.insightLabel}>次/件</Text>
-            </View>
-            <View style={styles.insightItem}>
-              <Text style={[styles.insightValue, { color: theme.colors.warning }]}>{wardrobeInsights.sleepingCount}</Text>
-              <Text style={styles.insightLabel}>沉睡件</Text>
-            </View>
-            <View style={styles.insightItem}>
               <Text style={styles.insightValue}>{totalCount}</Text>
-              <Text style={styles.insightLabel}>总数</Text>
+              <Text style={styles.insightLabel}>件数</Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightValue}>{outfits.length}</Text>
+              <Text style={styles.insightLabel}>搭配数</Text>
+            </View>
+            <View style={styles.insightItem}>
+              <Text style={styles.insightValue}>¥{wardrobeInsights.costPerWear.toFixed(1)}</Text>
+              <Text style={styles.insightLabel}>单次价格</Text>
             </View>
           </View>
+
+          <Image
+            source={require('../../assets/wardrobe-illustration-handdrawn.png')}
+            style={styles.statsHeroImage}
+            resizeMode="cover"
+          />
         </TouchableOpacity>
 
         <DoodleDivider doodle="star" style={{ marginVertical: 4 }} />
