@@ -15,6 +15,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 
 type OptionCategory = 'categories' | 'seasons' | 'tags' | 'sizes';
@@ -406,6 +407,7 @@ export function CustomOptionsScreen() {
   const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
 
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // 如果传入了特定分类，则进入单分类模式
@@ -700,7 +702,7 @@ export function CustomOptionsScreen() {
           <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()}>
             <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>管理分类选项</Text>
+          <Text style={[styles.headerTitle, headingFont]}>管理分类选项</Text>
           <View style={{ width: 36 }} />
         </View>
       </View>
@@ -714,7 +716,7 @@ export function CustomOptionsScreen() {
         <TouchableOpacity style={styles.headerBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>
+        <Text style={[styles.headerTitle, headingFont]}>
           {forcedCategory ? `${CATEGORIES.find(c => c.key === forcedCategory)?.label}管理` : '管理分类选项'}
         </Text>
         {forcedCategory ? (

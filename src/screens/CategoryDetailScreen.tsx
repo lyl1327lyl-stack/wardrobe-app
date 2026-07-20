@@ -14,6 +14,7 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 
 const { width } = Dimensions.get('window');
@@ -117,6 +118,7 @@ export function CategoryDetailScreen() {
   const { clothing, loadData } = useWardrobeStore();
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const stickerCard = theme.decoration
     ? {
         borderWidth: 3,
@@ -201,7 +203,7 @@ export function CategoryDetailScreen() {
         >
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{getTitle()}</Text>
+        <Text style={[styles.headerTitle, headingFont]}>{getTitle()}</Text>
         <Text style={styles.headerCount}>{items.length}件</Text>
       </View>
 

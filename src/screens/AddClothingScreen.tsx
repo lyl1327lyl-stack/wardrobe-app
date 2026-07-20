@@ -25,6 +25,7 @@ import { consumeCropResult, type CropState } from '../utils/cropNavigation';
 import { processImage } from '../utils/imageUtils';
 import { ClothingItem, COLORS, FIT_OPTIONS, THICKNESS_OPTIONS } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { OverflowScrollView } from '../components/OverflowScrollView';
 import { Theme } from '../utils/theme';
@@ -685,6 +686,7 @@ export function AddClothingScreen() {
   const clothing = useWardrobeStore(state => state.clothing);
   const draftClothing = useWardrobeStore(state => state.draftClothing);
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const getParents = useCustomOptionsStore(state => state.getParents);
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
   const customSeasons = useCustomOptionsStore(state => state.seasons);
@@ -1178,7 +1180,7 @@ export function AddClothingScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={handleBack} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{isEditing ? (isEditingDraft ? '编辑草稿' : '编辑衣服') : '添加衣服'}</Text>
+        <Text style={[styles.headerTitle, headingFont]}>{isEditing ? (isEditingDraft ? '编辑草稿' : '编辑衣服') : '添加衣服'}</Text>
         <View style={styles.headerRight}>
           {isEditingDraft && (
             <TouchableOpacity style={styles.headerDraftBtn} onPress={() => doSave(true)} activeOpacity={0.7} disabled={isSubmitting}>

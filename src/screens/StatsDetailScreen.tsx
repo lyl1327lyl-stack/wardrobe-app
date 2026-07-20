@@ -6,6 +6,7 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 
 const TYPE_COLORS = ['#6B7FD7', '#E8B4A0', '#00B894', '#FDCB6E', '#A29BFE', '#74B9FF'];
@@ -87,6 +88,7 @@ export function StatsDetailScreen() {
   const { clothing, soldClothing } = useWardrobeStore();
   const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [statsTab, setStatsTab] = useState<StatsDetailTab>(initialTab);
   const [warnDays, setWarnDays] = useState(30);
@@ -180,7 +182,7 @@ export function StatsDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={20} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{getTabTitle()}</Text>
+        <Text style={[styles.headerTitle, headingFont]}>{getTabTitle()}</Text>
         <Text style={styles.headerCount}>共 {getTotalCount()} 件</Text>
       </View>
 

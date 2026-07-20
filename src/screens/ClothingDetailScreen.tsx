@@ -21,6 +21,7 @@ import { useOutfitStore } from '../store/outfitStore';
 import { deleteImage } from '../utils/imageUtils';
 import { Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 import { DiscardReasonSheet } from '../components/DiscardReasonSheet';
 import { SellItemSheet } from '../components/SellItemSheet';
@@ -515,6 +516,7 @@ export function ClothingDetailScreen() {
   const route = useRoute<RouteProp<RouteParams, 'ClothingDetail'>>();
   const { getClothingByIdIncludingAll, moveToTrash, sellClothing, restoreFromTrash, restoreFromSold, permanentDelete, updateClothing, publishDraft, getOutfitWarningForDeletion } = useWardrobeStore();
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   // 直接从 store 订阅，不要用本地 state
@@ -804,7 +806,7 @@ export function ClothingDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{item.parentType && item.parentType !== item.type ? `${item.parentType} > ${item.type}` : item.type}</Text>
+        <Text style={[styles.headerTitle, headingFont]}>{item.parentType && item.parentType !== item.type ? `${item.parentType} > ${item.type}` : item.type}</Text>
         {!isTrash && !isSold ? (
           <TouchableOpacity
             style={styles.editBtn}

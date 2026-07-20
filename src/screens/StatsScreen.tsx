@@ -7,6 +7,7 @@ import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { Season, WearRecord } from '../types';
 import { getWearRecordsByDateRange } from '../db/wearRecords';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../utils/theme';
 
@@ -275,6 +276,7 @@ export function StatsScreen() {
   const categories = useCustomOptionsStore(state => state.categories);
   const getParentOfChild = useCustomOptionsStore(state => state.getParentOfChild);
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [statsTab, setStatsTab] = useState<'efficiency' | 'frequency' | 'warn' | 'companion'>('efficiency');
@@ -603,7 +605,7 @@ export function StatsScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="file-tray-full-outline" size={15} color={theme.colors.primary} />
-            <Text style={styles.wardrobePickerText} numberOfLines={1}>{scopeName}</Text>
+            <Text style={[styles.wardrobePickerText, headingFont]} numberOfLines={1}>{scopeName}</Text>
             <Ionicons name="chevron-down" size={14} color={theme.colors.primary} />
           </TouchableOpacity>
         </View>

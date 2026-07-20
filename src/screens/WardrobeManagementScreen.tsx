@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { Wardrobe } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 import WardrobeEditSheet from '../components/WardrobeEditSheet';
 import DeleteWardrobeSheet from '../components/DeleteWardrobeSheet';
@@ -175,6 +176,7 @@ const makeStyles = (theme: Theme) =>
 export function WardrobeManagementScreen() {
   const navigation = useNavigation();
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const {
@@ -348,7 +350,7 @@ export function WardrobeManagementScreen() {
         >
           <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>管理衣橱</Text>
+        <Text style={[styles.headerTitle, headingFont]}>管理衣橱</Text>
         <TouchableOpacity onPress={handleAdd} activeOpacity={0.85}>
           <LinearGradient
             colors={[theme.colors.primary, theme.colors.primaryDark || theme.colors.primary]}

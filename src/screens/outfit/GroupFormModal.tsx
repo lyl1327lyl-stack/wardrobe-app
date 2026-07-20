@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 
 interface Props {
@@ -23,6 +24,7 @@ interface Props {
 
 export function GroupFormModal({ visible, onClose, editGroup }: Props) {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const addGroup = useWardrobeStore(state => state.addGroup);
   const updateGroup = useWardrobeStore(state => state.updateGroup);
@@ -75,7 +77,7 @@ export function GroupFormModal({ visible, onClose, editGroup }: Props) {
           <TouchableOpacity activeOpacity={1} onPress={() => {}}>
             <View style={[styles.sheet, { backgroundColor: theme.colors.card, paddingBottom: insets.bottom + 20 }]}>
               <View style={styles.handle} />
-              <Text style={[styles.title, { color: theme.colors.text }]}>
+              <Text style={[styles.title, { color: theme.colors.text }, headingFont]}>
                 {isEdit ? '编辑分组' : '新建分组'}
               </Text>
 

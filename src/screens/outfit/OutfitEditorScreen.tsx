@@ -24,6 +24,7 @@ import {
 import { generateOutfitThumbnail } from '../../utils/generateOutfitThumbnail';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { useOutfitStore, CanvasItem, CanvasBackground } from '../../store/outfitStore';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { CanvasToolsBar } from '../../components/outfit/CanvasToolsBar';
@@ -270,6 +271,7 @@ function DraggableItem({
 
 export function OutfitEditorScreen({ onSave }: Props) {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'OutfitEditor'>>();
@@ -634,7 +636,7 @@ export function OutfitEditorScreen({ onSave }: Props) {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>搭配画板</Text>
+        <Text style={[styles.headerTitle, headingFont]}>搭配画板</Text>
         <TouchableOpacity
           style={[styles.saveButton, isSavingOutfit && styles.saveButtonDisabled]}
           onPress={isCanvasOnly ? handleSaveCanvasOnly : handleSave}

@@ -15,6 +15,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { ClothingItem, ClothingType } from '../../types';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { useOutfitStore } from '../../store/outfitStore';
@@ -41,6 +42,7 @@ const CLOTHING_TABS: { label: string; value: ClothingType | '全部' }[] = [
 
 export function ClothingSelectionScreen() {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'ClothingSelection'>>();
@@ -136,7 +138,7 @@ export function ClothingSelectionScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{source === 'Editor' ? '添加衣服' : '创建搭配'}</Text>
+        <Text style={[styles.headerTitle, headingFont]}>{source === 'Editor' ? '添加衣服' : '创建搭配'}</Text>
         <View style={{ width: 50 }} />
       </View>
 

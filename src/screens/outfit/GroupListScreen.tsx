@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { useCustomOptionsStore } from '../../store/customOptionsStore';
 import { OutfitGroup } from '../../types';
@@ -39,6 +40,7 @@ type RootStackParamList = {
 
 export function GroupListScreen() {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -209,7 +211,7 @@ export function GroupListScreen() {
         <View style={styles.headerInner}>
           <View style={styles.headerRow}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-              <Text style={[styles.headerTitle, { color: theme.colors.text }]}>我的搭配</Text>
+              <Text style={[styles.headerTitle, { color: theme.colors.text }, headingFont]}>我的搭配</Text>
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <TouchableOpacity

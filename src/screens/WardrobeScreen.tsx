@@ -18,6 +18,7 @@ import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { DEFAULT_OPTIONS } from '../utils/customOptions';
 import { ClothingItem, Season } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../utils/theme';
 import { BatchDiscardReasonSheet } from '../components/BatchDiscardReasonSheet';
@@ -707,6 +708,7 @@ export function WardrobeScreen() {
     getCurrentWardrobe,
   } = useWardrobeStore();
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const stickerCard = theme.decoration
     ? {
         borderWidth: 3,
@@ -1050,7 +1052,7 @@ export function WardrobeScreen() {
               onPress={() => setShowWardrobePicker(true)}
               activeOpacity={0.7}
             >
-              <Text style={styles.headerTitle}>{currentWardrobe?.name || '我的衣橱'}</Text>
+              <Text style={[styles.headerTitle, headingFont]}>{currentWardrobe?.name || '我的衣橱'}</Text>
               <Ionicons name="chevron-down" size={18} color={theme.colors.textTertiary} />
             </TouchableOpacity>
             {/* 右侧：搜索 + 日历 + 草稿箱 */}

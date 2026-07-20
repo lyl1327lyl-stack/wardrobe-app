@@ -19,6 +19,7 @@ import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { ClothingItem, Season, CategoryFilter, Outfit } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 import { MonthCalendar, getDaysInMonth } from '../components/MonthCalendar';
 import * as wearRecordsDb from '../db/wearRecords';
@@ -401,6 +402,7 @@ export function RecordWearScreen() {
   const initialDate = route.params?.date as string | undefined;
   const initialOutfitId = route.params?.outfitId as number | undefined;
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const clothing = useWardrobeStore(s => s.clothing);
@@ -677,7 +679,7 @@ export function RecordWearScreen() {
             <Ionicons name="chevron-back" size={20} color={theme.colors.text} />
           </TouchableOpacity>
         </View>
-        <Text style={styles.headerTitle}>记录穿搭</Text>
+        <Text style={[styles.headerTitle, headingFont]}>记录穿搭</Text>
         <View style={[styles.headerSide, styles.headerSideRight]}>
           <TouchableOpacity
           style={styles.dateBtn}

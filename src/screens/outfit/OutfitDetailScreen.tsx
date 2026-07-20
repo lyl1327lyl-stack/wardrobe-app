@@ -14,6 +14,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { Outfit, ClothingItem } from '../../types';
 import { Theme } from '../../utils/theme';
@@ -33,6 +34,7 @@ type RootStackParamList = {
 
 export function OutfitDetailScreen() {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -125,7 +127,7 @@ export function OutfitDetailScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>搭配详情</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }, headingFont]}>搭配详情</Text>
         <TouchableOpacity
           style={[styles.headerEditBtn, { backgroundColor: theme.colors.primary }]}
           onPress={() => {

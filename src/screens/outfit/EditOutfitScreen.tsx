@@ -16,6 +16,7 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { Theme } from '../../utils/theme';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { useCustomOptionsStore } from '../../store/customOptionsStore';
@@ -33,6 +34,7 @@ type RootStackParamList = {
 
 export function EditOutfitScreen() {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const route = useRoute<RouteProp<RootStackParamList, 'EditOutfit'>>();
@@ -131,7 +133,7 @@ export function EditOutfitScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>编辑搭配</Text>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }, headingFont]}>编辑搭配</Text>
         <TouchableOpacity
           style={[styles.saveBtn, { backgroundColor: theme.colors.primary }, isSubmitting && styles.saveBtnDisabled]}
           onPress={handleSave}

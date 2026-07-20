@@ -12,6 +12,7 @@ import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 import { ClothingItem } from '../types';
 
@@ -227,6 +228,7 @@ export function DraftsScreen() {
   const navigation = useNavigation<any>();
   const { draftClothing, loadDrafts, deleteDraft, deleteAllDrafts } = useWardrobeStore();
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [isSelecting, setIsSelecting] = useState(false);
@@ -330,7 +332,7 @@ export function DraftsScreen() {
             <Ionicons name="chevron-back" size={24} color={theme.colors.text} />
           </TouchableOpacity>
           <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-            <Text style={styles.headerTitle}>草稿箱</Text>
+            <Text style={[styles.headerTitle, headingFont]}>草稿箱</Text>
             <Text style={styles.headerSubtitle}>{draftClothing.length}个</Text>
           </View>
         </View>

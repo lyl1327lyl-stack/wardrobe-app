@@ -16,6 +16,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useTheme } from '../../hooks/useTheme';
+import { useHeadingFont } from '../../hooks/useHeadingFont';
 import { useWardrobeStore } from '../../store/wardrobeStore';
 import { GroupFormModal } from './GroupFormModal';
 import { Outfit } from '../../types';
@@ -41,6 +42,7 @@ type RootStackParamList = {
 
 export function GroupDetailScreen() {
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const insets = useSafeAreaInsets();
   const isFocused = useIsFocused();
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -301,7 +303,7 @@ export function GroupDetailScreen() {
             <>
               <View style={styles.headerInfo}>
                 <View style={styles.headerTitleRow}>
-                  <Text style={[styles.headerTitle, { color: theme.colors.text }]}>{group?.name || groupName}</Text>
+                  <Text style={[styles.headerTitle, { color: theme.colors.text }, headingFont]}>{group?.name || groupName}</Text>
                   <Text style={[styles.headerCount, { color: theme.colors.textTertiary }]}>{groupOutfits.length}套</Text>
                 </View>
                 {group?.description ? (

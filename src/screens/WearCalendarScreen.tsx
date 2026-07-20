@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ClothingItem, WearRecord } from '../types';
 import { useTheme } from '../hooks/useTheme';
+import { useHeadingFont } from '../hooks/useHeadingFont';
 import { Theme } from '../utils/theme';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import * as wearRecordsDb from '../db/wearRecords';
@@ -171,6 +172,7 @@ const makeStyles = (theme: Theme) =>
 export function WearCalendarScreen() {
   const navigation = useNavigation<any>();
   const { theme } = useTheme();
+  const headingFont = useHeadingFont();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const clothing = useWardrobeStore(s => s.clothing);
   const trashClothing = useWardrobeStore(s => s.trashClothing);
@@ -392,7 +394,7 @@ export function WearCalendarScreen() {
             <View style={styles.headerTitleIcon}>
               <Ionicons name="calendar-outline" size={16} color={theme.colors.primary} />
             </View>
-            <Text style={styles.headerTitle}>穿着记录</Text>
+            <Text style={[styles.headerTitle, headingFont]}>穿着记录</Text>
           </View>
           {isViewingOtherMonth ? (
             <TouchableOpacity style={styles.todayBtn} onPress={goToToday} activeOpacity={0.7}>
