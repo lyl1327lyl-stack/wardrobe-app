@@ -533,6 +533,22 @@ export function StatsScreen() {
     return Object.entries(m).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, count]) => ({ name, count }));
   }, [filteredClothing]);
 
+  // 季节分布（一件衣服属多季会在多季都计入；占比 = 该季件数 / 总衣物数）
+  const seasonDist = useMemo(() => {
+    return SEASON_CONFIG.map(s => ({
+      name: s.season,
+      count: filteredClothing.filter(c => Array.isArray(c.seasons) && c.seasons.includes(s.season)).length,
+      color: s.color,
+    }));
+  }, [filteredClothing]);
+
+  // 大类型（parentType）分布
+  const parentTypeDist = useMemo(() => {
+    const m: Record<string, number> = {};
+    filteredClothing.forEach(c => { const k = (c.parentType || '').trim() || '未分类'; m[k] = (m[k] || 0) + 1; });
+    return Object.entries(m).sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count }));
+  }, [filteredClothing]);
+
   // 搭配概览
   const outfitOverview = useMemo(() => {
     const total = outfits.length;
@@ -723,6 +739,55 @@ export function StatsScreen() {
                     <View style={[styles.distBarFill, { width: `${Math.max((c.count / max) * 100, 8)}%`, backgroundColor: c.hex }]} />
                   </View>
                   <Text style={styles.distCount}>{c.count}</Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* 季节分布 */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>季节分布</Text>
+          {filteredClothing.length === 0 ? (
+            <Text style={styles.emptyText}>暂无衣物</Text>
+          ) : (
+            seasonDist.map((s, idx) => {
+              const max = Math.max(...seasonDist.map(x => x.count), 1);
+              const total = filteredClothing.length;
+              const pct = total > 0 ? Math.round((s.count / total) * 100) : 0;
+              return (
+                <View key={s.name} style={styles.distRow}>
+                  <Text style={styles.distRank}>{idx + 1}</Text>
+                  <View style={[styles.distDot, { backgroundColor: s.color }]} />
+                  <Text style={styles.distName} numberOfLines={1}>{s.name}</Text>
+                  <View style={styles.distBarBg}>
+                    <View style={[styles.distBarFill, { width: `${Math.max((s.count / max) * 100, s.count > 0 ? 8 : 0)}%`, backgroundColor: s.color }]} />
+                  </View>
+                  <Text style={styles.distCount}>{s.count} · {pct}%</Text>
+                </View>
+              );
+            })
+          )}
+        </View>
+
+        {/* 大类型分布 */}
+        <View style={styles.analysisCard}>
+          <Text style={styles.analysisCardTitle}>类型分布（大类型）</Text>
+          {parentTypeDist.length === 0 ? (
+            <Text style={styles.emptyText}>暂无衣物</Text>
+          ) : (
+            parentTypeDist.map((p, idx) => {
+              const max = parentTypeDist[0].count;
+              const total = filteredClothing.length;
+              const pct = total > 0 ? Math.round((p.count / total) * 100) : 0;
+              return (
+                <View key={p.name} style={styles.distRow}>
+                  <Text style={styles.distRank}>{idx + 1}</Text>
+                  <Text style={[styles.distName, { flex: 1, fontWeight: '500' }]} numberOfLines={1}>{p.name}</Text>
+                  <View style={styles.distBarBg}>
+                    <View style={[styles.distBarFill, { width: `${Math.max((p.count / max) * 100, 8)}%`, backgroundColor: TYPE_COLORS[idx % TYPE_COLORS.length] }]} />
+                  </View>
+                  <Text style={styles.distCount}>{p.count} · {pct}%</Text>
                 </View>
               );
             })
