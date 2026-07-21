@@ -118,7 +118,7 @@ const baseShadows = {
 
 export const woodTheme: Theme = {
   id: 'wood',
-  name: '暖阳原木',
+  name: '秋日原木',
   colors: {
     primary: '#8B7355',
     primaryLight: '#A89070',
