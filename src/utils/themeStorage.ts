@@ -6,7 +6,9 @@ const THEME_STORAGE_KEY = 'app_theme';
 export async function getStoredThemeId(): Promise<ThemeId> {
   try {
     const stored = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-    if (stored && ['wood', 'spring', 'summer', 'winter', 'journal'].includes(stored)) {
+    // 'journal'(手账少女)暂时从白名单移除 → 已选过的用户会回退到 'wood'。
+    // 恢复主题时把 'journal' 加回此数组即可。
+    if (stored && ['wood', 'spring', 'summer', 'winter'].includes(stored)) {
       return stored as ThemeId;
     }
   } catch (e) {

@@ -27,7 +27,9 @@ const THEME_OPTIONS: { id: ThemeId; label: string; icon: keyof typeof Ionicons.g
   { id: 'spring', label: '春日樱花', icon: 'flower-outline' },
   { id: 'summer', label: '夏日海洋', icon: 'water-outline' },
   { id: 'winter', label: '冬日初雪', icon: 'snow-outline' },
-  { id: 'journal', label: '手账少女', icon: 'book-outline' },
+  // 手账少女主题暂时隐藏（功能/代码/资产全部保留）。恢复：取消下行注释，
+  // 并在 src/utils/themeStorage.ts 的白名单加回 'journal'。
+  // { id: 'journal', label: '手账少女', icon: 'book-outline' },
 ];
 
 interface MenuItem {
