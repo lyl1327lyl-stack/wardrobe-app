@@ -720,8 +720,8 @@ export function HomeScreen() {
         >
           <Image
             source={require('../../assets/wardrobe-illustration-handdrawn.jpg')}
-            style={StyleSheet.absoluteFillObject}
-            resizeMode="cover"
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
+            resizeMode="contain"
           />
           <LinearGradient
             colors={['rgba(0,0,0,0.50)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.34)']}
