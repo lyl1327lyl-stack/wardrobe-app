@@ -122,20 +122,19 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   statsCard: {
     marginHorizontal: CARD_H_PADDING,
     marginTop: 16,
-    backgroundColor: theme.colors.white,
+    height: 220,
     borderRadius: 16,
-    padding: 18,
+    overflow: 'hidden',
+    backgroundColor: theme.colors.card,
     shadowColor: theme.colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 3,
   },
-  statsHeroImage: {
-    width: '100%',
-    height: 150,
-    borderRadius: 12,
-    marginTop: 12,
+  statsOverlay: {
+    flex: 1,
+    padding: 16,
   },
   statsHeader: {
     flexDirection: 'row',
@@ -719,40 +718,46 @@ export function HomeScreen() {
           activeOpacity={0.7}
           onPress={() => navigation.navigate('Stats' as any)}
         >
-          <View style={styles.statsHeader}>
-            <View style={styles.statsHeaderLeft}>
-              <View style={styles.statsHeaderIcon}>
-                <Ionicons name="bar-chart-outline" size={14} color={theme.colors.primary} />
-              </View>
-              <Text style={styles.statsHeaderTitle}>衣橱概况</Text>
-            </View>
-            <Text style={styles.statsHeaderLink}>查看详情 ›</Text>
-          </View>
-
-          <View style={styles.insightsRow}>
-            <View style={styles.insightItem}>
-              <Text style={styles.insightValue}>¥{wardrobeInsights.totalPrice.toLocaleString()}</Text>
-              <Text style={styles.insightLabel}>总价</Text>
-            </View>
-            <View style={styles.insightItem}>
-              <Text style={styles.insightValue}>{totalCount}</Text>
-              <Text style={styles.insightLabel}>件数</Text>
-            </View>
-            <View style={styles.insightItem}>
-              <Text style={styles.insightValue}>{outfits.length}</Text>
-              <Text style={styles.insightLabel}>搭配数</Text>
-            </View>
-            <View style={styles.insightItem}>
-              <Text style={styles.insightValue}>¥{wardrobeInsights.costPerWear.toFixed(1)}</Text>
-              <Text style={styles.insightLabel}>单次价格</Text>
-            </View>
-          </View>
-
           <Image
             source={require('../../assets/wardrobe-illustration-handdrawn.jpg')}
-            style={styles.statsHeroImage}
+            style={StyleSheet.absoluteFillObject}
             resizeMode="cover"
           />
+          <LinearGradient
+            colors={['rgba(0,0,0,0.50)', 'rgba(0,0,0,0.08)', 'rgba(0,0,0,0.34)']}
+            locations={[0, 0.5, 1]}
+            style={StyleSheet.absoluteFillObject}
+          />
+          <View style={styles.statsOverlay}>
+            <View style={styles.statsHeader}>
+              <View style={styles.statsHeaderLeft}>
+                <View style={[styles.statsHeaderIcon, { backgroundColor: 'rgba(255,255,255,0.22)' }]}>
+                  <Ionicons name="bar-chart-outline" size={14} color="#fff" />
+                </View>
+                <Text style={[styles.statsHeaderTitle, { color: '#fff' }]}>衣橱概况</Text>
+              </View>
+              <Text style={[styles.statsHeaderLink, { color: 'rgba(255,255,255,0.9)' }]}>查看详情 ›</Text>
+            </View>
+
+            <View style={styles.insightsRow}>
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightValue, { color: '#fff' }]}>¥{wardrobeInsights.totalPrice.toLocaleString()}</Text>
+                <Text style={[styles.insightLabel, { color: 'rgba(255,255,255,0.85)' }]}>总价</Text>
+              </View>
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightValue, { color: '#fff' }]}>{totalCount}</Text>
+                <Text style={[styles.insightLabel, { color: 'rgba(255,255,255,0.85)' }]}>件数</Text>
+              </View>
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightValue, { color: '#fff' }]}>{outfits.length}</Text>
+                <Text style={[styles.insightLabel, { color: 'rgba(255,255,255,0.85)' }]}>搭配数</Text>
+              </View>
+              <View style={styles.insightItem}>
+                <Text style={[styles.insightValue, { color: '#fff' }]}>¥{wardrobeInsights.costPerWear.toFixed(1)}</Text>
+                <Text style={[styles.insightLabel, { color: 'rgba(255,255,255,0.85)' }]}>单次价格</Text>
+              </View>
+            </View>
+          </View>
         </TouchableOpacity>
 
         <DoodleDivider doodle="star" style={{ marginVertical: 4 }} />
