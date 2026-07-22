@@ -1,10 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, Animated } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -49,12 +49,50 @@ function TabIcon({ name, focused, theme }: { name: string; focused: boolean; the
     '个人中心': { focused: 'person', unfocused: 'person-outline' },
   };
   const iconName = focused ? icons[name].focused : icons[name].unfocused;
+  // 选中态：图标微放大 + 主题色
   return (
     <Ionicons
       name={iconName}
-      size={22}
+      size={focused ? 24 : 22}
       color={focused ? theme.colors.primary : theme.colors.textTertiary}
     />
+  );
+}
+
+// 主页 Tab：凸起的圆形中央按钮（与其他四个 tab 区分）
+function HomeTabIcon({ focused, theme }: { focused: boolean; theme: any }) {
+  const scale = useRef(new Animated.Value(focused ? 1.12 : 1)).current;
+  useEffect(() => {
+    Animated.spring(scale, {
+      toValue: focused ? 1.12 : 1,
+      useNativeDriver: true,
+      friction: 7,
+      tension: 100,
+    }).start();
+  }, [focused]);
+
+  return (
+    <Animated.View
+      style={{
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: theme.colors.primary,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: -20,
+        borderWidth: 4,
+        borderColor: theme.colors.card,
+        transform: [{ scale }],
+        shadowColor: theme.colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.45,
+        shadowRadius: 8,
+        elevation: 8,
+      }}
+    >
+      <Ionicons name="home" size={30} color="#fff" />
+    </Animated.View>
   );
 }
 
@@ -102,7 +140,12 @@ function MainTabs() {
     <Tab.Navigator
       initialRouteName="主页"
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused }) => <TabIcon name={route.name} focused={focused} theme={theme} />,
+        tabBarIcon: ({ focused }) =>
+          route.name === '主页'
+            ? <HomeTabIcon focused={focused} theme={theme} />
+            : <TabIcon name={route.name} focused={focused} theme={theme} />,
+        // 主页用凸起圆形按钮，不显示文字标签；其余 tab 正常显示
+        tabBarLabel: route.name === '主页' ? () => null : undefined,
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.textTertiary,
         tabBarStyle: {
@@ -110,8 +153,8 @@ function MainTabs() {
           borderTopWidth: 1,
           borderTopColor: theme.colors.border,
           paddingTop: 8,
-          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
-          height: 60 + (insets.bottom > 0 ? insets.bottom : 8),
+          // 凸起按钮需要更多顶部空间，避免圆形被裁切
+          height: 68 + (insets.bottom > 0 ? insets.bottom : 8),
         },
         tabBarLabelStyle: {
           fontSize: 11,

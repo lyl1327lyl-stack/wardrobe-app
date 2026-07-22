@@ -293,6 +293,8 @@ const makeStyles = (theme: Theme) => StyleSheet.create({
   todayHeroMoreText: { fontSize: 9, color: '#fff', fontWeight: '700' },
   todayHeroHint: { fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 8 },
   todayHeroRecordBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.25)',
     borderRadius: 14,
     paddingHorizontal: 18,
@@ -474,6 +476,7 @@ export function HomeScreen() {
   );
 
   const loadRecommendations = useCallback(async (wardrobeId: number | null) => {
+    try {
     const w = await getWeather();
     setWeather(w);
     setRecLoading(true);
@@ -512,6 +515,12 @@ export function HomeScreen() {
     setRecommendations(recs);
     setRecIndex(0);
     setRecLoading(false);
+    } catch (e: any) {
+      console.warn('[loadRecommendations] ERROR:', e?.message || e, '\n', e?.stack);
+      setRecommendations([]);
+      setRecLoading(false);
+      Alert.alert('推荐诊断', `loadRecommendations 出错:\n${e?.message || String(e)}\n\n请截图反馈`);
+    }
   }, []);
 
   const refreshTodayRecords = useCallback(async () => {
@@ -582,7 +591,11 @@ export function HomeScreen() {
       const s2 = useWardrobeStore.getState();
       lastSnapshotRef.current = { clothingCount: s2.clothing.length, outfitCount: s2.outfits.length };
       await refreshTodayRecords();
-      await loadRecommendations(scopeWardrobeId);
+      // 默认选中"我的衣橱"（找不到则回退到第一个衣橱），并用该范围生成首次推荐
+      const mine = s2.wardrobes.find((w: any) => w.name === '我的衣橱');
+      const defaultWardrobeId = mine ? mine.id : (s2.wardrobes[0]?.id ?? null);
+      setScopeWardrobeId(defaultWardrobeId);
+      await loadRecommendations(defaultWardrobeId);
     };
     init();
   }, []);
@@ -729,6 +742,13 @@ export function HomeScreen() {
             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
             resizeMode="stretch"
           />
+          {/* 主题色滤镜：让插图随主题变色，与整体风格更适配 */}
+          <View
+            style={[
+              StyleSheet.absoluteFillObject,
+              { backgroundColor: theme.colors.primary + '30' },
+            ]}
+          />
           <LinearGradient
             colors={['rgba(0,0,0,0.30)', 'rgba(0,0,0,0.0)', 'rgba(0,0,0,0.62)']}
             locations={[0, 0.42, 1]}
@@ -815,13 +835,22 @@ export function HomeScreen() {
               <Text style={styles.todayHeroHint}>今天还没记录，看看下方推荐 ›</Text>
             )}
           </View>
-          {todayItems.length === 0 && (
+          {todayItems.length === 0 ? (
             <TouchableOpacity
               style={styles.todayHeroRecordBtn}
               onPress={() => navigation.navigate('RecordWear')}
               activeOpacity={0.7}
             >
               <Text style={styles.todayHeroRecordBtnText}>记录</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.todayHeroRecordBtn}
+              onPress={() => navigation.navigate('RecordWear')}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="create-outline" size={16} color="#fff" style={{ marginRight: 4 }} />
+              <Text style={styles.todayHeroRecordBtnText}>编辑</Text>
             </TouchableOpacity>
           )}
           <WashiTape

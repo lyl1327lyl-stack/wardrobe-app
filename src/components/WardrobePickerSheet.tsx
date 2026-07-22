@@ -169,7 +169,7 @@ export function WardrobePickerSheet({
                   onPress={() => handleSelect(wardrobe.id)}
                 >
                   <View style={styles.optionIcon}>
-                    <Text style={styles.optionIconText}>{wardrobe.icon || '👔'}</Text>
+                    <Ionicons name={((Ionicons as any).glyphMap?.[wardrobe.icon as any] ? wardrobe.icon : 'shirt-outline') as any} size={20} color={theme.colors.primary} />
                   </View>
                   <Text style={[styles.optionText, isCurrent && styles.optionTextSelected]}>
                     {wardrobe.name}

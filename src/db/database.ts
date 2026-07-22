@@ -263,7 +263,7 @@ async function ensureDefaultWardrobe(db: SQLite.SQLiteDatabase): Promise<void> {
   if (!result || result.count === 0) {
     await db.runAsync(
       'INSERT INTO wardrobes (name, icon, isDefault, createdAt) VALUES (?, ?, ?, ?)',
-      ['我的衣橱', 'grid-outline', 1, localDateString()]
+      ['我的衣橱', 'shirt-outline', 1, localDateString()]
     );
   }
 }

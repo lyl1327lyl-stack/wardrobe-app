@@ -46,7 +46,7 @@ const COLOR_MAP: Record<string, string> = {
   '绿色': '#6B8B6B', '军绿色': '#5C6B4E', '墨绿色': '#3D5C3D', '薄荷绿': '#8BC4A8',
   '翠绿色': '#4CAF6E', '草绿色': '#8BAA4E',
   // 黄橙
-  '黄色': '#D4B896', '姜黄色': '#C9A040', '橙色': '#D48B4E', '金色': '#C8A040',
+  '黄色': '#D4B896', '鹅黄色': '#F8E58D', '柠檬黄': '#F6E934', '姜黄色': '#C9A040', '芥末黄': '#BDA046', '土黄色': '#9C7A1F', '橙色': '#D48B4E', '金色': '#C8A040',
   // 紫粉
   '紫色': '#8B7B9B', '薰衣草': '#A08CB8', '粉色': '#D4A0A0', '紫红色': '#9B4A7B',
   // 棕卡
@@ -71,13 +71,13 @@ const COLOR_FAMILIES: { name: string; colors: string[] }[] = [
   { name: '红色系', colors: ['红色', '酒红色', '砖红色', '粉红', '玫红色', '桃红色', '橘红色'] },
   { name: '蓝色系', colors: ['蓝色', '深蓝', '浅蓝', '藏青色', '天蓝色', '宝蓝色', '湖蓝色', '牛仔蓝', '靛蓝色', '水洗蓝'] },
   { name: '绿色系', colors: ['绿色', '军绿色', '墨绿色', '薄荷绿', '翠绿色', '草绿色'] },
-  { name: '黄橙系', colors: ['黄色', '姜黄色', '橙色', '金色'] },
+  { name: '黄橙系', colors: ['黄色', '鹅黄色', '柠檬黄', '姜黄色', '芥末黄', '土黄色', '橙色', '金色'] },
   { name: '紫粉系', colors: ['紫色', '薰衣草', '粉色', '紫红色'] },
   { name: '棕卡系', colors: ['棕色', '咖啡色', '卡其色', '驼色'] },
   { name: '其他', colors: ['青色', '香槟色', '银色', '其他'] },
 ];
 
-const LIGHT_COLORS = ['白色', '米白', '奶油色', '浅灰', '米色', '杏色', '香槟色', '银色', '天蓝色', '水洗蓝', '草绿色', '桃红色'];
+const LIGHT_COLORS = ['白色', '米白', '奶油色', '浅灰', '米色', '杏色', '香槟色', '银色', '天蓝色', '水洗蓝', '草绿色', '桃红色', '鹅黄色', '柠檬黄'];
 
 function formatDate(date: Date | null): string {
   if (!date || isNaN(date.getTime())) return '';
@@ -689,6 +689,8 @@ export function AddClothingScreen() {
   const headingFont = useHeadingFont();
   const getParents = useCustomOptionsStore(state => state.getParents);
   const getChildrenOf = useCustomOptionsStore(state => state.getChildrenOf);
+  // 订阅 categories 数据本身（非函数引用），才能在 CustomOptionsScreen 添加类型后触发重渲染
+  useCustomOptionsStore(state => state.categories);
   const customSeasons = useCustomOptionsStore(state => state.seasons);
   const customTags = useCustomOptionsStore(state => state.tags);
   const customSizes = useCustomOptionsStore(state => state.sizes);
@@ -903,6 +905,7 @@ export function AddClothingScreen() {
   }, [isEditing]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false); // 同步防护：阻止 performSave 并发执行
 
   // 初始状态快照，用于检测未保存更改
   const initialState = useRef({
@@ -1064,20 +1067,46 @@ export function AddClothingScreen() {
       if (seasons.length === 0) { Alert.alert('请至少选择一个季节'); return; }
     }
 
-    // 如果是编辑草稿并点击"创建"，先显示衣橱选择对话框
+    // 如果是编辑草稿并点击"创建"：只有一个衣橱时直接用，否则弹窗选择
     if (isEditingDraft && !asDraft) {
-      setShowWardrobeDialog(true);
+      if (wardrobes.length <= 1) {
+        await performSave(false, wardrobes[0]?.id ?? currentWardrobeId ?? 1);
+      } else {
+        setShowWardrobeDialog(true);
+      }
       return;
     }
 
     await performSave(asDraft, currentWardrobeId ?? 1);
   };
 
-  const performSave = async (asDraft: boolean, wardrobeId: number) => {
-    // 如果正在提交，不执行
-    if (isSubmitting) return;
+  // 安全返回：能返回就 goBack；栈异常（goBack 会退出 app 回桌面）则兜底重置到主页，并弹出栈状态用于诊断
+  const safeBack = useCallback(() => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const st = navigation.getState();
+    const routes = (st?.routes || []).map((r: any) => r.name);
+    Alert.alert('已保存（诊断信息）', `当前栈: ${JSON.stringify(routes)}\ncanGoBack=false，已自动返回主页。请截图反馈此内容。`);
+    let nav: any = navigation;
+    while (nav) {
+      const names = (nav.getState()?.routes || []).map((r: any) => r.name);
+      if (names.includes('Main')) {
+        nav.reset({ index: 0, routes: [{ name: 'Main' }] });
+        return;
+      }
+      nav = nav.getParent();
+    }
+    navigation.goBack();
+  }, [navigation]);
 
+  const performSave = async (asDraft: boolean, wardrobeId: number) => {
+    // 用 ref 做同步防护：杜绝并发执行（Android 上两次 goBack 会崩溃）
+    if (isSubmittingRef.current) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
+
     try {
       let processedUri = '';
       let thumbnailUri = '';
@@ -1109,7 +1138,6 @@ export function AddClothingScreen() {
       // 确保 imageUri 有效
       if (!processedUri || !thumbnailUri) {
         Alert.alert('图片保存失败', '请重试');
-        setIsSubmitting(false);
         return;
       }
 
@@ -1146,24 +1174,24 @@ export function AddClothingScreen() {
         // 编辑草稿并点击"创建"：先更新草稿，再发布
         await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);
         await publishDraft(existingItem!.id);
-        // 返回衣橱主页（重置栈避免导航混乱）
         navigation.popToTop();
         navigation.navigate('Main');
       } else if (isEditing && existingItem) {
         await updateClothing({ ...existingItem, ...clothingData } as ClothingItem);
-        navigation.goBack();
+        safeBack();
       } else if (asDraft) {
         await saveDraft({ ...clothingData, id: existingItem?.id } as any);
-        navigation.goBack();
+        safeBack();
       } else {
         await addClothing(clothingData as any);
-        navigation.goBack();
+        safeBack();
       }
     } catch (error) {
       console.error('Failed to save clothing:', error);
       Alert.alert('保存失败，请重试');
     } finally {
       setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   };
 
@@ -1368,7 +1396,7 @@ export function AddClothingScreen() {
                 </View>
               ) : (
                 <View style={styles.colorScrollRow}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.colorScrollFlex} contentContainerStyle={{ gap: 6, paddingRight: 4 }}>
+                  <View style={[styles.colorScrollFlex, { flexDirection: 'row', gap: 6 }]}>
                     {sortedColors.slice(0, collapsedCount).map(c => {
                       const isSelected = colors.includes(c);
                       const isLight = LIGHT_COLORS.includes(c);
@@ -1382,7 +1410,7 @@ export function AddClothingScreen() {
                         </TouchableOpacity>
                       );
                     })}
-                  </ScrollView>
+                  </View>
                   <TouchableOpacity onPress={() => setColorExpanded(true)} activeOpacity={0.7}>
                     <View style={[styles.colorExpandBtn, { borderRadius: 14, paddingHorizontal: 8, width: 44 }]}>
                       <Text style={styles.colorExpandBtnText}>展开</Text>

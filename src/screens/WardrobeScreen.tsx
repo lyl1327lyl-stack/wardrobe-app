@@ -41,6 +41,7 @@ const SORT_OPTIONS = [
   { key: 'wearCount' as const, label: '穿着次数', icon: 'stats-chart-outline' as const },
   { key: 'price' as const, label: '价格', icon: 'cash-outline' as const },
   { key: 'color' as const, label: '颜色', icon: 'color-palette-outline' as const },
+  { key: 'type' as const, label: '类型', icon: 'shapes-outline' as const },
 ];
 
 const SEASON_ICONS: Record<string, { name: keyof typeof Ionicons.glyphMap; color: string }> = {
@@ -1521,6 +1522,7 @@ export function WardrobeScreen() {
         currentWardrobeId={currentWardrobeId}
         onClose={() => setShowMoveSheet(false)}
         onSelect={handleMoveToWardrobe}
+        onCreateNew={() => navigation.navigate('WardrobeManagement')}
       />
     </ThemedScreen>
   );

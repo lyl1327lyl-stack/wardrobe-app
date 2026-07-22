@@ -505,7 +505,7 @@ export function StatsScreen() {
   // 颜色分布（受季节/类型细分影响）
   const colorDist = useMemo(() => {
     const m: Record<string, number> = {};
-    filteredClothing.forEach(c => { const k = (c.color || '').trim() || '未知'; m[k] = (m[k] || 0) + 1; });
+    filteredClothing.forEach(c => { const k = (c.color || '').split(',')[0]?.trim() || '未知'; m[k] = (m[k] || 0) + 1; });
     return Object.entries(m).map(([name, count]) => ({ name, count, hex: name === '未知' ? theme.colors.border : colorHexOf(name) }))
       .sort((a, b) => b.count - a.count);
   }, [filteredClothing, theme]);

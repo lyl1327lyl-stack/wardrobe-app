@@ -28,7 +28,9 @@ import { SellItemSheet } from '../components/SellItemSheet';
 import { EditDiscardReasonSheet } from '../components/EditDiscardReasonSheet';
 import { OutfitWarningModal } from '../components/OutfitWarningModal';
 import { WearHeatmap } from '../components/WearHeatmap';
+import MoveToWardrobeSheet from '../components/MoveToWardrobeSheet';
 import * as wearRecordsDb from '../db/wearRecords';
+import { moveClothingToWardrobe } from '../db/clothing';
 
 type DetailSource = 'wardrobe' | 'trash' | 'sold' | 'draft';
 type RouteParams = { ClothingDetail: { id: number; source?: DetailSource } };
@@ -546,6 +548,7 @@ export function ClothingDetailScreen() {
 
   const [showDiscardSheet, setShowDiscardSheet] = useState(false);
   const [showSellSheet, setShowSellSheet] = useState(false);
+  const [showMoveSheet, setShowMoveSheet] = useState(false);
   const [showEditReason, setShowEditReason] = useState(false);
   const [showImageViewer, setShowImageViewer] = useState(false);
   const [savingImage, setSavingImage] = useState(false);
@@ -655,6 +658,12 @@ export function ClothingDetailScreen() {
 
   const handleTrash = () => {
     setShowDiscardSheet(true);
+  };
+
+  const handleMove = async (targetWardrobeId: number) => {
+    if (!item) return;
+    await moveClothingToWardrobe(item.id, targetWardrobeId);
+    await useWardrobeStore.getState().loadData();
   };
 
   const handleSell = () => {
@@ -1119,12 +1128,24 @@ export function ClothingDetailScreen() {
                 <Ionicons name="card-outline" size={18} color={theme.colors.success} />
                 <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextSuccess]}>卖出</Text>
               </TouchableOpacity>
+              <TouchableOpacity style={[styles.mgmtBtn, styles.mgmtBtnPublish]} onPress={() => setShowMoveSheet(true)} activeOpacity={0.8}>
+                <Ionicons name="swap-horizontal-outline" size={18} color={theme.colors.primary} />
+                <Text style={[styles.mgmtBtnText, styles.mgmtBtnTextPrimary]}>移动</Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
 
         <View style={styles.bottomPadding} />
       </ScrollView>
+
+      <MoveToWardrobeSheet
+        visible={showMoveSheet}
+        currentWardrobeId={item?.wardrobeId ?? 0}
+        onClose={() => setShowMoveSheet(false)}
+        onSelect={handleMove}
+        onCreateNew={() => navigation.navigate('WardrobeManagement')}
+      />
 
       <DiscardReasonSheet
         visible={showDiscardSheet}

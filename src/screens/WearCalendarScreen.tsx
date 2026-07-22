@@ -517,7 +517,7 @@ export function WearCalendarScreen() {
                 <Text style={styles.statsTopLabel}>最常穿 Top {monthStats.topItems.length}</Text>
                 <View style={styles.topItemRow}>
                   {monthStats.topItems.map(({ item, count }) => (
-                    <View key={item!.id} style={styles.topItem}>
+                    <TouchableOpacity key={item!.id} style={styles.topItem} onPress={() => navigation.navigate('ClothingDetail' as any, { id: item!.id })} activeOpacity={0.7}>
                       {(item!.thumbnailUri || item!.imageUri) ? (
                         <Image
                           source={{ uri: item!.thumbnailUri || item!.imageUri }}
@@ -531,7 +531,7 @@ export function WearCalendarScreen() {
                       )}
                       <Text style={styles.topItemName} numberOfLines={1}>{item!.type || item!.remarks || '--'}</Text>
                       <Text style={styles.topItemCount}>{count} 次</Text>
-                    </View>
+                    </TouchableOpacity>
                   ))}
                 </View>
               </>

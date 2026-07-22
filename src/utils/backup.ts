@@ -6,8 +6,10 @@ import { getDatabase } from '../db/database';
 import { useWardrobeStore } from '../store/wardrobeStore';
 import { useCustomOptionsStore } from '../store/customOptionsStore';
 import { OPTIONS_STORAGE_KEY } from './customOptions';
+import { ensureImageDir } from './imageUtils';
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
+const IMAGE_DIR = `${FileSystem.documentDirectory}images/`;
 
 // 衣物已知列（导入时与实际表列取交集，容错 schema 差异）
 const KNOWN_CLOTHING_COLUMNS = [
@@ -19,13 +21,38 @@ const KNOWN_CLOTHING_COLUMNS = [
 // JSON 文本列：原样写回（已是字符串）
 const JSON_TEXT_COLUMNS = ['seasons', 'styles', 'cropState'];
 
-/** 收集全量数据（衣物含 废衣篓/已卖出/草稿 + 穿着记录 + 搭配/分组/衣柜 + 自定义选项） */
+/** 收集全量数据（衣物含 废衣篓/已卖出/草稿 + 穿着记录 + 搭配/分组/衣柜 + 自定义选项 + 图片） */
 export async function buildBackup(): Promise<any> {
   const db = await getDatabase();
   const clothing = await db.getAllAsync('SELECT * FROM clothing_items');
   const wearRecords = await db.getAllAsync('SELECT * FROM wear_records');
   const s = useWardrobeStore.getState();
   const optionsRaw = await AsyncStorage.getItem(OPTIONS_STORAGE_KEY);
+
+  // 收集所有唯一图片路径（imageUri + thumbnailUri，跳过 originalImageUri 以控制体积）
+  const imagePaths = new Set<string>();
+  for (const item of clothing as any[]) {
+    if (item.imageUri) imagePaths.add(item.imageUri);
+    if (item.thumbnailUri) imagePaths.add(item.thumbnailUri);
+  }
+
+  // 读取图片文件并转为 base64
+  const images: Record<string, string> = {};
+  for (const path of imagePaths) {
+    try {
+      const info = await FileSystem.getInfoAsync(path);
+      if (info.exists) {
+        const base64 = await FileSystem.readAsStringAsync(path, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        images[path] = base64;
+      }
+    } catch (e) {
+      // 文件无法读取则跳过（导出不中断）
+      console.warn('[backup] Failed to read image:', path, e);
+    }
+  }
+
   return {
     version: BACKUP_VERSION,
     createdAt: new Date().toISOString(),
@@ -35,6 +62,7 @@ export async function buildBackup(): Promise<any> {
     groups: s.groups,
     wardrobes: s.wardrobes,
     options: optionsRaw ? JSON.parse(optionsRaw) : null,
+    images,
   };
 }
 
@@ -61,7 +89,7 @@ export async function pickBackupFile(): Promise<any | null> {
 
 /** 还原：清空后按备份写回（保留原 id，保证搭配/穿着记录引用有效） */
 export async function restoreBackup(data: any): Promise<void> {
-  if (!data || data.version !== BACKUP_VERSION) {
+  if (!data || data.version < 1 || data.version > BACKUP_VERSION) {
     throw new Error('备份文件版本不兼容');
   }
   const db = await getDatabase();
@@ -70,6 +98,25 @@ export async function restoreBackup(data: any): Promise<void> {
   await db.runAsync('DELETE FROM clothing_items');
   await db.runAsync('DELETE FROM wear_records');
 
+  // 还原图片：将 base64 写回新设备的 images 目录，建立 oldPath → newPath 映射
+  const pathMap: Record<string, string> = {};
+  if (data.images) {
+    await ensureImageDir();
+    for (const [oldPath, base64] of Object.entries(data.images as Record<string, string>)) {
+      try {
+        // 从旧路径提取文件名（保留唯一性）
+        const filename = oldPath.split(/[\\/]/).pop() || oldPath;
+        const newPath = IMAGE_DIR + filename;
+        await FileSystem.writeAsStringAsync(newPath, base64, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        pathMap[oldPath] = newPath;
+      } catch (e) {
+        console.warn('[backup] Failed to restore image:', oldPath, e);
+      }
+    }
+  }
+
   // 取实际表列交集
   const infoCols = await db.getAllAsync<{ name: string }>('PRAGMA table_info(clothing_items)');
   const tableCols = infoCols.map(c => c.name);
@@ -77,8 +124,12 @@ export async function restoreBackup(data: any): Promise<void> {
   const colList = useCols.join(',');
   const placeholders = useCols.map(() => '?').join(',');
 
-  // 写回衣物（保留原 id）
+  // 写回衣物（保留原 id），同时将图片路径映射为新设备路径
   for (const c of data.clothing || []) {
+    // 替换图片路径
+    if (c.imageUri && pathMap[c.imageUri]) c.imageUri = pathMap[c.imageUri];
+    if (c.thumbnailUri && pathMap[c.thumbnailUri]) c.thumbnailUri = pathMap[c.thumbnailUri];
+
     const values = useCols.map(col => {
       const v = c[col];
       if (v == null) return null;

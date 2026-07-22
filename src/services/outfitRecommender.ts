@@ -250,7 +250,14 @@ function filterByWeather(items: ClothingItem[], weather: Weather | null): Clothi
   const excludedBySeason = items.filter(item => !item.seasons.includes(season));
   console.log(`[filterByWeather] extreme temp — seasonFiltered: ${seasonFiltered.length} excluded:`, excludedBySeason.slice(0, 10).map(i => `#${i.id} ${i.type}(${i.seasons.join('/')})`));
 
-  const pool = seasonFiltered.length >= 5 ? seasonFiltered : items;
+  // 小衣橱回退策略: 季节匹配项太少时补充跨季通用品类，避免全量回退到所有衣服导致夏天推荐冬天衣物
+  const crossSeasonItems = items.filter(i => {
+    const ep = effectiveParent(i);
+    return ['上装', '下装', '鞋', '配饰', '包包'].includes(ep);
+  });
+  const pool = seasonFiltered.length >= 5
+    ? seasonFiltered
+    : [...new Map([...seasonFiltered, ...crossSeasonItems].map(i => [i.id, i])).values()];
 
   const result = pool.filter(item => {
     const ep = effectiveParent(item);
@@ -258,7 +265,7 @@ function filterByWeather(items: ClothingItem[], weather: Weather | null): Clothi
     if (t > 28 && item.thickness === '厚款' && ep === '外套') return false;
     return true;
   });
-  console.log(`[filterByWeather] extreme temp — final pool: ${result.length}`);
+  console.log(`[filterByWeather] extreme temp — seasonFiltered:${seasonFiltered.length} crossSeason:${crossSeasonItems.length} → pool:${pool.length} result:${result.length}`);
   return result;
 }
 
@@ -951,8 +958,9 @@ export function generateRecommendations(
   // Step 1: 天气过滤
   const filtered = filterByWeather(clothing, weather);
   if (filtered.length < 3) {
-    // 过滤后太少，回退到全部
-    return generateRecommendationsFallback(clothing, weather);
+    // 过滤后太少（衣橱太小或季节不匹配），不勉强推荐，返回空让 UI 展示提示
+    console.log('[generateRecommendations] filtered < 3 — wardrobe too small or season mismatch, returning empty');
+    return [];
   }
 
   // 准备数据（模块级缓存，outfits 不变时复用）
@@ -993,9 +1001,10 @@ export function generateRecommendations(
     options?.accessoryUsage ?? 'sometimes',
   );
 
-  // 候选太少则回退到简单生成
+  // 候选太少，不勉强用无季节过滤的回退方案
   if (candidates.length === 0) {
-    return generateRecommendationsFallback(clothing, weather);
+    console.log('[generateRecommendations] candidates=0 — returning empty');
+    return [];
   }
 
   // 黑名单过滤：排除用户标记为不喜欢的组合
@@ -1028,7 +1037,15 @@ export function generateRecommendations(
     if (diverse.length >= topN * 3) break; // 取足够多再截断
   }
 
-  const best = diverse.slice(0, topN);
+  // 质量门槛：评分过低的推荐不展示（小衣橱/季节不匹配时自然过滤）
+  const MIN_SCORE = 0.15;
+  const qualified = diverse.filter(s => s.totalScore >= MIN_SCORE);
+  const best = qualified.slice(0, topN);
+
+  if (best.length === 0 && diverse.length > 0) {
+    console.log('[generateRecommendations] all scored below threshold — returning empty');
+    return [];
+  }
 
   console.log(`[generateRecommendations] candidates=${candidates.length} scored=${scored.length} diverse=${diverse.length} top=${best.length}`);
   best.forEach((s, i) => {
@@ -1060,12 +1077,33 @@ function generateRecommendationsFallback(
   clothing: ClothingItem[],
   weather: Weather | null,
 ): OutfitRecommendation[] {
-  const tops = clothing.filter(i => effectiveParent(i) === '上装');
-  const bottoms = clothing.filter(i => effectiveParent(i) === '下装');
-  const shoes = clothing.filter(i => effectiveParent(i) === '鞋');
-  const dresses = clothing.filter(i => effectiveParent(i) === '连衣裙');
-  const outers = clothing.filter(i => effectiveParent(i) === '外套');
-  const accessories = clothing.filter(i => effectiveParent(i) === '配饰' || effectiveParent(i) === '包包');
+  // 至少做基本季节过滤：排除与当前天气完全不匹配的单品
+  let pool = clothing;
+  if (weather && clothing.length > 0) {
+    const season = getSeasonFromTemp(weather.temperature);
+    const t = weather.temperature;
+    pool = clothing.filter(item => {
+      if (t < 10 && item.thickness === '薄款') {
+        const ep = effectiveParent(item);
+        if (['下装', '连衣裙'].includes(ep)) return false;
+      }
+      if (t > 28 && (item.thickness === '厚款' || item.thickness === '加厚')) {
+        const ep = effectiveParent(item);
+        if (ep === '外套') return false;
+      }
+      return item.seasons.includes(season) || ['上装', '下装', '鞋', '配饰', '包包'].includes(effectiveParent(item));
+    });
+    if (pool.length < clothing.length) {
+      console.log('[fallback] season filtered: ' + pool.length + '/' + clothing.length + ' (season=' + season + ' temp=' + t + ')');
+    }
+  }
+
+  const tops = pool.filter(i => effectiveParent(i) === '上装');
+  const bottoms = pool.filter(i => effectiveParent(i) === '下装');
+  const shoes = pool.filter(i => effectiveParent(i) === '鞋');
+  const dresses = pool.filter(i => effectiveParent(i) === '连衣裙');
+  const outers = pool.filter(i => effectiveParent(i) === '外套');
+  const accessories = pool.filter(i => effectiveParent(i) === '配饰' || effectiveParent(i) === '包包');
   const hasShoes = shoes.length > 0;
 
   const results: OutfitRecommendation[] = [];
@@ -1073,7 +1111,7 @@ function generateRecommendationsFallback(
 
   // 按不同的 effectiveParent 分组所有衣服
   const allByCategory = new Map<string, ClothingItem[]>();
-  for (const item of clothing) {
+  for (const item of pool) {
     const cat = effectiveParent(item);
     if (!allByCategory.has(cat)) allByCategory.set(cat, []);
     allByCategory.get(cat)!.push(item);
@@ -1117,9 +1155,9 @@ function generateRecommendationsFallback(
   }
 
   // 最后手段：无法构成任何搭配时，至少展示已有单品
-  if (results.length === 0 && clothing.length > 0) {
+  if (results.length === 0 && pool.length > 0) {
     return [{
-      items: clothing.slice(0, Math.min(3, clothing.length)),
+      items: pool.slice(0, Math.min(3, pool.length)),
       scene,
       reason: '快去添加更多单品完善搭配吧',
       score: 50,
