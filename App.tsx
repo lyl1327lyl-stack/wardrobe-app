@@ -4,7 +4,7 @@ import { NavigationContainer, Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Text, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, TouchableOpacity, Animated, Alert } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFonts } from 'expo-font';
@@ -33,8 +33,20 @@ import { WearCalendarScreen } from './src/screens/WearCalendarScreen';
 import { RecordWearScreen } from './src/screens/RecordWearScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ThemeProvider } from './src/context/ThemeContext';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
 import { useTheme } from './src/hooks/useTheme';
 import { useWardrobeStore } from './src/store/wardrobeStore';
+
+// 诊断：捕获未处理的 JS 异常（含 fatal），避免 release 直接退出，改为弹窗显示供定位
+const __g: any = global;
+if (__g?.ErrorUtils?.setGlobalHandler) {
+  __g.ErrorUtils.setGlobalHandler((e: any, isFatal?: boolean) => {
+    console.warn('[GlobalExceptionHandler]', isFatal, e?.message, (e as any)?.stack);
+    try {
+      Alert.alert('诊断-全局异常', `${isFatal ? 'FATAL ' : ''}${e?.message || String(e)}\n\n请截图反馈此内容`);
+    } catch {}
+  });
+}
 
 const RootStack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -408,11 +420,13 @@ function AppNavigator() {
 export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <ThemeProvider>
-        <WearCountFixer>
-          <AppNavigator />
-        </WearCountFixer>
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <WearCountFixer>
+            <AppNavigator />
+          </WearCountFixer>
+        </ThemeProvider>
+      </ErrorBoundary>
     </GestureHandlerRootView>
   );
 }

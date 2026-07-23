@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system/legacy';
+import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -29,23 +30,43 @@ export async function buildBackup(): Promise<any> {
   const s = useWardrobeStore.getState();
   const optionsRaw = await AsyncStorage.getItem(OPTIONS_STORAGE_KEY);
 
-  // 收集所有唯一图片路径（imageUri + thumbnailUri，跳过 originalImageUri 以控制体积）
+  // 收集所有唯一图片路径（衣物主图/缩略图/原图 + 搭配缩略图；去重以控制体积）
   const imagePaths = new Set<string>();
   for (const item of clothing as any[]) {
     if (item.imageUri) imagePaths.add(item.imageUri);
     if (item.thumbnailUri) imagePaths.add(item.thumbnailUri);
+    if (item.originalImageUri) imagePaths.add(item.originalImageUri);
+  }
+  for (const o of (s.outfits || [])) {
+    if (o.thumbnailUri) imagePaths.add(o.thumbnailUri);
   }
 
-  // 读取图片文件并转为 base64
+  // 读取图片文件并转为 base64；大图先压缩避免内存溢出（OOM）
   const images: Record<string, string> = {};
   for (const path of imagePaths) {
     try {
       const info = await FileSystem.getInfoAsync(path);
-      if (info.exists) {
-        const base64 = await FileSystem.readAsStringAsync(path, {
+      if (!info.exists) continue;
+      const size = (info as any).size || 0;
+      if (size > 1_000_000) {
+        // 大图压缩：resize 到 1280px。PNG 保留透明(format PNG)，JPEG 压缩 0.85
+        const isPng = path.toLowerCase().endsWith('.png');
+        const manip = await manipulateAsync(
+          path,
+          [{ resize: { width: 1280 } }],
+          isPng ? { compress: 1, format: SaveFormat.PNG } : { compress: 0.85, format: SaveFormat.JPEG }
+        );
+        try {
+          images[path] = await FileSystem.readAsStringAsync(manip.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+        } finally {
+          FileSystem.deleteAsync(manip.uri, { idempotent: true }).catch(() => {});
+        }
+      } else {
+        images[path] = await FileSystem.readAsStringAsync(path, {
           encoding: FileSystem.EncodingType.Base64,
         });
-        images[path] = base64;
       }
     } catch (e) {
       // 文件无法读取则跳过（导出不中断）
@@ -97,6 +118,8 @@ export async function restoreBackup(data: any): Promise<void> {
   // 清空现有数据
   await db.runAsync('DELETE FROM clothing_items');
   await db.runAsync('DELETE FROM wear_records');
+  await db.runAsync('DELETE FROM outfits');
+  await db.runAsync('DELETE FROM outfit_groups');
 
   // 还原图片：将 base64 写回新设备的 images 目录，建立 oldPath → newPath 映射
   const pathMap: Record<string, string> = {};
@@ -126,9 +149,10 @@ export async function restoreBackup(data: any): Promise<void> {
 
   // 写回衣物（保留原 id），同时将图片路径映射为新设备路径
   for (const c of data.clothing || []) {
-    // 替换图片路径
+    // 替换图片路径（主图/缩略图/原图）
     if (c.imageUri && pathMap[c.imageUri]) c.imageUri = pathMap[c.imageUri];
     if (c.thumbnailUri && pathMap[c.thumbnailUri]) c.thumbnailUri = pathMap[c.thumbnailUri];
+    if (c.originalImageUri && pathMap[c.originalImageUri]) c.originalImageUri = pathMap[c.originalImageUri];
 
     const values = useCols.map(col => {
       const v = c[col];
@@ -149,6 +173,7 @@ export async function restoreBackup(data: any): Promise<void> {
   const wrColList = wrUseCols.join(',');
   const wrPlaceholders = wrUseCols.map(() => '?').join(',');
   for (const r of data.wearRecords || []) {
+    if (r.clothingThumbnailUri && pathMap[r.clothingThumbnailUri]) r.clothingThumbnailUri = pathMap[r.clothingThumbnailUri];
     const values = wrUseCols.map(col => (r as any)[col] ?? (col === 'clothingThumbnailUri' || col === 'clothingType' ? '' : null));
     await db.runAsync(`INSERT INTO wear_records (${wrColList}) VALUES (${wrPlaceholders})`, values);
   }
@@ -157,6 +182,38 @@ export async function restoreBackup(data: any): Promise<void> {
   if (data.options) {
     await AsyncStorage.setItem(OPTIONS_STORAGE_KEY, JSON.stringify(data.options));
     await useCustomOptionsStore.getState().load();
+  }
+
+  // 写回搭配（保留原 id；store 中已是解析后的对象，JSON 字段需重新 stringify）
+  for (const o of data.outfits || []) {
+    // 替换搭配缩略图路径
+    if (o.thumbnailUri && pathMap[o.thumbnailUri]) o.thumbnailUri = pathMap[o.thumbnailUri];
+    await db.runAsync(
+      'INSERT INTO outfits (id, name, itemIds, itemPositions, canvasData, canvasBackground, style, groupId, thumbnailUri, notes, seasons, styles, createdAt) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [
+        o.id,
+        o.name || '',
+        JSON.stringify(o.itemIds || []),
+        '{}',
+        o.canvasData ? JSON.stringify(o.canvasData) : '{}',
+        o.canvasBackground ? JSON.stringify(o.canvasBackground) : '{}',
+        o.style || '',
+        o.groupId || 0,
+        o.thumbnailUri || '',
+        o.notes || '',
+        JSON.stringify(o.seasons || []),
+        JSON.stringify(o.tags || []),
+        o.createdAt || new Date().toISOString(),
+      ]
+    );
+  }
+
+  // 写回分组（保留原 id）
+  for (const g of data.groups || []) {
+    await db.runAsync(
+      'INSERT INTO outfit_groups (id, name, description, sortOrder, createdAt) VALUES (?,?,?,?,?)',
+      [g.id, g.name || '', g.description || '', g.sortOrder || 0, g.createdAt || new Date().toISOString()]
+    );
   }
 
   // 还原 store：搭配/分组/衣柜
